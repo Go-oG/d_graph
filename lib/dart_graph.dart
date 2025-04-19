@@ -1,4 +1,6 @@
 library;
+export 'package:d_util/d_util.dart';
+export 'package:collection/collection.dart';
 
 export 'src/geomtry/arc.dart';
 export 'src/geomtry/line.dart';
@@ -33,3 +35,5 @@ export 'src/index/kd_tree.dart';
 export 'src/index/quad_tree.dart';
 export 'src/index/r_tree.dart';
 export 'src/index/tree.dart';
+
+

@@ -1,7 +1,6 @@
 import 'dart:math' as m;
 import 'dart:ui';
-
-import 'package:d_graph/src/geomtry/line.dart';
+import 'package:dart_graph/src/geomtry/line.dart';
 
 import 'polygon.dart';
 

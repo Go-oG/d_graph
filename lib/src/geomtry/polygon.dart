@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'dart:math' as m;
-import 'package:d_graph/src/geomtry/rect_ext.dart';
+import 'package:dart_graph/src/geomtry/rect_ext.dart';
 import 'package:d_util/d_util.dart';
 import 'package:flutter/foundation.dart';
 

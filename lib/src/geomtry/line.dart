@@ -1,8 +1,8 @@
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:d_graph/src/geomtry/offset_ext.dart';
-import 'package:d_graph/src/geomtry/polygon.dart';
+import 'package:dart_graph/src/geomtry/offset_ext.dart';
+import 'package:dart_graph/src/geomtry/polygon.dart';
 
 class Line {
   final LineType type;

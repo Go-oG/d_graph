@@ -1,8 +1,8 @@
 import 'dart:ui';
 import 'dart:math' as m;
 
-import 'package:d_graph/src/geomtry/offset_ext.dart';
-import 'package:d_graph/src/geomtry/path_ext.dart';
+import 'package:dart_graph/src/geomtry/offset_ext.dart';
+import 'package:dart_graph/src/geomtry/path_ext.dart';
 
 class Arc {
   static const angleUnit = m.pi / 180;
