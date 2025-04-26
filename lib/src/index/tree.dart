@@ -220,7 +220,11 @@ class Tree<T> {
   }
 
   TreeNode<T>? find(TreeEachFun<T> where) {
-    return IterableExt(findWhere(where)).firstOrNull;
+    var list=findWhere(where);
+    if(list.isEmpty){
+      return null;
+    }
+    return list.first;
   }
 
   List<TreeNode<T>> findWhere(TreeEachFun<T> where) {
@@ -531,11 +535,11 @@ class TreeNode<T> {
 
   ///在子节点中查找对应节点
   TreeNode<T>? findInChildren(TreeEachFun<T> where) {
-    return IterableExt(findWhere(where, iterator: false, limit: 1)).firstOrNull;
+    return findWhere(where, iterator: false, limit: 1).firstOrNull;
   }
 
   TreeNode<T>? find(TreeEachFun<T> where) {
-    return IterableExt(findWhere(where, iterator: true)).firstOrNull;
+    return findWhere(where, iterator: true).firstOrNull;
   }
 
   List<TreeNode<T>> findWhere(TreeEachFun<T> where, {bool iterator = true, int limit = -1}) {

@@ -200,7 +200,7 @@ class BinaryHeapArray<T> implements BinaryHeap<T> {
     int growSize = size + (size << 1);
     Array<T> old = _array.copy();
     _array = Array(growSize);
-    _array.addAll(old);
+    _array.setAll(0,old);
   }
 
   void _shrink() {

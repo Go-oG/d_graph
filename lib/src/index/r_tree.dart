@@ -679,7 +679,7 @@ class RTree<T> {
       left = stack.removeLast();
       if (right - left <= n) continue;
       int mid = left + ((right - left) / n / 2).ceil() * n;
-      fastSelect(arr, mid, left, right, compare);
+      FastSelect.fastSelect(arr, mid, left, right, compare);
       stack.addAll([left, mid, mid, right]);
     }
   }
