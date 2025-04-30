@@ -1,11 +1,9 @@
-
 import 'package:d_util/d_util.dart';
 import 'package:flutter/foundation.dart';
 
 enum GraphType { directed, undirected }
 
 class Graph<T> {
-  final Map<dynamic, dynamic> extraMap = {};
   final List<Vertex<T>> _allVertices = [];
   final List<T> _nodes = [];
   final List<Edge<T>> _allEdges = [];
@@ -119,7 +117,6 @@ class Graph<T> {
 }
 
 class Vertex<T> implements Comparable<Vertex<T>> {
-  final Map<dynamic, dynamic> extraMap = {};
   late T data;
   double weight = 0;
   List<Edge<T>> edges = [];
@@ -218,8 +215,6 @@ class Vertex<T> implements Comparable<Vertex<T>> {
 }
 
 class Edge<T> implements Comparable<Edge<T>> {
-  final Map<dynamic, dynamic> extraMap = {};
-
   late final String id;
   late Vertex<T> from;
   late Vertex<T> to;
