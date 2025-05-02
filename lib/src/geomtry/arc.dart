@@ -104,30 +104,6 @@ class Arc {
     return Rect.fromCircle(center: center, radius: outRadius.toDouble());
   }
 
-  Arc lerpTo(covariant Arc e, double t) {
-    if (this == e) {
-      return e;
-    }
-    Arc s = this;
-    var innerRadius = lerpDouble(s.innerRadius, e.innerRadius, t)!;
-    var outerRadius = lerpDouble(s.outRadius, e.outRadius, t)!;
-    var startAngle = lerpDouble(s.startAngle, e.startAngle, t)!;
-    var sweepAngle = lerpDouble(s.sweepAngle, e.sweepAngle, t)!;
-    num corner = lerpDouble(s.cornerRadius, e.cornerRadius, t)!;
-    num padAngle = lerpDouble(s.padAngle, e.padAngle, t)!;
-    var center = s.center == e.center ? s.center : Offset.lerp(s.center, e.center, t)!;
-    return Arc(
-      center: center,
-      cornerRadius: corner.toDouble(),
-      innerRadius: innerRadius,
-      outRadius: outerRadius,
-      startAngle: startAngle,
-      sweepAngle: sweepAngle,
-      padAngle: padAngle.toDouble(),
-      maxRadius: e.maxRadius,
-    );
-  }
-
   Path arcOpen() {
     double r = m.max(innerRadius, outRadius).toDouble();
     if (sweepAngle.abs() >= circleMinAngle) {
