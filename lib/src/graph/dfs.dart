@@ -1,7 +1,6 @@
 
-import 'package:d_util/d_util.dart';
+import 'package:dart_graph/dart_graph.dart';
 
-import 'graph.dart';
 
 extension DFSG<T> on Graph<T> {
   List<Vertex<T>> dfs(Vertex<T> source) {

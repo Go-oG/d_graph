@@ -1,6 +1,6 @@
 
-import 'package:d_util/d_util.dart';
 
+import '../math.dart';
 import 'graph.dart';
 
 ///路径查找

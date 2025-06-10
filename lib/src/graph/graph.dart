@@ -1,5 +1,7 @@
-import 'package:d_util/d_util.dart';
+
 import 'package:flutter/foundation.dart';
+
+import '../random_id.dart';
 
 enum GraphType { directed, undirected }
 

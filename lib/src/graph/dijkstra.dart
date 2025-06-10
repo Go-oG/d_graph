@@ -1,7 +1,6 @@
 import 'package:collection/collection.dart';
-import 'package:d_util/d_util.dart';
 
-import 'graph.dart';
+import '../../dart_graph.dart';
 
 extension Dijkstra<T> on Graph<T> {
   Map<Vertex<T>, CostPath<T>> getShortestPathsByDijkstra(Vertex<T> start) {

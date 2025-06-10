@@ -1,6 +1,6 @@
 import 'package:collection/collection.dart';
-import 'package:d_util/d_util.dart';
 
+import '../map_ext.dart';
 import 'graph.dart';
 
 /// Kruskal 的最小生成树。仅适用于无向图。它找到一个

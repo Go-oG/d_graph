@@ -1,8 +1,9 @@
 import 'dart:collection';
 import 'dart:core';
 import 'dart:math';
-
-import 'package:d_util/d_util.dart';
+import '../array.dart';
+import '../math.dart';
+import '../types.dart';
 
 interface class BinaryHeap<T> {
   List<T> getHeap() {
@@ -200,7 +201,7 @@ class BinaryHeapArray<T> implements BinaryHeap<T> {
     int growSize = size + (size << 1);
     Array<T> old = _array.copy();
     _array = Array(growSize);
-    _array.setAll(0,old);
+    _array.setAll(0, old);
   }
 
   void _shrink() {

@@ -1,7 +1,8 @@
 import 'dart:math';
 
-import 'package:d_util/d_util.dart';
 import 'package:quiver/collection.dart';
+import '../model.dart';
+import '../types.dart';
 
 class Tree<T> {
   TreeNode<T>? _root;
@@ -17,7 +18,7 @@ class Tree<T> {
   TreeNode<T> add(T? parent, T value) {
     TreeNode<T>? parentNode;
     if (parent != null) {
-      parentNode = _nodeMap.get2(parent, () => TreeNode(null, parent));
+      parentNode = _nodeMap.putIfAbsent(parent, () => TreeNode(null, parent));
     }
 
     final node = TreeNode(parentNode, value);

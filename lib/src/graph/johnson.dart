@@ -1,9 +1,8 @@
 
-import 'package:d_util/d_util.dart';
-
 import 'bellman_ford.dart';
 import 'dijkstra.dart';
 import 'graph.dart';
+import '../map_ext.dart';
 
 /// Johnson 算法是一种查找所有稀疏有向图中的顶点。
 /// 它允许一些边权重为负数，但不存在负权重循环.

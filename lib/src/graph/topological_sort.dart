@@ -1,5 +1,5 @@
 
-import 'package:d_util/d_util.dart';
+import 'package:dart_graph/src/list_ext.dart';
 
 import 'graph.dart';
 

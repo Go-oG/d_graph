@@ -1,7 +1,6 @@
 
-import 'package:d_util/d_util.dart';
+import 'package:dart_graph/dart_graph.dart';
 
-import 'graph.dart';
 
 /// 在图论中，无向图的连通分量（或只是分量）是一个子图，其中任意两个顶点都连接到每个
 /// other by path 的 PATHS，并且它不连接到超图中的其他顶点。没有入射边的顶点本身就是 connected

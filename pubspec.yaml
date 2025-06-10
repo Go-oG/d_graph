@@ -1,6 +1,6 @@
 name: dart_graph
 description: "A geomtry util library"
-version: 1.0.4
+version: 1.0.5
 homepage: https://github.com/Go-oG/d_graph
 
 
@@ -11,9 +11,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  d_util: ^1.0.5
   quiver: ^3.2.2
   collection: ^1.19.1
+  uuid: ^4.5.1
 
 dev_dependencies:
   flutter_test:

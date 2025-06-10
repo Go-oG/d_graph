@@ -2,7 +2,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
 
-import 'package:d_util/d_util.dart';
+import '../types.dart';
 
 ///四叉树
 class QuadTree<T> {

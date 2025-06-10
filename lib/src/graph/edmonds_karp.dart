@@ -1,7 +1,7 @@
 import 'dart:collection';
 import 'dart:math';
 
-import 'package:d_util/d_util.dart';
+import '../../dart_graph.dart';
 
 
 /// Edmonds-Karp 算法是 Ford-Fulkerson 方法的一种实现，用于
