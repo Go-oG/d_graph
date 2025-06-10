@@ -6,7 +6,7 @@ import 'graph.dart';
 /// 边的子集，该子集形成一个包含每个顶点的树，其中
 /// 树中所有边的总重量最小化。
 extension Prim<T> on Graph<T> {
-  CostPath<T> getMinimumSpanningTree(Vertex<T> start) {
+  CostPath<T> minSpanningTreeByPrim(Vertex<T> start) {
     if (type == GraphType.directed) {
       throw "Undirected graphs only.";
     }

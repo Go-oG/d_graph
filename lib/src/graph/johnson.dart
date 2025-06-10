@@ -1,6 +1,4 @@
-
-import 'package:d_util/d_util.dart';
-
+import '../map_ext.dart';
 import 'bellman_ford.dart';
 import 'dijkstra.dart';
 import 'graph.dart';
@@ -8,7 +6,7 @@ import 'graph.dart';
 /// Johnson 算法是一种查找所有稀疏有向图中的顶点。
 /// 它允许一些边权重为负数，但不存在负权重循环.
 extension Johnson<T> on Graph<T> {
-  Map<Vertex<T>, Map<Vertex<T>, List<Edge<T>>>> getAllPairsShortestPaths(T maxData) {
+  Map<Vertex<T>, Map<Vertex<T>, List<Edge<T>>>> shortestPathsByJohnson(T maxData) {
     final Graph<T> graph = Graph.of(this);
 
     final Vertex<T> connector = Vertex<T>(maxData);
@@ -22,7 +20,7 @@ extension Johnson<T> on Graph<T> {
 
     graph.vertices.add(connector);
 
-    final Map<Vertex<T>, CostPath<T>> costs = graph.getShortestPathsByBellmanFord(connector);
+    final Map<Vertex<T>, CostPath<T>> costs = graph.shortestPathsByBellmanFord(connector);
 
     for (Edge<T> e in graph.edges) {
       final int weight = e.cost;
@@ -50,7 +48,7 @@ extension Johnson<T> on Graph<T> {
     final Map<Vertex<T>, Map<Vertex<T>, List<Edge<T>>>> allShortestPaths = {};
 
     for (Vertex<T> v in graph.vertices) {
-      final Map<Vertex<T>, CostPath<T>> costPaths = graph.getShortestPathsByDijkstra(v);
+      final Map<Vertex<T>, CostPath<T>> costPaths = graph.shortestPathsByDijkstra(v);
       final Map<Vertex<T>, List<Edge<T>>> paths = {};
       for (Vertex<T> v2 in costPaths.keys) {
         final CostPath<T> pair = costPaths.get(v2)!;

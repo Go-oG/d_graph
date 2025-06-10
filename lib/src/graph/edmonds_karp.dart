@@ -1,21 +1,20 @@
 import 'dart:collection';
 import 'dart:math';
 
-import 'package:d_util/d_util.dart';
-
+import '../../dart_graph.dart';
 
 /// Edmonds-Karp 算法是 Ford-Fulkerson 方法的一种实现，用于
 /// 计算流网络中以 O（V*E^2） 时间内的最大流量。
 
-class EdmondsKarp {
-  late Array<Array<int>> flow;
-  late Array<Array<int>> capacity;
-  late Array<int> parent;
-  late Array<bool> visited;
-  late int n, m;
+final class EdmondsKarp {
+  late final int n, m;
+  late final Array<Array<int>> flow;
+  late final Array<Array<int>> capacity;
+  late final Array<int> parent;
+  late final Array<bool> visited;
 
-  EdmondsKarp(int numOfVerticles, int numOfEdges) {
-    n = numOfVerticles;
+  EdmondsKarp(int numOfVertices, int numOfEdges) {
+    n = numOfVertices;
     m = numOfEdges;
     flow = Array.matrix(n);
     capacity = Array.matrix(n);

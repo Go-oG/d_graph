@@ -1,12 +1,12 @@
+import 'package:dart_graph/src/map_ext.dart';
 
-import 'package:d_util/d_util.dart';
-
+import '../math.dart';
 import 'graph.dart';
 
 /// 贝尔曼-福特的最短路径。
 /// 适用于负加权和正加权边。还可以检测负权重循环。返回最短路径和路径。
 extension BellmanFord<T> on Graph<T> {
-  Map<Vertex<T>, CostPath<T>> getShortestPathsByBellmanFord(Vertex<T> start) {
+  Map<Vertex<T>, CostPath<T>> shortestPathsByBellmanFord(Vertex<T> start) {
     final Map<Vertex<T>, List<Edge<T>>> paths = {};
     final Map<Vertex<T>, CostVertex<T>> costs = {};
 
@@ -22,7 +22,7 @@ extension BellmanFord<T> on Graph<T> {
     return map;
   }
 
-  CostPath<T> getShortestPathByBellmanFord(Vertex<T> start, Vertex<T> end) {
+  CostPath<T> shortestPathsByBellmanFord2(Vertex<T> start, Vertex<T> end) {
     final Map<Vertex<T>, List<Edge<T>>> paths = {};
     final Map<Vertex<T>, CostVertex<T>> costs = {};
     return _getShortestPath(this, start, end, paths, costs);

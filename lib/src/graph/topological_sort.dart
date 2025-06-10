@@ -1,11 +1,9 @@
-
-import 'package:d_util/d_util.dart';
+import 'package:dart_graph/src/list_ext.dart';
 
 import 'graph.dart';
 
-/// 在计算机科学中，拓扑排序（有时缩写为 topsort 或
-/// toposort） 或有向图的拓扑排序是
-/// 其顶点，使得对于每个边 UV，u 在排序中位于 v 之前。
+/// 在计算机科学中，拓扑排序（有时缩写为 topSort）或有向图的拓扑排序
+/// 对于每个顶点 使得对于每个边 UV，u 在排序中位于 v 之前。
 extension TopologicalSort<T> on Graph<T> {
   ///对有向图执行拓扑排序。如果检测到循环，则返回 NULL.
   List<Vertex<T>>? sort() {

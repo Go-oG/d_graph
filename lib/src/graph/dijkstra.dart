@@ -1,10 +1,9 @@
 import 'package:collection/collection.dart';
-import 'package:d_util/d_util.dart';
 
-import 'graph.dart';
+import '../../dart_graph.dart';
 
 extension Dijkstra<T> on Graph<T> {
-  Map<Vertex<T>, CostPath<T>> getShortestPathsByDijkstra(Vertex<T> start) {
+  Map<Vertex<T>, CostPath<T>> shortestPathsByDijkstra(Vertex<T> start) {
     final Map<Vertex<T>, List<Edge<T>>> paths = {};
     final Map<Vertex<T>, CostVertex<T>> costs = {};
     _getShortestPath2(this, start, null, paths, costs);
@@ -19,15 +18,15 @@ extension Dijkstra<T> on Graph<T> {
     return map;
   }
 
-  static CostPath<T>? getShortestPath<T>(Graph<T> graph, Vertex<T> start, Vertex<T> end) {
-    final bool hasNegativeEdge = _checkForNegativeEdges(graph.vertices);
+  CostPath<T>? shortestPathsByDijkstra2(Vertex<T> start, Vertex<T> end) {
+    final bool hasNegativeEdge = _checkForNegativeEdges(vertices);
     if (hasNegativeEdge) {
       throw "Negative cost Edges are not allowed.";
     }
 
     final Map<Vertex<T>, List<Edge<T>>> paths = {};
     final Map<Vertex<T>, CostVertex<T>> costs = {};
-    return _getShortestPath2(graph, start, end, paths, costs);
+    return _getShortestPath2(this, start, end, paths, costs);
   }
 
   static CostPath<T>? _getShortestPath2<T>(
@@ -97,8 +96,8 @@ extension Dijkstra<T> on Graph<T> {
     return null;
   }
 
-  static bool _checkForNegativeEdges<T>(Iterable<Vertex<T>> vertitices) {
-    for (Vertex<T> v in vertitices) {
+  static bool _checkForNegativeEdges<T>(Iterable<Vertex<T>> vertices) {
+    for (Vertex<T> v in vertices) {
       for (Edge<T> e in v.edges) {
         if (e.cost < 0) {
           return true;

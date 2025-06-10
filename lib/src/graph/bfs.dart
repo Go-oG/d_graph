@@ -1,8 +1,6 @@
 import 'dart:collection';
 
-import 'package:d_util/d_util.dart';
-
-import 'graph.dart';
+import 'package:dart_graph/dart_graph.dart';
 
 /// 广度优先搜索 （BFS） 是一种用于遍历或搜索树或图形数据结构的算法。它从树根（或图形的某个任意节点，有时称为
 /// 'search key'） 并首先探索邻居节点，然后再移动到下一级别的邻居.
@@ -29,8 +27,7 @@ extension BFSGE<T> on Graph<T> {
       final idx = vertexToIndex.get(v)!;
       final Array<int> array = Array(n);
       adj[idx] = array;
-      final List<Edge<T>> edges = v.edges;
-      for (Edge<T> e in edges) {
+      for (Edge<T> e in v.edges) {
         array[vertexToIndex.get(e.to)!] = 1;
       }
     }

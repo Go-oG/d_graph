@@ -1,35 +1,25 @@
-import 'package:d_util/d_util.dart';
+import 'package:dart_graph/dart_graph.dart';
 import 'package:flutter/foundation.dart';
+import 'package:quiver/collection.dart';
 
 enum GraphType { directed, undirected }
 
 class Graph<T> {
-  final List<Vertex<T>> _allVertices = [];
-  final List<T> _nodes = [];
+  late final GraphType type;
+  final BiMap<T, Vertex<T>> _vertexMap = BiMap();
+  final UniqueList<Vertex<T>> _allVertices = UniqueList();
   final List<Edge<T>> _allEdges = [];
 
-  late final GraphType type;
-
-  Graph({this.type = GraphType.undirected, Iterable<Vertex<T>>? vertices, Iterable<Edge<T>>? edges}) {
+  Graph(
+      {this.type = GraphType.undirected, Iterable<Vertex<T>>? vertices, Iterable<Edge<T>>? edges}) {
     if (vertices != null) {
-      _allVertices.addAll(vertices);
-      _nodes.addAll(_allVertices.map((e) => e.data));
+      for (final vertex in vertices) {
+        addVertex(vertex);
+      }
     }
-
     if (edges != null) {
-      _allEdges.addAll(edges);
-      for (Edge<T> e in edges) {
-        final Vertex<T> from = e.from;
-        final Vertex<T> to = e.to;
-        if (!_allVertices.contains(from) || !_allVertices.contains(to)) {
-          continue;
-        }
-        from.addEdge(e);
-        if (type == GraphType.undirected) {
-          Edge<T> reciprical = Edge<T>(e.cost, to, from);
-          to.addEdge(reciprical);
-          _allEdges.add(reciprical);
-        }
+      for (final edge in edges) {
+        addEdgeNode(edge);
       }
     }
   }
@@ -44,25 +34,76 @@ class Graph<T> {
     }
   }
 
-  List<Vertex<T>> get vertices {
-    return _allVertices;
-  }
+  UniqueList<Vertex<T>> get vertices => _allVertices;
 
   List<Edge<T>> get edges {
     return _allEdges;
   }
 
-  List<T> get nodes => _nodes;
-
   void add(T data) {
-    Vertex<T> vertex = Vertex(data);
+    final old = _vertexMap[data];
+    if (old != null) {
+      debugPrint("当前已存在相同数据");
+      return;
+    }
+    final vertex = Vertex(data);
+    _vertexMap[data] = vertex;
     _allVertices.add(vertex);
-    _nodes.add(data);
   }
 
-  ///TODO 待完成
-  void addEdge(T source, T target, int cost) {
+  void addVertex(Vertex<T> vertex) {
+    final old = _vertexMap.inverse[vertex];
+    if (old != null) {
+      debugPrint("当前已存在相同数据");
+      return;
+    }
+    _vertexMap[vertex.data] = vertex;
+    _allVertices.add(vertex);
+  }
+
+  void addEdge(T source, T target, [int cost = 0]) {
     var edge = Edge<T>(cost, Vertex(source), Vertex(target));
+    addEdgeNode(edge);
+  }
+
+  void addEdgeNode(Edge<T> e) {
+    final Vertex<T> from = e.from;
+    final Vertex<T> to = e.to;
+    addVertex(from);
+    addVertex(to);
+
+    from.addEdge(e);
+    _allEdges.add(e);
+
+    if (type == GraphType.undirected) {
+      final edge2 = Edge<T>(e.cost, to, from);
+      to.addEdge(edge2);
+      _allEdges.add(edge2);
+    }
+  }
+
+  void remove(T data) {
+    final old = _vertexMap[data];
+    if (old == null) {
+      return;
+    }
+    removeVertex(old);
+  }
+
+  void removeVertex(Vertex<T> v, [bool clearSelfEdge = true]) {
+    if (_allVertices.remove(v)) {
+      _vertexMap.remove(v.data);
+      _allEdges.removeWhere((e) => e.from == v || e.to == v);
+    }
+    if (clearSelfEdge) {
+      v.edges.clear();
+    }
+  }
+
+  void clear() {
+    _allEdges.clear();
+    _allVertices.clear();
+    _vertexMap.clear();
   }
 
   @override
@@ -116,10 +157,12 @@ class Graph<T> {
   }
 }
 
+///顶点唯一性只和边关联
 class Vertex<T> implements Comparable<Vertex<T>> {
-  late T data;
+  late final T data;
+  final UniqueList<Edge<T>> _edges = UniqueList();
+
   double weight = 0;
-  List<Edge<T>> edges = [];
 
   Vertex(this.data, [this.weight = 0]);
 
@@ -129,12 +172,12 @@ class Vertex<T> implements Comparable<Vertex<T>> {
     edges.addAll(vertex.edges);
   }
 
-  void addEdge(Edge<T> e) {
-    edges.add(e);
-  }
+  UniqueList<Edge<T>> get edges => _edges;
+
+  void addEdge(Edge<T> e) => _edges.add(e);
 
   Edge<T>? getEdge(Vertex<T> v) {
-    for (Edge<T> e in edges) {
+    for (Edge<T> e in _edges) {
       if (e.to == v) {
         return e;
       }
@@ -143,7 +186,7 @@ class Vertex<T> implements Comparable<Vertex<T>> {
   }
 
   bool pathTo(Vertex<T> v) {
-    for (Edge<T> e in edges) {
+    for (Edge<T> e in _edges) {
       if (e.to == v) {
         return true;
       }
@@ -152,9 +195,7 @@ class Vertex<T> implements Comparable<Vertex<T>> {
   }
 
   @override
-  int get hashCode {
-    return Object.hash(data, weight, edges.length);
-  }
+  int get hashCode => data.hashCode;
 
   @override
   bool operator ==(Object other) {
@@ -164,70 +205,35 @@ class Vertex<T> implements Comparable<Vertex<T>> {
     if (other is! Vertex<T>) {
       return false;
     }
-    if (weight != other.weight) {
-      return false;
-    }
-
-    if (edges.length != other.edges.length) {
-      return false;
-    }
-
-    if (data != (other.data)) {
-      return false;
-    }
-
-    return listEquals(edges, other.edges);
+    return data == other.data;
   }
 
   @override
   int compareTo(Vertex<T> v) {
-    final int valueComp = (data as dynamic).compareTo(v.data);
-    if (valueComp != 0) return valueComp;
-
-    if (this.weight < v.weight) {
-      return -1;
+    if (T is Comparable) {
+      return (data as Comparable).compareTo(v.data);
     }
-    if (this.weight > v.weight) {
-      return 1;
-    }
-
-    if (this.edges.length < v.edges.length) {
-      return -1;
-    }
-    if (this.edges.length > v.edges.length) {
-      return 1;
-    }
-
-    final Iterator<Edge<T>> iter1 = edges.iterator;
-    final Iterator<Edge<T>> iter2 = v.edges.iterator;
-    while (iter1.moveNext() && iter2.moveNext()) {
-      final Edge<T> e1 = iter1.current;
-      final Edge<T> e2 = iter2.current;
-      if (e1.cost < e2.cost) {
-        return -1;
-      }
-      if (e1.cost > e2.cost) {
-        return 1;
-      }
-    }
-    return 0;
+    return -1;
   }
 }
 
+///边唯一性判断只和顶点关联
 class Edge<T> implements Comparable<Edge<T>> {
   late final String id;
-  late Vertex<T> from;
-  late Vertex<T> to;
-  late int cost;
+  late final Vertex<T> from;
+  late final Vertex<T> to;
+
+  int cost = 0;
 
   Edge(this.cost, this.from, this.to, {String? id}) {
-    this.id = id ?? randomId();
+    this.id = id ?? "";
     this.cost = cost;
     this.from = from;
     this.to = to;
   }
 
-  Edge.of(Edge<T> e) {
+  Edge.of(Edge<T> e, {String? id}) {
+    this.id = id ?? "";
     from = e.from;
     to = e.to;
     cost = e.cost;
@@ -235,40 +241,25 @@ class Edge<T> implements Comparable<Edge<T>> {
 
   @override
   int get hashCode {
-    return Object.hash(cost, from, to);
+    return Object.hash(id, from, to);
   }
 
   @override
-  int compareTo(Edge<T> e) {
-    if (this.cost < e.cost) {
-      return -1;
-    }
-    if (this.cost > e.cost) {
-      return 1;
-    }
-
-    int from = this.from.compareTo(e.from);
-    if (from != 0) {
-      return from;
-    }
-
-    final int to = this.to.compareTo(e.to);
-    if (to != 0) {
-      return to;
-    }
-    return 0;
-  }
+  int compareTo(Edge<T> e) => this.cost.compareTo(e.cost);
 
   @override
   bool operator ==(Object other) {
+    if (identical(other, this)) {
+      return true;
+    }
     if (other is! Edge<T>) {
       return false;
     }
     final Edge<T> e = other;
-
-    if (this.cost != e.cost) {
+    if (id != other.id) {
       return false;
     }
+
     if (from != e.from) {
       return false;
     }
@@ -288,7 +279,7 @@ class CostPath<T> {
   final int cost;
   final List<Edge<T>> path;
 
-  CostPath(this.cost, this.path);
+  const CostPath(this.cost, this.path);
 
   @override
   int get hashCode {

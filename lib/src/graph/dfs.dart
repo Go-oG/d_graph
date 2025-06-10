@@ -1,7 +1,4 @@
-
-import 'package:d_util/d_util.dart';
-
-import 'graph.dart';
+import 'package:dart_graph/dart_graph.dart';
 
 extension DFSG<T> on Graph<T> {
   List<Vertex<T>> dfs(Vertex<T> source) {
@@ -21,8 +18,7 @@ extension DFSG<T> on Graph<T> {
       final int idx = vertexToIndex.get(v)!;
       final Array<int> array = Array(n);
       adj[idx] = array;
-      final List<Edge<T>> edges = v.edges;
-      for (Edge<T> e in edges) {
+      for (Edge<T> e in v.edges) {
         array[vertexToIndex.get(e.to)!] = 1;
       }
     }

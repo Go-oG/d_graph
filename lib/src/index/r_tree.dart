@@ -1,8 +1,9 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
-import 'package:d_util/d_util.dart';
-
+import '../fast_select.dart';
+import '../random_id.dart';
+import '../types.dart';
 
 class RTree<T> {
   late final int maxEntries;

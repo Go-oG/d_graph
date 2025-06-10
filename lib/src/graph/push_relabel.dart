@@ -1,15 +1,15 @@
 import 'dart:collection';
 import 'dart:math';
 
+import 'package:dart_graph/src/list_ext.dart';
 
-import 'package:d_util/d_util.dart';
-
+import '../map_ext.dart';
 import 'graph.dart' as g;
 
 /// push-relabel 算法（或者 preflow-push algorithm） 是一种计算最大流量的算法。
 /// 名称 “push-relabel” 来自算法中使用的两个基本操作。
 /// 在整个执行过程中，算法保持 “preflow” 并通过移动逐渐将其转换为最大流量
-class PushRelabel {
+final class PushRelabel {
   final Queue<_Vertex> _queue = Queue();
   final List<_Vertex> _vertices = [];
 
@@ -18,7 +18,8 @@ class PushRelabel {
   late final _Vertex _source;
   late final _Vertex _sink;
 
-  static int getMaximumFlow<T>(Map<g.Edge<T>, int> edgesToCapacities, g.Vertex<T> source, g.Vertex<T> sink) {
+  static int getMaximumFlow<T>(
+      Map<g.Edge<T>, int> edgesToCapacities, g.Vertex<T> source, g.Vertex<T> sink) {
     final Map<g.Vertex<T>, _Vertex> vertexMap = SplayTreeMap<g.Vertex<T>, _Vertex>();
     for (g.Edge<T> edge in edgesToCapacities.keys) {
       vertexMap.put(edge.from, _Vertex());

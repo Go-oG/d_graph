@@ -1,13 +1,10 @@
-
-import 'package:d_util/d_util.dart';
-
-import 'graph.dart';
+import 'package:dart_graph/dart_graph.dart';
 
 /// 在图论中，无向图的连通分量（或只是分量）是一个子图，其中任意两个顶点都连接到每个
 /// other by path 的 PATHS，并且它不连接到超图中的其他顶点。没有入射边的顶点本身就是 connected
 ///元件。本身连通的图恰好有一个连通分量，由整个图组成
 extension CCEG<T> on Graph<T> {
-  List<List<Vertex<T>>> getConnectedComponents() {
+  List<List<Vertex<T>>> connectedComponents() {
     if (type != GraphType.directed) {
       throw "Cannot perform a connected components search on a non-directed graph";
     }

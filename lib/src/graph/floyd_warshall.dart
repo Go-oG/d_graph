@@ -1,13 +1,10 @@
-
-import 'package:d_util/d_util.dart';
-
-import 'graph.dart';
+import '../../dart_graph.dart';
 
 /// Floyd-Warshall 算法是用于查找所有的最短路径的
 /// 加权图中的路径（具有正或负边缘权重）
 extension FloydWarshall<T> on Graph<T> {
-  Map<Vertex<T>, Map<Vertex<T>, int>> getAllPairsShortestPaths() {
-    final List<Vertex<T>> vertices = this.vertices;
+  Map<Vertex<T>, Map<Vertex<T>, int>> shortestPathsByFloydWarshall() {
+    final vertices = this.vertices;
 
     final Array<Array<int>> sums = Array(vertices.length);
     for (var i = 0; i < vertices.length; i++) {
@@ -28,9 +25,9 @@ extension FloydWarshall<T> on Graph<T> {
       sums[indexOfFrom][indexOfTo] = e.cost;
     }
 
-    for (int k = 0; k < vertices.size; k++) {
-      for (int i = 0; i < vertices.size; i++) {
-        for (int j = 0; j < vertices.size; j++) {
+    for (int k = 0; k < vertices.length; k++) {
+      for (int i = 0; i < vertices.length; i++) {
+        for (int j = 0; j < vertices.length; j++) {
           if (i == j) {
             sums[i][j] = 0;
           } else {
@@ -50,12 +47,14 @@ extension FloydWarshall<T> on Graph<T> {
 
     for (int i = 0; i < sums.length; i++) {
       for (int j = 0; j < sums[i].length; j++) {
-        final Vertex<T> from = vertices.get(i);
-        final Vertex<T> to = vertices.get(j);
+        final Vertex<T> from = vertices[i];
+        final Vertex<T> to = vertices[j];
         Map<Vertex<T>, int>? map = allShortestPaths[from];
         map ??= {};
         final int cost = sums[i][j];
-        if (cost != maxInt) map.put(to, cost);
+        if (cost != maxInt) {
+          map.put(to, cost);
+        }
         allShortestPaths.put(from, map);
       }
     }

@@ -1,6 +1,4 @@
-
-import 'package:d_util/d_util.dart';
-
+import '../math.dart';
 import 'graph.dart';
 
 ///路径查找
@@ -17,7 +15,7 @@ extension AStar<T> on Graph<T> {
     for (Vertex<T> v in vertices) {
       fScore[v] = Integer.minValue;
     }
-    fScore[start] = heuristicCostEstimate(start, goal);
+    fScore[start] = _heuristicCostEstimate(start, goal);
 
     comparator(o1, o2) {
       if (fScore[o1]! < fScore[o2]!) {
@@ -42,7 +40,7 @@ extension AStar<T> on Graph<T> {
           continue;
         }
 
-        final int tenativeGScore = gScore[current]! + distanceBetween(current, neighbor);
+        final int tenativeGScore = gScore[current]! + _distanceBetween(current, neighbor);
         if (!openSet.contains(neighbor)) {
           openSet.add(neighbor);
         } else if (tenativeGScore >= gScore[neighbor]!) {
@@ -53,7 +51,7 @@ extension AStar<T> on Graph<T> {
 
         gScore[neighbor] = tenativeGScore;
 
-        final int estimatedFScore = gScore[neighbor]! + heuristicCostEstimate(neighbor, goal);
+        final int estimatedFScore = gScore[neighbor]! + _heuristicCostEstimate(neighbor, goal);
         fScore[neighbor] = estimatedFScore;
 
         openSet.sort(comparator);
@@ -63,14 +61,14 @@ extension AStar<T> on Graph<T> {
     return null;
   }
 
-  int distanceBetween(Vertex<T> start, Vertex<T> next) {
+  int _distanceBetween(Vertex<T> start, Vertex<T> next) {
     for (Edge<T> e in start.edges) {
       if (e.to == next) return e.cost;
     }
     return Integer.maxValue;
   }
 
-  int heuristicCostEstimate(Vertex<T> start, Vertex<T> goal) {
+  int _heuristicCostEstimate(Vertex<T> start, Vertex<T> goal) {
     return 1;
   }
 

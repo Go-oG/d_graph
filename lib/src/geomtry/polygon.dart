@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'dart:math' as m;
 import 'package:dart_graph/src/geomtry/rect_ext.dart';
-import 'package:d_util/d_util.dart';
+import 'package:dart_graph/src/list_ext.dart';
 import 'package:flutter/foundation.dart';
 
 import 'line.dart';
@@ -410,5 +410,3 @@ class Hull {
 
   Hull(this.x, this.y, this.i);
 }
-
-

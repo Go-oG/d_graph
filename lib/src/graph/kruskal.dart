@@ -1,13 +1,13 @@
 import 'package:collection/collection.dart';
-import 'package:d_util/d_util.dart';
 
+import '../map_ext.dart';
 import 'graph.dart';
 
 /// Kruskal 的最小生成树。仅适用于无向图。它找到一个
 /// 边的子集，该子集形成一个包含每个顶点的树，其中
 /// 树中所有边的总重量最小化。
 extension Kruskal<T> on Graph<T> {
-  CostPath<T> getMinimumSpanningTree() {
+  CostPath<T> minSpanningTreeByKruskal() {
     if (type == GraphType.directed) {
       throw "Undirected graphs only.";
     }
@@ -38,7 +38,8 @@ extension Kruskal<T> on Graph<T> {
     return CostPath<T>(cost, path);
   }
 
-  static bool _isTheSamePart<T>(Vertex<T> v1, Vertex<T> v2, Map<Vertex<T>, Set<Vertex<T>>> membershipMap) {
+  static bool _isTheSamePart<T>(
+      Vertex<T> v1, Vertex<T> v2, Map<Vertex<T>, Set<Vertex<T>>> membershipMap) {
     return membershipMap.get(v1) == membershipMap.get(v2);
   }
 
