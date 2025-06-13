@@ -1,8 +1,8 @@
 import 'dart:collection';
 import 'dart:core';
-
+import 'package:d_util/d_util.dart';
 import 'i_tree.dart';
-import '../array.dart';
+
 
 class BTree<T extends Comparable<T>> extends ITree<T> {
   late final int _minKeySize;

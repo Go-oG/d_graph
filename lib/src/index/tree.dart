@@ -1,8 +1,8 @@
 import 'dart:math';
 
+import 'package:d_util/d_util.dart';
 import 'package:quiver/collection.dart';
-import '../model.dart';
-import '../types.dart';
+
 
 class Tree<T> {
   TreeNode<T>? _root;

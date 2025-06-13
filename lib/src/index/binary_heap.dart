@@ -1,9 +1,7 @@
 import 'dart:collection';
 import 'dart:core';
 import 'dart:math';
-import '../array.dart';
-import '../math.dart';
-import '../types.dart';
+import 'package:d_util/d_util.dart';
 
 interface class BinaryHeap<T> {
   List<T> getHeap() {

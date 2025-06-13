@@ -1,5 +1,5 @@
-import 'package:collection/collection.dart';
 
+import 'package:d_util/d_util.dart';
 import '../../dart_graph.dart';
 
 extension Dijkstra<T> on Graph<T> {

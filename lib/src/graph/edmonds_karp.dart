@@ -1,7 +1,6 @@
 import 'dart:collection';
 import 'dart:math';
-
-import '../../dart_graph.dart';
+import 'package:d_util/d_util.dart';
 
 /// Edmonds-Karp 算法是 Ford-Fulkerson 方法的一种实现，用于
 /// 计算流网络中以 O（V*E^2） 时间内的最大流量。

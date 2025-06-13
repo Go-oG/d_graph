@@ -1,8 +1,7 @@
 import 'dart:collection';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-
-import '../types.dart';
+import 'package:d_util/d_util.dart';
 import 'i_tree.dart';
 
 class BinarySearchTree<T> extends ITree<T> {
