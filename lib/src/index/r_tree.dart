@@ -3,79 +3,37 @@ import 'dart:ui';
 
 import 'package:d_util/d_util.dart';
 
-class RTree<T> {
+class RTree<E> {
   late final int maxEntries;
   late final int minEntries;
-  late RNode<T> _root;
-  late Fun2<T, double> minXFun;
-  late Fun2<T, double> minYFun;
-  late Fun2<T, double> maxXFun;
-  late Fun2<T, double> maxYFun;
+  final Rect Function(E value) boundsFun;
+  late RNode<E> _root;
 
-  RTree(this.minXFun, this.minYFun, this.maxXFun, this.maxYFun, [int maxEntries = 9]) {
+  RTree(this.boundsFun, [int maxEntries = 9]) {
     this.maxEntries = math.max(4, maxEntries);
     minEntries = math.max(2, (this.maxEntries * 0.4).ceil());
-    this._root = _createNode([]);
+    _root = _createNode([]);
   }
 
-  RTree.from(Rect Function<T, Rect>(T) fun, [int maxEntries = 9]) {
-    this.maxEntries = math.max(4, maxEntries);
-    minEntries = math.max(2, (this.maxEntries * 0.4).ceil());
-    this._root = _createNode([]);
-    this.minXFun = (T t) => fun.call(t).left;
-    this.minYFun = (T t) => fun.call(t).top;
-    this.maxXFun = (T t) => fun.call(t).right;
-    this.maxYFun = (T t) => fun.call(t).bottom;
-  }
-
-  List<T> all() {
-    List<T> result = [];
+  List<E> all() {
+    List<E> result = [];
     each((p) {
       if (p.value != null) {
-        result.add(p.value as T);
+        result.add(p.value as E);
       }
       return false;
     });
     return result;
   }
 
-  List<T> search(Rect rect) {
-    RNode<T>? node = _root;
-    if (!_intersects(rect, node)) {
-      return [];
-    }
-    List<T> result = [];
-    List<RNode<T>> next = [_root];
-    while (next.isNotEmpty) {
-      var node = next.removeLast();
-      for (var child in node.children) {
-        if (!_intersects(rect, child)) {
-          continue;
-        }
-        if (node.leaf) {
-          var d = child.value;
-          if (d != null) {
-            result.add(d);
-          }
-          continue;
-        }
-        if (_contains2(rect, child)) {
-          _eachData(child, result);
-        } else {
-          next.add(child);
-        }
-      }
-    }
-    return result;
-  }
-
-  List<T> search2(Rect rect) {
+  List<E> search(Rect rect) {
     if (!_intersects(rect, _root)) {
       return [];
     }
-    List<T> result = [];
-    List<RNode<T>> list = [_root];
-    List<RNode<T>> next = [];
+    List<E> result = [];
+
+    List<RNode<E>> list = [_root];
+    List<RNode<E>> next = [];
     while (list.isNotEmpty) {
       for (var node in list) {
         for (var child in node.children) {
@@ -99,15 +57,16 @@ class RTree<T> {
       list = next;
       next = [];
     }
+
     return result;
   }
 
-  T? searchSingle(Rect rect, bool Function(T node) testFun) {
+  E? searchSingle(Rect rect, bool Function(E node) testFun) {
     if (!_intersects(rect, _root)) {
       return null;
     }
-    List<RNode<T>> list = [_root];
-    List<RNode<T>> next = [];
+    List<RNode<E>> list = [_root];
+    List<RNode<E>> next = [];
     while (list.isNotEmpty) {
       for (var node in list) {
         for (var child in node.children) {
@@ -137,8 +96,8 @@ class RTree<T> {
     return null;
   }
 
-  void _eachData(RNode<T>? node, List<T> result) {
-    List<RNode<T>> next = [];
+  void _eachData(RNode<E>? node, List<E> result) {
+    List<RNode<E>> next = [];
     while (node != null) {
       if (node.leaf) {
         for (var c in node.children) {
@@ -155,8 +114,8 @@ class RTree<T> {
     }
   }
 
-  T? _eachSingleData(RNode<T>? node, bool Function(T node) testFun) {
-    List<RNode<T>> next = [];
+  E? _eachSingleData(RNode<E>? node, bool Function(E node) testFun) {
+    List<RNode<E>> next = [];
     while (node != null) {
       if (node.leaf) {
         for (var c in node.children) {
@@ -179,8 +138,8 @@ class RTree<T> {
   ///遍历节点(层序遍历)
   ///如果返回为 true 则停止遍历
   ///[minX,minY,maxX,maxY,leaf,height,value,childCount]
-  RTree<T> each(EachCallback<T> test, [bool stopAll = false]) {
-    List<RNode<T>> next = [_root];
+  RTree<E> each(EachCallback<E> test, [bool stopAll = false]) {
+    List<RNode<E>> next = [_root];
     while (next.isNotEmpty) {
       var node = next.removeAt(0);
       if (test.call(node)) {
@@ -195,8 +154,8 @@ class RTree<T> {
   }
 
   ///先序遍历
-  RTree<T> eachBefore(EachCallback<T> test, [bool stopAll = false]) {
-    List<RNode<T>> nodes = [_root];
+  RTree<E> eachBefore(EachCallback<E> test, [bool stopAll = false]) {
+    List<RNode<E>> nodes = [_root];
     while (nodes.isNotEmpty) {
       var node = nodes.removeLast();
       if (test.call(node)) {
@@ -211,9 +170,9 @@ class RTree<T> {
   }
 
   ///后序遍历
-  RTree<T> eachAfter(EachCallback<T> test, [bool stopAll = false]) {
-    List<RNode<T>> nodes = [_root];
-    List<RNode<T>> next = [];
+  RTree<E> eachAfter(EachCallback<E> test, [bool stopAll = false]) {
+    List<RNode<E>> nodes = [_root];
+    List<RNode<E>> next = [];
     while (nodes.isNotEmpty) {
       var node = nodes.removeLast();
       next.add(node);
@@ -235,7 +194,7 @@ class RTree<T> {
   ///如果有任何数据项与给定边界框相交，则返回 true，否则 false
   bool hasCollides(Rect rect) {
     if (!_intersects(rect, _root)) return false;
-    List<RNode<T>> next = [_root];
+    List<RNode<E>> next = [_root];
     while (next.isNotEmpty) {
       var node = next.removeAt(0);
       for (var child in node.children) {
@@ -250,7 +209,7 @@ class RTree<T> {
     return false;
   }
 
-  RTree<T> addAll(Iterable<T> data) {
+  RTree<E> addAll(Iterable<E> data) {
     if (data.isEmpty) {
       return this;
     }
@@ -263,13 +222,10 @@ class RTree<T> {
     }
 
     // 使用OMT算法从头开始用给定的数据递归地构建树
-    List<RNode<T>> buildList = [];
-    for (var p0 in data) {
-      var node = RNode(value: p0);
-      node.left = minXFun.call(p0);
-      node.top = minYFun.call(p0);
-      node.right = maxXFun.call(p0);
-      node.bottom = maxYFun.call(p0);
+    List<RNode<E>> buildList = [];
+    for (var value in data) {
+      final rect = boundsFun(value);
+      final node = RNode(value: value, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom);
       buildList.add(node);
     }
     var node = _build(buildList, 0, buildList.length - 1, 0);
@@ -294,30 +250,27 @@ class RTree<T> {
     return this;
   }
 
-  RTree<T> add(T item) {
-    var node = RNode(value: item);
-    node.left = minXFun.call(item);
-    node.top = minYFun.call(item);
-    node.right = maxXFun.call(item);
-    node.bottom = maxYFun.call(item);
+  RTree<E> add(E value) {
+    final rect = boundsFun(value);
+    final node = RNode(value: value, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom);
     _insert(node, _root.height - 1);
     return this;
   }
 
-  RTree<T> clear() {
+  RTree<E> clear() {
     _root = _createNode([]);
     return this;
   }
 
-  RTree<T> remove(T item) {
-    List<RNode> path = [];
+  RTree<E> remove(E item) {
+    List<RNode<E>> path = [];
     List<int> indexes = [];
     int i = 0;
 
     ///标识查找方向
     bool goingUp = false;
-    RNode? parent;
-    RNode? tmpNode = _root;
+    RNode<E>? parent;
+    RNode<E>? tmpNode = _root;
     // 深度优先遍历树
     while (tmpNode != null || path.isNotEmpty) {
       if (tmpNode == null) {
@@ -369,10 +322,10 @@ class RTree<T> {
     return a.top.compareTo(b.top);
   }
 
-  RNode<T> _build(List<RNode<T>> items, int left, int right, int height) {
+  RNode<E> _build(List<RNode<E>> items, int left, int right, int height) {
     int N = right - left + 1;
     int M = maxEntries;
-    RNode<T>? node;
+    RNode<E>? node;
 
     if (N <= M) {
       node = _createNode(List.from(items.getRange(left, right + 1)));
@@ -410,14 +363,14 @@ class RTree<T> {
     return node;
   }
 
-  RNode _chooseSubtree(RNode bbox, RNode node, int level, List<RNode> path) {
+  RNode<E> _chooseSubtree(RNode<E> bbox, RNode<E> node, int level, List<RNode<E>> path) {
     while (true) {
       path.add(node);
       if (node.leaf || path.length - 1 == level) break;
 
       num minArea = double.infinity;
       num minEnlargement = double.infinity;
-      RNode? targetNode;
+      RNode<E>? targetNode;
       for (int i = 0; i < node.children.length; i++) {
         var child = node.children[i];
         var area = _bboxArea(child);
@@ -445,9 +398,9 @@ class RTree<T> {
     return node;
   }
 
-  void _insert(RNode<T> item, int level) {
+  void _insert(RNode<E> item, int level) {
     var bbox = item;
-    List<RNode<T>> insertPath = [];
+    List<RNode<E>> insertPath = [];
     var node = _chooseSubtree(bbox, _root, level, insertPath);
     node.children.add(item);
     _extend(node, bbox);
@@ -463,14 +416,14 @@ class RTree<T> {
   }
 
   ///将溢出节点一分为二
-  void _split(List<RNode<T>> insertPath, int level) {
+  void _split(List<RNode<E>> insertPath, int level) {
     var node = insertPath[level];
     int M = node.children.length;
     int m = minEntries;
     _chooseSplitAxis(node, m, M);
     int splitIndex = _chooseSplitIndex(node, m, M);
 
-    List<RNode<T>> removeList = List.from(node.children.getRange(splitIndex, node.children.length));
+    List<RNode<E>> removeList = List.from(node.children.getRange(splitIndex, node.children.length));
     node.children.removeRange(splitIndex, node.children.length);
     var newNode = _createNode(removeList);
 
@@ -488,14 +441,14 @@ class RTree<T> {
   }
 
   ///划分根节点
-  void _splitRoot(RNode<T> node, RNode<T> newNode) {
+  void _splitRoot(RNode<E> node, RNode<E> newNode) {
     _root = _createNode([node, newNode]);
     _root.height = node.height + 1;
     _root.leaf = false;
     _calcBBox(_root);
   }
 
-  int _chooseSplitIndex(RNode node, int m, int M) {
+  int _chooseSplitIndex(RNode<E> node, int m, int M) {
     int index = 0;
     num minOverlap = double.infinity;
     num minArea = double.infinity;
@@ -524,7 +477,7 @@ class RTree<T> {
   }
 
   // 按要拆分的最佳轴对节点子级进行排序
-  void _chooseSplitAxis(RNode node, int m, int M) {
+  void _chooseSplitAxis(RNode<E> node, int m, int M) {
     var compareMinX = node.leaf ? this.compareMinX : _compareNodeMinX;
     var compareMinY = node.leaf ? this.compareMinY : _compareNodeMinY;
     var xMargin = _allDistMargin(node, m, M, compareMinX);
@@ -535,7 +488,7 @@ class RTree<T> {
   }
 
   // 所有可能的分裂分布的总裕度，其中每个节点至少满m
-  double _allDistMargin(RNode node, int m, int M, compare) {
+  double _allDistMargin(RNode<E> node, int m, int M, compare) {
     node.children.sort(compare);
 
     var leftBBox = _distBBox(node, 0, m);
@@ -556,14 +509,14 @@ class RTree<T> {
   }
 
   ///沿着给定的树路径调整区域范围
-  void _adjustParentBBoxes(RNode bbox, List<RNode> path, int level) {
+  void _adjustParentBBoxes(RNode<E> bbox, List<RNode<E>> path, int level) {
     for (int i = level; i >= 0; i--) {
       _extend(path[i], bbox);
     }
   }
 
   /// 遍历路径，删除空节点并更新区域范围(相当于收缩树范围)
-  _condense(List<RNode> path) {
+  _condense(List<RNode<E>> path) {
     List<RNode> siblings;
     for (int i = path.length - 1; i >= 0; i--) {
       if (path[i].children.isNotEmpty) {
@@ -581,18 +534,18 @@ class RTree<T> {
     }
   }
 
-  int _findItem2(T item, List<RNode> items) {
+  int _findItem2(E item, List<RNode<E>> items) {
     return items.indexWhere((e) => item == e.value);
   }
 
   //=========================
   ///计算从节点的孩子节点中计算bbox
-  void _calcBBox(RNode node) {
+  void _calcBBox(RNode<E> node) {
     _distBBox(node, 0, node.children.length, node);
   }
 
   ///计算从k到p-1节点子节点的最小边界矩形
-  RNode _distBBox(RNode node, int k, int p, [RNode? destNode]) {
+  RNode<E> _distBBox(RNode<E> node, int k, int p, [RNode<E>? destNode]) {
     destNode ??= _createNode([]);
     destNode.left = double.infinity;
     destNode.top = double.infinity;
@@ -605,7 +558,7 @@ class RTree<T> {
     return destNode;
   }
 
-  RNode _extend(RNode a, RNode b) {
+  RNode<E> _extend(RNode<E> a, RNode<E> b) {
     a.left = math.min(a.left, b.left);
     a.top = math.min(a.top, b.top);
     a.right = math.max(a.right, b.right);
@@ -648,18 +601,16 @@ class RTree<T> {
     return a.left <= b.left && a.top <= b.top && b.right <= a.right && b.bottom <= a.bottom;
   }
 
-  bool _contains3(RNode a, T b) {
-    return a.left <= minXFun.call(b) &&
-        a.top <= minYFun.call(b) &&
-        maxXFun.call(b) <= a.right &&
-        maxYFun.call(b) <= a.bottom;
+  bool _contains3(RNode a, E b) {
+    final rect = boundsFun(b);
+    return a.left <= rect.left && a.top <= rect.top && rect.right <= a.right && rect.bottom <= a.bottom;
   }
 
   bool _intersects(Rect a, RNode b) {
     return b.left <= a.right && b.top <= a.bottom && b.right >= a.left && b.bottom >= a.top;
   }
 
-  RNode<T> _createNode(List<RNode<T>>? children) {
+  RNode<E> _createNode(List<RNode<E>>? children) {
     return RNode(
       height: 1,
       leaf: true,
@@ -684,18 +635,17 @@ class RTree<T> {
   }
 }
 
-class RNode<T> {
-  late final String id;
-  List<RNode<T>> children = [];
+class RNode<E> {
+  late List<RNode<E>> children;
   int height;
   bool leaf;
 
-  late double left;
-  late double top;
-  late double right;
-  late double bottom;
+  double left;
+  double top;
+  double right;
+  double bottom;
 
-  T? value;
+  E? value;
 
   RNode({
     this.height = 1,
@@ -704,54 +654,10 @@ class RNode<T> {
     this.top = double.infinity,
     this.right = double.negativeInfinity,
     this.bottom = double.negativeInfinity,
-    List<RNode<T>>? children,
+    List<RNode<E>>? children,
     this.value,
-    String? id,
   }) {
-    if (id == null || id.isEmpty) {
-      this.id = randomId();
-    } else {
-      this.id = id;
-    }
-    if (children != null) {
-      this.children = children;
-    }
-  }
-
-  RNode.fromRect(Rect rect, {this.height = 1, this.leaf = true, this.value, String? id}) {
-    if (id == null || id.isEmpty) {
-      this.id = randomId();
-    } else {
-      this.id = id;
-    }
-    children = [];
-    left = rect.left;
-    top = rect.top;
-    right = rect.right;
-    bottom = rect.bottom;
-  }
-
-  @override
-  int get hashCode {
-    if (value != null) {
-      return value.hashCode;
-    }
-    return id.hashCode;
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (other is! RNode) {
-      return false;
-    }
-
-    if (other.value != null && value != null) {
-      return other.value == value;
-    }
-    if (other.value == null && value == null) {
-      return other.id == id;
-    }
-    return false;
+    this.children = children ?? [];
   }
 }
 
