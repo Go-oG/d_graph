@@ -2,6 +2,7 @@ library;
 
 export 'src/geomtry/arc.dart';
 export 'src/geomtry/line.dart';
+export 'src/geomtry/multi_line.dart';
 export 'src/geomtry/offset_ext.dart';
 export 'src/geomtry/path_ext.dart';
 export 'src/geomtry/polygon.dart';
@@ -33,6 +34,3 @@ export 'src/index/kd_tree.dart';
 export 'src/index/quad_tree.dart';
 export 'src/index/r_tree.dart';
 export 'src/index/tree.dart';
-
-
-

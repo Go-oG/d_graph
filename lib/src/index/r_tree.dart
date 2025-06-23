@@ -4,9 +4,10 @@ import 'dart:ui';
 import 'package:d_util/d_util.dart';
 
 class RTree<E> {
+  final Map<E, Rect> _valueRectMap = {};
+  final Rect Function(E value) boundsFun;
   late final int maxEntries;
   late final int minEntries;
-  final Rect Function(E value) boundsFun;
   late RNode<E> _root;
 
   RTree(this.boundsFun, [int maxEntries = 9]) {
@@ -14,6 +15,8 @@ class RTree<E> {
     minEntries = math.max(2, (this.maxEntries * 0.4).ceil());
     _root = _createNode([]);
   }
+
+  Rect? getBounds(E value) => _valueRectMap[value];
 
   List<E> all() {
     List<E> result = [];
@@ -225,6 +228,7 @@ class RTree<E> {
     List<RNode<E>> buildList = [];
     for (var value in data) {
       final rect = boundsFun(value);
+      _valueRectMap[value] = rect;
       final node = RNode(value: value, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom);
       buildList.add(node);
     }
@@ -252,17 +256,22 @@ class RTree<E> {
 
   RTree<E> add(E value) {
     final rect = boundsFun(value);
+    _valueRectMap[value] = rect;
     final node = RNode(value: value, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom);
     _insert(node, _root.height - 1);
     return this;
   }
 
   RTree<E> clear() {
+    _valueRectMap.clear();
     _root = _createNode([]);
     return this;
   }
 
   RTree<E> remove(E item) {
+    if (_valueRectMap.remove(item) == null) {
+      return this;
+    }
     List<RNode<E>> path = [];
     List<int> indexes = [];
     int i = 0;
@@ -311,6 +320,12 @@ class RTree<E> {
       //未找到
       tmpNode = null;
     }
+    return this;
+  }
+
+  RTree<E> update(E value) {
+    remove(value);
+    add(value);
     return this;
   }
 
@@ -602,7 +617,10 @@ class RTree<E> {
   }
 
   bool _contains3(RNode a, E b) {
-    final rect = boundsFun(b);
+    final rect = _valueRectMap[b];
+    if (rect == null) {
+      return false;
+    }
     return a.left <= rect.left && a.top <= rect.top && rect.right <= a.right && rect.bottom <= a.bottom;
   }
 
