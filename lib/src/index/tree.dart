@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:d_util/d_util.dart';
 import 'package:quiver/collection.dart';
 
-
 class Tree<T> {
   TreeNode<T>? _root;
 
