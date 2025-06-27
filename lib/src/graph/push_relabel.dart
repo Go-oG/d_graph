@@ -1,9 +1,8 @@
 import 'dart:collection';
 import 'dart:math';
 
-import 'package:dart_graph/src/list_ext.dart';
+import 'package:d_util/d_util.dart';
 
-import '../map_ext.dart';
 import 'graph.dart' as g;
 
 /// push-relabel 算法（或者 preflow-push algorithm） 是一种计算最大流量的算法。

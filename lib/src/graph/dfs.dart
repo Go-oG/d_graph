@@ -1,3 +1,4 @@
+import 'package:d_util/d_util.dart';
 import 'package:dart_graph/dart_graph.dart';
 
 extension DFSG<T> on Graph<T> {

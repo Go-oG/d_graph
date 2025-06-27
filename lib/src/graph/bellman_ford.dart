@@ -1,6 +1,6 @@
-import 'package:dart_graph/src/map_ext.dart';
 
-import '../math.dart';
+import 'package:d_util/d_util.dart';
+
 import 'graph.dart';
 
 /// 贝尔曼-福特的最短路径。

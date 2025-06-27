@@ -1,5 +1,7 @@
 library;
 
+export 'package:d_util/d_util.dart';
+
 export 'src/geomtry/arc.dart';
 export 'src/geomtry/line.dart';
 export 'src/geomtry/multi_line.dart';

@@ -1,4 +1,5 @@
-import '../map_ext.dart';
+import 'package:d_util/d_util.dart';
+
 import 'bellman_ford.dart';
 import 'dijkstra.dart';
 import 'graph.dart';
