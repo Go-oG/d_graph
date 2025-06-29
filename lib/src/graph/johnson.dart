@@ -24,7 +24,7 @@ extension Johnson<T> on Graph<T> {
     final Map<Vertex<T>, CostPath<T>> costs = graph.shortestPathsByBellmanFord(connector);
 
     for (Edge<T> e in graph.edges) {
-      final int weight = e.cost;
+      final  weight = e.value;
       final Vertex<T> u = e.from;
       final Vertex<T> v = e.to;
 
@@ -33,10 +33,10 @@ extension Johnson<T> on Graph<T> {
       }
 
       // Adjust the costs
-      final int uCost = costs.get(u)!.cost;
-      final int vCost = costs.get(v)!.cost;
-      final int newWeight = weight + uCost - vCost;
-      e.cost = newWeight;
+      final  uCost = costs.get(u)!.cost;
+      final  vCost = costs.get(v)!.cost;
+      final  newWeight = weight + uCost - vCost;
+      e.value = newWeight;
     }
 
     final int indexOfConnector = graph.vertices.indexOf(connector);

@@ -10,7 +10,7 @@ extension Dijkstra<T> on Graph<T> {
 
     final Map<Vertex<T>, CostPath<T>> map = {};
     for (CostVertex<T> pair in costs.values) {
-      int cost = pair.cost;
+      double cost = pair.cost;
       Vertex<T> vertex = pair.vertex;
       List<Edge<T>> path = paths[vertex]!;
       map[vertex] = CostPath(cost, path);
@@ -49,7 +49,7 @@ extension Dijkstra<T> on Graph<T> {
       if (v == start) {
         costs[v] = CostVertex(0, v);
       } else {
-        costs[v] = CostVertex(Integer.maxValue, v);
+        costs[v] = CostVertex(Double.maxValue, v);
       }
     }
 
@@ -62,7 +62,7 @@ extension Dijkstra<T> on Graph<T> {
       for (Edge<T> e in vertex.edges) {
         final CostVertex<T> toPair = costs[e.to]!; // O(1)
         final CostVertex<T> lowestCostToThisVertex = costs[vertex]!; // O(1)
-        final int cost = lowestCostToThisVertex.cost + e.cost;
+        final  cost = lowestCostToThisVertex.cost + e.value;
         if (toPair.cost == Integer.maxValue) {
           unvisited.remove(toPair);
           toPair.cost = cost;
@@ -99,7 +99,7 @@ extension Dijkstra<T> on Graph<T> {
   static bool _checkForNegativeEdges<T>(Iterable<Vertex<T>> vertices) {
     for (Vertex<T> v in vertices) {
       for (Edge<T> e in v.edges) {
-        if (e.cost < 0) {
+        if (e.value < 0) {
           return true;
         }
       }

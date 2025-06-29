@@ -11,8 +11,10 @@ class Graph<T> {
   final UniqueList<Vertex<T>> _allVertices = UniqueList();
   final List<Edge<T>> _allEdges = [];
 
-  Graph(
-      {this.type = GraphType.undirected, Iterable<Vertex<T>>? vertices, Iterable<Edge<T>>? edges}) {
+  double width = -1;
+  double height = -1;
+
+  Graph({this.type = GraphType.undirected, Iterable<Vertex<T>>? vertices, Iterable<Edge<T>>? edges}) {
     if (vertices != null) {
       for (final vertex in vertices) {
         addVertex(vertex);
@@ -41,6 +43,16 @@ class Graph<T> {
     return _allEdges;
   }
 
+  bool get isEmpty => _allVertices.isEmpty;
+
+  bool get isNotEmpty => _allVertices.isNotEmpty;
+
+  void adds(Iterable<T> datas) {
+    for (final data in datas) {
+      add(data);
+    }
+  }
+
   void add(T data) {
     final old = _vertexMap[data];
     if (old != null) {
@@ -62,7 +74,13 @@ class Graph<T> {
     _allVertices.add(vertex);
   }
 
-  void addEdge(T source, T target, [int cost = 0]) {
+  void addVertexs(Iterable<Vertex<T>> vertexs) {
+    for(final vertex in vertexs){
+      addVertex(vertex);
+    }
+  }
+
+  void addEdge(T source, T target, [double cost = 0]) {
     var edge = Edge<T>(cost, Vertex(source), Vertex(target));
     addEdgeNode(edge);
   }
@@ -77,7 +95,7 @@ class Graph<T> {
     _allEdges.add(e);
 
     if (type == GraphType.undirected) {
-      final edge2 = Edge<T>(e.cost, to, from);
+      final edge2 = Edge<T>(e.value, to, from);
       to.addEdge(edge2);
       _allEdges.add(edge2);
     }
@@ -224,11 +242,17 @@ class Edge<T> implements Comparable<Edge<T>> {
   late final Vertex<T> from;
   late final Vertex<T> to;
 
-  int cost = 0;
+  dynamic extraLayoutResult;
 
-  Edge(this.cost, this.from, this.to, {String? id}) {
+  dynamic extra;
+
+  dynamic extra2;
+
+  double value = 0;
+
+  Edge(this.value, this.from, this.to, {String? id}) {
     this.id = id ?? "";
-    this.cost = cost;
+    this.value = value;
     this.from = from;
     this.to = to;
   }
@@ -237,7 +261,7 @@ class Edge<T> implements Comparable<Edge<T>> {
     this.id = id ?? "";
     from = e.from;
     to = e.to;
-    cost = e.cost;
+    value = e.value;
   }
 
   @override
@@ -246,7 +270,7 @@ class Edge<T> implements Comparable<Edge<T>> {
   }
 
   @override
-  int compareTo(Edge<T> e) => this.cost.compareTo(e.cost);
+  int compareTo(Edge<T> e) => this.value.compareTo(e.value);
 
   @override
   bool operator ==(Object other) {
@@ -277,7 +301,7 @@ class Edge<T> implements Comparable<Edge<T>> {
 }
 
 class CostPath<T> {
-  final int cost;
+  final double cost;
   final List<Edge<T>> path;
 
   const CostPath(this.cost, this.path);
@@ -315,7 +339,7 @@ class CostPath<T> {
 
 class CostVertex<T> implements Comparable<CostVertex<T>> {
   final Vertex<T> vertex;
-  int cost;
+  double cost;
 
   CostVertex(this.cost, this.vertex);
 

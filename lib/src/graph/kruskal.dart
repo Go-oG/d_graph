@@ -11,7 +11,7 @@ extension Kruskal<T> on Graph<T> {
       throw "Undirected graphs only.";
     }
 
-    int cost = 0;
+    double cost = 0;
     final List<Edge<T>> path = [];
 
     // Prepare data to store information which part of tree given vertex is
@@ -30,7 +30,7 @@ extension Kruskal<T> on Graph<T> {
       if (!_isTheSamePart(edge.from, edge.to, membershipMap)) {
         _union(edge.from, edge.to, membershipMap);
         path.add(edge);
-        cost += edge.cost;
+        cost += edge.value;
       }
     }
 

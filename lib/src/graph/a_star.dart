@@ -10,11 +10,11 @@ extension AStar<T> on Graph<T> {
     openSet.add(start);
     final Map<Vertex<T>, Vertex<T>> cameFrom = {};
 
-    final Map<Vertex<T>, int> gScore = {};
+    final Map<Vertex<T>, double> gScore = {};
     gScore[start] = 0;
-    final Map<Vertex<T>, int> fScore = {};
+    final Map<Vertex<T>, double> fScore = {};
     for (Vertex<T> v in vertices) {
-      fScore[v] = Integer.minValue;
+      fScore[v] = Double.minValue;
     }
     fScore[start] = _heuristicCostEstimate(start, goal);
 
@@ -41,7 +41,7 @@ extension AStar<T> on Graph<T> {
           continue;
         }
 
-        final int tenativeGScore = gScore[current]! + _distanceBetween(current, neighbor);
+        final tenativeGScore = gScore[current]! + _distanceBetween(current, neighbor);
         if (!openSet.contains(neighbor)) {
           openSet.add(neighbor);
         } else if (tenativeGScore >= gScore[neighbor]!) {
@@ -52,8 +52,7 @@ extension AStar<T> on Graph<T> {
 
         gScore[neighbor] = tenativeGScore;
 
-        final int estimatedFScore = gScore[neighbor]! + _heuristicCostEstimate(neighbor, goal);
-        fScore[neighbor] = estimatedFScore;
+        fScore[neighbor] = gScore[neighbor]! + _heuristicCostEstimate(neighbor, goal);
 
         openSet.sort(comparator);
       }
@@ -62,14 +61,14 @@ extension AStar<T> on Graph<T> {
     return null;
   }
 
-  int _distanceBetween(Vertex<T> start, Vertex<T> next) {
+  double _distanceBetween(Vertex<T> start, Vertex<T> next) {
     for (Edge<T> e in start.edges) {
-      if (e.to == next) return e.cost;
+      if (e.to == next) return e.value;
     }
-    return Integer.maxValue;
+    return Double.maxValue;
   }
 
-  int _heuristicCostEstimate(Vertex<T> start, Vertex<T> goal) {
+  double _heuristicCostEstimate(Vertex<T> start, Vertex<T> goal) {
     return 1;
   }
 

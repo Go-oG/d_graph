@@ -1,21 +1,19 @@
-import 'package:d_util/d_util.dart';
-
 import '../../dart_graph.dart';
 
 /// Floyd-Warshall 算法是用于查找所有的最短路径的
 /// 加权图中的路径（具有正或负边缘权重）
 extension FloydWarshall<T> on Graph<T> {
-  Map<Vertex<T>, Map<Vertex<T>, int>> shortestPathsByFloydWarshall() {
+  Map<Vertex<T>, Map<Vertex<T>, double>> shortestPathsByFloydWarshall() {
     final vertices = this.vertices;
 
-    final Array<Array<int>> sums = Array(vertices.length);
+    final Array<Array<double>> sums = Array(vertices.length);
     for (var i = 0; i < vertices.length; i++) {
       sums[i] = Array(vertices.length);
     }
 
     for (int i = 0; i < sums.length; i++) {
       for (int j = 0; j < sums[i].length; j++) {
-        sums[i][j] = Integer.maxValue;
+        sums[i][j] = Double.maxValue;
       }
     }
 
@@ -24,7 +22,7 @@ extension FloydWarshall<T> on Graph<T> {
     for (Edge<T> e in edges) {
       final int indexOfFrom = vertices.indexOf(e.from);
       final int indexOfTo = vertices.indexOf(e.to);
-      sums[indexOfFrom][indexOfTo] = e.cost;
+      sums[indexOfFrom][indexOfTo] = e.value;
     }
 
     for (int k = 0; k < vertices.length; k++) {
@@ -33,27 +31,27 @@ extension FloydWarshall<T> on Graph<T> {
           if (i == j) {
             sums[i][j] = 0;
           } else {
-            final int ijCost = sums[i][j];
-            final int ikCost = sums[i][k];
-            final int kjCost = sums[k][j];
-            final int summed = (ikCost != maxInt && kjCost != maxInt) ? (ikCost + kjCost) : maxInt;
+            final ijCost = sums[i][j];
+            final ikCost = sums[i][k];
+            final kjCost = sums[k][j];
+            final summed = (ikCost != maxInt && kjCost != maxInt) ? (ikCost + kjCost) : maxInt;
             if (ijCost > summed) {
-              sums[i][j] = summed;
+              sums[i][j] = summed.toDouble();
             }
           }
         }
       }
     }
 
-    final Map<Vertex<T>, Map<Vertex<T>, int>> allShortestPaths = {};
+    final Map<Vertex<T>, Map<Vertex<T>, double>> allShortestPaths = {};
 
     for (int i = 0; i < sums.length; i++) {
       for (int j = 0; j < sums[i].length; j++) {
         final Vertex<T> from = vertices[i];
         final Vertex<T> to = vertices[j];
-        Map<Vertex<T>, int>? map = allShortestPaths[from];
+        Map<Vertex<T>, double>? map = allShortestPaths[from];
         map ??= {};
-        final int cost = sums[i][j];
+        final double cost = sums[i][j];
         if (cost != maxInt) {
           map.put(to, cost);
         }

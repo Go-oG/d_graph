@@ -10,7 +10,7 @@ extension Prim<T> on Graph<T> {
     if (type == GraphType.directed) {
       throw "Undirected graphs only.";
     }
-    int cost = 0;
+    double cost = 0;
     final Set<Vertex<T>> unvisited = <Vertex<T>>{};
     unvisited.addAll(vertices);
     unvisited.remove(start);
@@ -24,7 +24,7 @@ extension Prim<T> on Graph<T> {
         }
       }
       final Edge<T> e = edgesAvailable.removeFirst();
-      cost += e.cost;
+      cost += e.value;
       path.add(e); // O(1)
 
       vertex = e.to;

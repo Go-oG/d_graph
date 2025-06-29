@@ -29,7 +29,7 @@ extension CycleDetection<T> on Graph<T> {
       bool result = false;
       if (!visitedEdges.contains(edge)) {
         visitedEdges.add(edge);
-        final Edge<T> recip = Edge<T>(edge.cost, edge.to, edge.from);
+        final Edge<T> recip = Edge<T>(edge.value, edge.to, edge.from);
         visitedEdges.add(recip);
         result = _depthFirstSearch(to, visitedVertices, visitedEdges);
       }

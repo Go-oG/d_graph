@@ -14,7 +14,7 @@ extension BellmanFord<T> on Graph<T> {
 
     final Map<Vertex<T>, CostPath<T>> map = {};
     for (CostVertex<T> pair in costs.values) {
-      final int cost = pair.cost;
+      final  cost = pair.cost;
       final Vertex<T> vertex = pair.vertex;
       final List<Edge<T>> path = paths[vertex]!;
       map.put(vertex, CostPath(cost, path));
@@ -55,7 +55,7 @@ extension BellmanFord<T> on Graph<T> {
       if (v == start) {
         costs.put(v, CostVertex(0, v));
       } else {
-        costs.put(v, CostVertex(Integer.maxValue, v));
+        costs.put(v, CostVertex(Double.maxValue, v));
       }
     }
 
@@ -73,7 +73,7 @@ extension BellmanFord<T> on Graph<T> {
           continue;
         }
 
-        final int cost = lowestCostToThisVertex.cost + e.cost;
+        final  cost = lowestCostToThisVertex.cost + e.value;
         if (cost < pair.cost) {
           pair.cost = cost;
           if (negativeCycleCheck) {
