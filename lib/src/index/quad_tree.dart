@@ -666,6 +666,14 @@ class QuadNode2<T> {
     }
     return list;
   }
+
+  dynamic extraLayoutResult;
+
+  double extra=0;
+  double extra2=0;
+  double extra3=0;
+  double extra4=0;
+
 }
 
 int _toInt(bool a) {
