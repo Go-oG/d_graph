@@ -243,9 +243,7 @@ class Edge<T> implements Comparable<Edge<T>> {
   late final Vertex<T> to;
 
   dynamic extraLayoutResult;
-
   dynamic extra;
-
   dynamic extra2;
 
   double value = 0;
