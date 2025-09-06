@@ -54,8 +54,7 @@ abstract class BasicLine extends BasicGeometry {
       return IntersectUtil.intersectWithLine(start, end, geom.start, geom.end);
     }
     if (geom is Arc) {
-      return geom.annularSector
-          .isIntersectsLine(start, end);
+      return geom.annularSector.isIntersectsLine(start, end);
     }
     return super.isOverlap(geom, eps: eps);
   }
@@ -355,6 +354,8 @@ final class RayLine extends BasicLine {
 
   @override
   Path get path => throw UnimplementedError();
+
+  SegmentLine get segmentLine => _proxyLine;
 }
 
 final class Line extends BasicLine {
@@ -415,6 +416,8 @@ final class Line extends BasicLine {
 
   @override
   Path get path => throw UnimplementedError();
+
+  SegmentLine get segmentLine => _proxyLine;
 }
 
 /// 简洁版：把直线 p1->p2 延伸成“超长”线段
