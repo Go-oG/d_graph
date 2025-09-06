@@ -1,89 +1,228 @@
 import 'dart:math';
 import 'dart:ui';
+import 'package:dart_graph/dart_graph.dart';
+import 'package:dts/dts.dart' as dt;
+import 'basic.dart';
+import 'circle.dart';
+import 'polygon.dart';
+import 'triangle.dart';
+import '../extensions.dart';
 
-import 'package:dart_graph/src/geomtry/offset_ext.dart';
-import 'package:dart_graph/src/geomtry/polygon.dart';
-
-class Line {
-  final LineType type;
+abstract class BasicLine extends BasicGeometry {
   final Offset start;
   final Offset end;
 
-  const Line.ray(this.start, this.end) : type = LineType.ray;
+  BasicLine(this.start, this.end);
 
-  const Line.line(this.start, this.end) : type = LineType.line;
+  @override
+  late final Rect bbox = Rect.fromPoints(start, end);
+  @override
+  late final double area = 0;
+  @override
+  late final double length = (start - end).distance;
+  @override
+  late final Offset center = (start + end) / 2;
 
-  const Line.segment(this.start, this.end) : type = LineType.segment;
+  Offset get vector => end - start;
 
-  bool isCrossLine(Line other) {
-    final p1 = start, p2 = end, p3 = other.start, p4 = other.end;
+  Offset get unitVector {
+    final v = vector;
+    final d = v.distance;
+    if (d <= 0) {
+      return Offset.zero;
+    }
+    return v / d;
+  }
 
-    double x1 = p1.dx, y1 = p1.dy;
-    double x2 = p2.dx, y2 = p2.dy;
-    double x3 = p3.dx, y3 = p3.dy;
-    double x4 = p4.dx, y4 = p4.dy;
+  @override
+  int get hashCode => Object.hash(start, end);
 
-    // 计算叉积
-    double cross1 = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1);
-    double cross2 = (x2 - x1) * (y4 - y1) - (y2 - y1) * (x4 - x1);
-    double cross3 = (x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3);
-    double cross4 = (x4 - x3) * (y2 - y3) - (y4 - y3) * (x2 - x3);
-
-    // 判断是否相交
-    if (((cross1 > 0 && cross2 < 0) || (cross1 < 0 && cross2 > 0)) &&
-        ((cross3 > 0 && cross4 < 0) || (cross3 < 0 && cross4 > 0))) {
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) {
       return true;
     }
-
-    // 检查端点是否在另一条线段上
-    if (cross1 == 0 && _isOnLineRange(p1, p2, p3)) return true;
-    if (cross2 == 0 && _isOnLineRange(p1, p2, p4)) return true;
-    if (cross3 == 0 && _isOnLineRange(p3, p4, p1)) return true;
-    if (cross4 == 0 && _isOnLineRange(p3, p4, p2)) return true;
-    return false;
+    return other is BasicLine && other.start == start && other.end == end && other.runtimeType == runtimeType;
   }
 
-  ///是否和其它线段有重合
-  bool isOverlapLine(Line other) {
-    double cross(Offset o, Offset a, Offset b) {
-      return (a.dx - o.dx) * (b.dy - o.dy) - (a.dy - o.dy) * (b.dx - o.dx);
+  @override
+  bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) {
+    if (geom is Circle) {
+      return geom.isOverlap(this, eps: eps);
+    }
+    if (geom is BasicLine) {
+      return IntersectUtil.intersectWithLine(start, end, geom.start, geom.end);
+    }
+    if (geom is Arc) {
+      return geom.annularSector
+          .isIntersectsLine(start, end);
+    }
+    return super.isOverlap(geom, eps: eps);
+  }
+}
+
+class SegmentLine extends BasicLine {
+  SegmentLine(super.start, super.end);
+
+  @override
+  Path onBuildPath() {
+    Path path = Path();
+    path.moveTo(start.x, start.y);
+    path.lineTo(end.x, end.y);
+    return path;
+  }
+
+  @override
+  bool contains(BasicGeometry geom) => false;
+
+  @override
+  bool containsPoint(Offset p, {double eps = 1e-9}) {
+    eps = max(0, eps);
+    final dx = p.dx;
+    final dy = p.dy;
+    if (dy > max(start.dy, end.dy) + eps || dy < min(start.dy, end.dy) - eps) {
+      return false;
+    }
+    if (dx > max(start.dx, end.dx) + eps || dx < min(start.dx, end.dx) - eps) {
+      return false;
+    }
+    return distanceWithPoint(p) <= eps;
+  }
+
+  @override
+  double distance(BasicGeometry geom) {
+    if (geom is Circle) {
+      return distanceWithCircle(geom.center, geom.radius);
+    }
+    if (geom is SegmentLine) {
+      return distanceWithLine(geom);
+    }
+    if (geom is Triangle) {
+      return distanceWithTriangle(geom);
+    }
+    if (geom is Polygon) {
+      return distanceWithPolygon(geom);
+    }
+    return asGeometry.distance(geom.asGeometry);
+  }
+
+  @override
+  double distanceWithPoint(Offset p) {
+    final line = geomFactory.createLinearRing4([start, end]);
+    return line.distance(geomFactory.createPoint4(p));
+  }
+
+  @override
+  double distanceWithRect(Rect rect) {
+    final line = geomFactory.createLineString3([start, end]);
+    final rr = geomFactory.createPolygon5([rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft]);
+    return rr.distance(line);
+  }
+
+  double distanceWithCircle(Offset center, double radius) {
+    double dis = distanceWithPoint(center);
+    if (dis <= 0 || dis.isNaN || dis <= radius) {
+      return 0;
+    }
+    return dis - radius;
+  }
+
+  double distanceWithTriangle(Triangle triangle) {
+    if (triangle.containsPoint(start) || triangle.containsPoint(end)) return 0.0;
+    double minDist = double.infinity;
+    for (var edge in triangle.lines) {
+      double dist = distanceWithLine(edge);
+      minDist = min(minDist, dist);
+    }
+    return minDist;
+  }
+
+  double distanceWithPolygon(Polygon polygon) {
+    if (polygon.containsPoint(start) || polygon.containsPoint(end)) {
+      return 0;
     }
 
-    bool onSegment(Offset a, Offset b, Offset p) {
-      return (p.dx >= a.dx && p.dx <= b.dx || p.dx >= b.dx && p.dx <= a.dx) &&
-          (p.dy >= a.dy && p.dy <= b.dy || p.dy >= b.dy && p.dy <= a.dy);
-    }
-
-    bool doSegmentsOverlap(Offset p1, Offset p2, Offset p3, Offset p4) {
-      if (cross(p1, p2, p3) != 0 || cross(p1, p2, p4) != 0) {
-        return false;
+    double minDist = double.infinity;
+    for (var edge in polygon.lines) {
+      double dist = distanceWithLine(edge);
+      if (dist <= 0) {
+        return 0;
       }
-      return onSegment(p3, p4, p1) || onSegment(p3, p4, p2) || onSegment(p1, p2, p3) || onSegment(p1, p2, p4);
+      minDist = min(minDist, dist);
     }
-
-    return doSegmentsOverlap(start, end, other.start, other.end);
+    return minDist;
   }
 
-  //计算两条线段的交点
-  Offset? lineCrossPoint(Line line) {
-    final p1 = start, p2 = end, p3 = line.start, p4 = line.end;
+  ///求点Q到线的距离
+  /// 如果是射线 或者直线 则为垂直距离
+  /// 如果为线段 则为最近距离
+  double distanceWithLine(SegmentLine line) {
+    double dis = double.infinity;
+    dis = min(dis, distanceWithPoint(line.start));
+    dis = min(dis, distanceWithPoint(line.end));
+    dis = min(dis, line.distanceWithPoint(start));
+    dis = min(dis, line.distanceWithPoint(end));
+    return dis;
+  }
 
+  /// 计算和起点[start] 距离为 d 且在线上的点的坐标
+  Offset distancePoint(double d) {
+    Offset off = end - start;
+    final magnitude = off.distance;
+    if (magnitude == 0) {
+      throw ArgumentError("起点和终止点不能重合");
+    }
+    off = off * (d / magnitude);
+    return start + off;
+  }
+
+  @override
+  List<Offset> crossPoint(BasicGeometry geom) {
+    if (geom is Circle) {
+      return crossPointWithCircle(geom.center, geom.radius);
+    }
+    if (geom is Triangle) {
+      return crossPointWithTriangle(geom);
+    }
+    if (geom is Polygon) {
+      return crossPointWithPolygon(geom);
+    }
+
+    return BasicGeometry.pickCrossPoint(asGeometry.intersection(geom.asGeometry));
+  }
+
+  @override
+  List<Offset> crossPointWithRect(Rect rect) {
+    List<Offset> list = [];
+    List<SegmentLine> lineList = [
+      SegmentLine(rect.topLeft, rect.topRight),
+      SegmentLine(rect.topRight, rect.bottomRight),
+      SegmentLine(rect.bottomRight, rect.bottomLeft),
+      SegmentLine(rect.bottomLeft, rect.topLeft),
+    ];
+    for (final line in lineList) {
+      final p = crossPointWithLine(line);
+      if (p != null) {
+        list.add(p);
+      }
+    }
+    return list;
+  }
+
+  Offset? crossPointWithLine(BasicLine line) {
+    final p1 = start, p2 = end, p3 = line.start, p4 = line.end;
     double x1 = p1.dx, y1 = p1.dy;
     double x2 = p2.dx, y2 = p2.dy;
     double x3 = p3.dx, y3 = p3.dy;
     double x4 = p4.dx, y4 = p4.dy;
-
-    // 计算分母
     double denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
     if (denom == 0) {
       return null;
     }
 
-    // 计算参数 t 和 u
     double ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom;
     double ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom;
 
-    // 检查交点是否在线段上
     if (ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1) {
       double x = x1 + ua * (x2 - x1);
       double y = y1 + ua * (y2 - y1);
@@ -92,151 +231,207 @@ class Line {
     return null;
   }
 
-  // 计算直线与矩形的交点
-  List<Offset> rectCrossPoint(Rect rect) {
-    List<Offset> intersections = [];
-    double x1 = start.dx, y1 = start.dy;
-    double x2 = end.dx, y2 = end.dy;
-    double dx = x2 - x1;
-    double dy = y2 - y1;
-    if (dy != 0) {
-      double tTop = (rect.top - y1) / dy;
-      double tBottom = (rect.bottom - y1) / dy;
-
-      if (tTop >= 0 && tTop <= 1) {
-        double x = x1 + tTop * dx;
-        if (x >= rect.left && x <= rect.right) {
-          intersections.add(Offset(x, rect.top));
-        }
-      }
-
-      if (tBottom >= 0 && tBottom <= 1) {
-        double x = x1 + tBottom * dx;
-        if (x >= rect.left && x <= rect.right) {
-          intersections.add(Offset(x, rect.bottom));
-        }
+  List<Offset> crossPointWithTriangle(Triangle triangle) {
+    List<Offset> list = [];
+    for (final line in triangle.lines) {
+      final point = crossPointWithLine(line);
+      if (point != null) {
+        list.add(point);
       }
     }
-    if (dx != 0) {
-      double tLeft = (rect.left - x1) / dx;
-      double tRight = (rect.right - x1) / dx;
-
-      if (tLeft >= 0 && tLeft <= 1) {
-        double y = y1 + tLeft * dy;
-        if (y >= rect.top && y <= rect.bottom) {
-          intersections.add(Offset(rect.left, y));
-        }
-      }
-
-      if (tRight >= 0 && tRight <= 1) {
-        double y = y1 + tRight * dy;
-        if (y >= rect.top && y <= rect.bottom) {
-          intersections.add(Offset(rect.right, y));
-        }
-      }
-    }
-    return intersections;
+    return list;
   }
 
-  // 判断点是否在线段对应区间
-  bool _isOnLineRange(Offset p1, Offset p2, Offset p) {
-    double minX = min(p1.dx, p2.dx);
-    double maxX = max(p1.dx, p2.dx);
-    double minY = min(p1.dy, p2.dy);
-    double maxY = max(p1.dy, p2.dy);
-    return (p.dx >= minX && p.dx <= maxX) && (p.dy >= minY && p.dy <= maxY);
+  List<Offset> crossPointWithCircle(Offset center, double radius, {double eps = 1e-10}) {
+    final d = end - start;
+    final fx = start.x - center.x;
+    final fy = start.y - center.y;
+    final dx = d.x, dy = d.y;
+    final aCoeff = dx * dx + dy * dy;
+    final bCoeff = 2 * (fx * dx + fy * dy);
+    final cCoeff = fx * fx + fy * fy - radius * radius;
+
+    final disc = bCoeff * bCoeff - 4 * aCoeff * cCoeff;
+    if (disc < -eps) return [];
+    bool acceptT(double t) => t >= 0 && t <= 1;
+    final result = <Offset>[];
+    if (disc.abs() <= eps) {
+      final t = -bCoeff / (2 * aCoeff);
+      if (acceptT(t)) result.add(start + d * t);
+    } else {
+      final sqrtDisc = sqrt(disc);
+      final t1 = (-bCoeff - sqrtDisc) / (2 * aCoeff);
+      final t2 = (-bCoeff + sqrtDisc) / (2 * aCoeff);
+      if (acceptT(t1)) result.add(start + d * t1);
+      if (acceptT(t2)) result.add(start + d * t2);
+    }
+    return result;
   }
 
-  bool isCrossPolygon(Polygon polygon) {
-    for(var line in polygon.lines){
-      if (isCrossLine(line)) {
-        return true;
+  List<Offset> crossPointWithPolygon(Polygon polygon) {
+    List<Offset> list = [];
+    for (final line in polygon.lines) {
+      final p = crossPointWithLine(line);
+      if (p != null) {
+        list.add(p);
       }
     }
-    return (polygon.containsPoint(start) || polygon.containsPoint(end));
-  }
 
-  /// 计算线上一点该点距离起点[start] 距离为 d
-  Offset distancePoint(double d) {
-    final dx = end.dx - start.dx;
-    final dy = end.dy - start.dy;
-    final magnitude = sqrt(pow(dx, 2) + pow(dy, 2));
-    if (magnitude == 0) {
-      throw ArgumentError("起点和终止点不能重合");
-    }
-    final unitX = dx / magnitude;
-    final unitY = dy / magnitude;
-    return Offset(start.dx + d * unitX, start.dy + d * unitY);
+    return list;
   }
 
   /// 计算直线上点P的垂点Q，满足 PQ垂直于L 且距离为D
   /// [xA, yA] 和 [xB, yB] 是直线L上的两点，用于确定直线方向
   /// [dis] 是PQ的距离（可为正负，方向由垂线方向决定）
   Offset verticalPoint(Offset p, double dis) {
-    // 计算直线L的方向向量
-    final dx = end.dx - start.dx;
-    final dy = end.dy - start.dy;
-    // 计算垂直于直线的方向向量（左侧垂直方向）
-    final perpX = -dy;
-    final perpY = dx;
-
-    final magnitude = sqrt(perpX * perpX + perpY * perpY);
+    Offset unit = Offset(end.dx - start.dx, start.dy - end.dy);
+    final magnitude = unit.distance;
     if (magnitude == 0) {
       throw ArgumentError("直线L的两点重合，无法确定方向");
     }
-
-    // 单位化垂线向量
-    final unitX = perpX / magnitude;
-    final unitY = perpY / magnitude;
-
-    return Offset(p.dx + dis * unitX, p.dy + dis * unitY);
-  }
-
-  ///判断给定点是否在当前线段上
-  bool contains(Offset p, {double deviation = 4}) {
-    if (deviation < 0) {
-      deviation = 0;
-    }
-    var dx = p.dx;
-    var dy = p.dy;
-    if (dy > max(start.dy, end.dy) + deviation || dy < min(start.dy, end.dy) - deviation) {
-      return false;
-    }
-    if (dx > max(start.dx, end.dx) + deviation || dx < min(start.dx, end.dx) - deviation) {
-      return false;
-    }
-    return distance(p) <= deviation;
-  }
-
-  /// 求点Q到直线的距离
-  double distance(Offset p) {
-    var dx = p.dx;
-    var dy = p.dy;
-    if (start.dx.compareTo(end.dx) == 0 && start.dy.compareTo(end.dy) == 0) {
-      return p.distance2(start);
-    }
-    double A = end.dy - start.dy;
-    double B = start.dx - end.dx;
-    double C = end.dx * start.dy - start.dx * end.dy;
-    return ((A * dx + B * dy + C) / (sqrt(A * A + B * B))).abs();
+    unit = unit * (dis / magnitude);
+    return unit + p;
   }
 
   @override
-  int get hashCode {
-    return Object.hash(start, end);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(other, this)) {
-      return true;
-    }
-    return other is Line && other.start == start && other.end == end;
-  }
+  dt.Geometry buildGeometry() => geomFactory.createLineString3([start, end]);
 }
 
-enum LineType {
-  line,
-  segment,
-  ray;
+final class RayLine extends BasicLine {
+  late final SegmentLine _proxyLine;
+
+  RayLine(super.start, super.end) {
+    final res = _extendLineSimple(start, end);
+    _proxyLine = SegmentLine(start, res.last);
+  }
+
+  @override
+  double get area => 0;
+
+  @override
+  dt.Geometry get asGeometry => _proxyLine.asGeometry;
+
+  @override
+  Rect get bbox => _proxyLine.bbox;
+
+  @override
+  dt.Geometry buildGeometry() => throw UnimplementedError();
+
+  @override
+  Offset get center => _proxyLine.center;
+
+  @override
+  bool contains(BasicGeometry geom) => _proxyLine.contains(geom);
+
+  @override
+  bool containsPoint(Offset p, {double eps = 1e-9}) => _proxyLine.containsPoint(p, eps: eps);
+
+  @override
+  List<Offset> crossPoint(BasicGeometry geom) => _proxyLine.crossPoint(geom);
+
+  @override
+  List<Offset> crossPointWithRect(Rect rect) => _proxyLine.crossPointWithRect(rect);
+
+  @override
+  double distance(BasicGeometry geom) => _proxyLine.distance(geom);
+
+  @override
+  double distanceWithPoint(Offset p) => _proxyLine.distanceWithPoint(p);
+
+  @override
+  double distanceWithRect(Rect rect) => _proxyLine.distanceWithRect(rect);
+
+  @override
+  bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) => _proxyLine.isOverlap(geom, eps: eps);
+
+  @override
+  bool isOverlapRect(Rect rect) => _proxyLine.isOverlapRect(rect);
+
+  @override
+  double get length => double.infinity;
+
+  @override
+  Path onBuildPath() => throw UnimplementedError();
+
+  @override
+  Path get path => throw UnimplementedError();
+}
+
+final class Line extends BasicLine {
+  late final SegmentLine _proxyLine;
+
+  Line(super.start, super.end) {
+    final res = _extendLineSimple(start, end);
+    _proxyLine = SegmentLine(res.first, res.last);
+  }
+
+  @override
+  double get area => 0;
+
+  @override
+  dt.Geometry get asGeometry => _proxyLine.asGeometry;
+
+  @override
+  Rect get bbox => _proxyLine.bbox;
+
+  @override
+  dt.Geometry buildGeometry() => throw UnimplementedError();
+
+  @override
+  Offset get center => _proxyLine.center;
+
+  @override
+  bool contains(BasicGeometry geom) => _proxyLine.contains(geom);
+
+  @override
+  bool containsPoint(Offset p, {double eps = 1e-9}) => _proxyLine.containsPoint(p, eps: eps);
+
+  @override
+  List<Offset> crossPoint(BasicGeometry geom) => _proxyLine.crossPoint(geom);
+
+  @override
+  List<Offset> crossPointWithRect(Rect rect) => _proxyLine.crossPointWithRect(rect);
+
+  @override
+  double distance(BasicGeometry geom) => _proxyLine.distance(geom);
+
+  @override
+  double distanceWithPoint(Offset p) => _proxyLine.distanceWithPoint(p);
+
+  @override
+  double distanceWithRect(Rect rect) => _proxyLine.distanceWithRect(rect);
+
+  @override
+  bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) => _proxyLine.isOverlap(geom, eps: eps);
+
+  @override
+  bool isOverlapRect(Rect rect) => _proxyLine.isOverlapRect(rect);
+
+  @override
+  double get length => double.infinity;
+
+  @override
+  Path onBuildPath() => throw UnimplementedError();
+
+  @override
+  Path get path => throw UnimplementedError();
+}
+
+/// 简洁版：把直线 p1->p2 延伸成“超长”线段
+/// [L] 是半长度，返回 [start, end]
+List<Offset> _extendLineSimple(Offset p1, Offset p2, {double L = 1e10}) {
+  final dx = p2.dx - p1.dx;
+  final dy = p2.dy - p1.dy;
+  final dist = sqrt(dx * dx + dy * dy);
+
+  if (dist < 1e-12) {
+    return [Offset(p1.dx - L, p1.dy), Offset(p1.dx + L, p1.dy)];
+  }
+
+  final ux = dx / dist;
+  final uy = dy / dist;
+  final center = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
+  final start = Offset(center.dx - ux * L, center.dy - uy * L);
+  final end = Offset(center.dx + ux * L, center.dy + uy * L);
+  return [start, end];
 }

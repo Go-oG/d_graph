@@ -1,16 +1,235 @@
-import 'dart:math';
+import 'dart:math' as m;
 import 'dart:ui';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/painting.dart';
 
-import 'package:flutter/material.dart';
+import 'package:dart_graph/dart_graph.dart';
+import 'package:dts/dts.dart' as dt;
+
+extension RectExt on Rect {
+
+  bool contains2(Offset offset) {
+    return offset.dx >= left && offset.dx <= right && offset.dy >= top && offset.dy <= bottom;
+  }
+
+  bool contains3(num x, num y) {
+    return x >= left && x <= right && y >= top && y <= bottom;
+  }
+
+  String toString2() {
+    return 'LTRB(${left.toStringAsFixed(1)}, ${top.toStringAsFixed(1)}, ${right.toStringAsFixed(1)}, ${bottom.toStringAsFixed(1)})';
+  }
+
+  ///返回一个新矩形 其每条边向内缩减指定量
+  Rect deflate2({num left = 0, num right = 0, num top = 0, num bottom = 0}) {
+    if (left == 0 && right == 0 && top == 0 && bottom == 0) {
+      return this;
+    }
+    return Rect.fromLTRB(this.left - left, this.top - top, this.right - right, this.bottom - bottom);
+  }
+
+  double get centerX {
+    return left + width / 2;
+  }
+
+  double get centerY {
+    return top + height / 2;
+  }
+
+  bool containsPolygon(Polygon polygon) {
+    double xMin = left;
+    double yMin = top;
+    double xMax = right;
+    double yMax = bottom;
+    for (var point in polygon.vertex) {
+      if (point.dx < xMin || point.dx > xMax || point.dy < yMin || point.dy > yMax) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Path toPath() {
+    Path path = Path();
+    path.moveTo(left, top);
+    path.lineTo(right, top);
+    path.lineTo(right, bottom);
+    path.lineTo(left, bottom);
+    path.close();
+    return path;
+  }
+
+  dt.Geometry get asGeometry => geomFactory.createPolygon5([topLeft, topRight, bottomRight, bottomLeft], true);
+}
+
+extension RRectExt on RRect {
+  Path toPath() {
+    final path = Path();
+    path.moveTo(left + tlRadiusX, top);
+    path.lineTo(right - trRadiusX, top);
+    path.arcToPoint(Offset(right, top + trRadiusY), radius: trRadius, clockwise: false);
+    path.lineTo(right, bottom - brRadiusY);
+    path.arcToPoint(Offset(right - brRadiusX, bottom), radius: brRadius, clockwise: false);
+    path.lineTo(left + blRadiusX, bottom);
+    path.arcToPoint(Offset(left, bottom - blRadiusY), radius: blRadius, clockwise: false);
+    path.lineTo(left, top + tlRadiusY);
+    path.arcToPoint(Offset(left + tlRadiusX, top), radius: tlRadius, clockwise: false);
+    path.close();
+    return path;
+  }
+}
+
+extension OffsetExt on Offset {
+  Offset get invert => Offset(-dx, -dy);
+
+  Offset get abs {
+    if (dx >= 0 && dy >= 0) {
+      return this;
+    }
+    return Offset(dx.abs(), dy.abs());
+  }
+
+  double get x => dx;
+
+  double get y => dy;
+
+  //向量叉积
+  double cross(Offset b) => x * b.y - y * b.x;
+
+  //向量点积
+  double dot(Offset b) => x * b.x + y * b.y;
+
+  double distance2(Offset p) => distance3(p.dx, p.dy);
+
+  double distance3(num x, num y) => m.sqrt(distanceNotSqrt(x, y));
+
+  double distanceNotSqrt(num x, num y) {
+    double a = (dx - x).abs();
+    double b = (dy - y).abs();
+    return a * a + b * b;
+  }
+
+  bool inLine(Offset p1, Offset p2, {double deviation = 4}) {
+    return Line(p1, p2).containsPoint(this, eps: deviation);
+  }
+
+  bool inPolygon(List<Offset> list) => Polygon(list).containsPoint(this);
+
+  bool inSector(
+    num innerRadius,
+    num outerRadius,
+    num startAngle,
+    num sweepAngle, {
+    Offset center = Offset.zero,
+  }) {
+    double d1 = distance2(center);
+    if (d1 > outerRadius || d1 < innerRadius) {
+      return false;
+    }
+    if (sweepAngle.abs() >= 360) {
+      return true;
+    }
+    return inArc(
+      Arc(
+        innerRadius: innerRadius.toDouble(),
+        outRadius: outerRadius.toDouble(),
+        sweepAngle: sweepAngle.toDouble(),
+        startAngle: startAngle.toDouble(),
+        center: center,
+      ),
+    );
+  }
+
+  bool inArc(Arc arc) => arc.containsPoint(this);
+
+  bool inCircle(num radius, {Offset center = Offset.zero, bool equal = true}) {
+    return inCircle2(radius, center.dx, center.dy, equal);
+  }
+
+  bool inCircle2(num radius, [num cx = 0, num cy = 0, bool equal = true]) {
+    double a = (dx - cx).abs();
+    double b = (dy - cy).abs();
+    if (equal) {
+      return a * a + b * b <= radius * radius;
+    }
+    return a * a + b * b < radius * radius;
+  }
+
+  double angle([Offset center = Offset.zero]) {
+    double d = m.atan2(dy - center.dy, dx - center.dx);
+    if (d < 0) {
+      d += 2 * m.pi;
+    }
+    return d * 180 / m.pi;
+  }
+
+  ///返回绕center点旋转angle角度后的位置坐标
+  ///逆时针 angle 为负数
+  ///顺时针 angle 为正数
+  Offset rotate(num angle, {Offset center = Offset.zero}) {
+    angle = angle % 360;
+    num t = angle * Arc.angleUnit;
+    double x = (dx - center.dx) * m.cos(t) - (dy - center.dy) * m.sin(t) + center.dx;
+    double y = (dx - center.dx) * m.sin(t) + (dy - center.dy) * m.cos(t) + center.dy;
+    return Offset(x, y);
+  }
+
+  Offset translate2(Offset other) {
+    return translate(other.dx, other.dy);
+  }
+
+  Offset merge(Offset offset) {
+    if (offset == this) {
+      return offset;
+    }
+    return Offset((dx + offset.dx) / 2, (dy + offset.dy) / 2);
+  }
+
+  Offset symmetryPoint(Offset start, Offset end) {
+    double v1 = (dx - start.dx) * (end.dx - start.dx) + (dy - start.dy) * (end.dy - start.dy);
+    double v2 = (end.dx - start.dx) * (end.dx - start.dx) + (end.dy - start.dy) * (end.dy - start.dy);
+    double t = v1 / v2;
+    double qdx = start.dx + (end.dx - start.dx) * t;
+    double qdy = start.dy + (end.dy - start.dy) * t;
+
+    return Offset(2.0 * qdx - dx, 2.0 * qdy - dy);
+  }
+
+  bool equal(Offset other, [double accurate = 1e-6]) {
+    var x = other.dx - dx;
+    var y = other.dy - dy;
+    return x.abs() <= accurate && y.abs() <= accurate;
+  }
+
+  dt.Coordinate get asCoordinate => dt.Coordinate(dx, dy);
+
+  dt.Point get asPoint => geomFactory.createPoint4(this);
+}
+
+extension DTSPointExt on dt.Point {
+  Offset get asOffset => Offset(getX(), getY());
+}
+
+extension DTSCoordinateExt on dt.Coordinate {
+  Offset get asOffset => Offset(x, y);
+}
+
+extension DTSRectExt on dt.Envelope {
+  Rect get asRect => Rect.fromLTRB(minX, minY, maxX, maxY);
+}
+
 
 extension PathExt on Path {
+  void lineTo2(Offset p) => lineTo(p.x, p.y);
+
+  void moveTo2(Offset p) => moveTo(p.x, p.y);
+
   void drawShadows(Canvas canvas, Path path, List<BoxShadow> shadows) {
     for (final BoxShadow shadow in shadows) {
       final Paint shadowPainter = shadow.toPaint();
       if (shadow.spreadRadius == 0) {
         canvas.drawPath(path.shift(shadow.offset), shadowPainter);
       } else {
-        //关于扩散半径，后续优化
         Rect zone = path.getBounds();
         double xScale = (zone.width + shadow.spreadRadius) / zone.width;
         double yScale = (zone.height + shadow.spreadRadius) / zone.height;
@@ -30,7 +249,7 @@ extension PathExt on Path {
     }
     num dashLength = dash[0];
     num dashGapLength = dashLength >= 2 ? dash[1] : dash[0];
-    DashedPathProperties properties = DashedPathProperties(
+    _DashedProperties properties = _DashedProperties(
       path: Path(),
       dashLength: dashLength,
       dashGapLength: dashGapLength,
@@ -174,14 +393,6 @@ extension PathExt on Path {
     return path;
   }
 
-  void moveTo2(Offset offset) {
-    moveTo(offset.dx, offset.dy);
-  }
-
-  void lineTo2(Offset offset) {
-    lineTo(offset.dx, offset.dy);
-  }
-
   bool overlapRect(Rect rect) {
     if (contains(rect.topLeft)) {
       return true;
@@ -201,7 +412,7 @@ extension PathExt on Path {
 }
 
 ///用于实现 path dash
-class DashedPathProperties {
+class _DashedProperties {
   num extractedPathLength;
   Path path;
 
@@ -210,7 +421,7 @@ class DashedPathProperties {
   num _remainingDashGapLength;
   bool _previousWasDash;
 
-  DashedPathProperties({
+  _DashedProperties({
     required this.path,
     required num dashLength,
     required num dashGapLength,
@@ -262,7 +473,7 @@ class DashedPathProperties {
   }
 
   num _calculateLength(PathMetric metric, num addedLength) {
-    return min(extractedPathLength + addedLength, metric.length);
+    return m.min(extractedPathLength + addedLength, metric.length);
   }
 
   num _updateRemainingLength({

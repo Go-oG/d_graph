@@ -1,16 +1,18 @@
-import 'dart:ui';
 import 'dart:math' as m;
+import 'dart:math';
+import 'dart:ui';
 
-import 'package:dart_graph/src/geomtry/offset_ext.dart';
-import 'package:dart_graph/src/geomtry/path_ext.dart';
+import 'package:dart_graph/dart_graph.dart';
+import 'package:dts/dts.dart' show Geometry;
 
-class Arc {
+class Arc extends BasicGeometry {
   static const angleUnit = m.pi / 180;
   static final zero = Arc();
   static const double circleMinAngle = 359.99;
   static const double cornerMin = 0.001;
   static const double innerMin = 0.01;
 
+  @override
   final Offset center;
   final double innerRadius;
   final double outRadius;
@@ -19,8 +21,6 @@ class Arc {
   final double cornerRadius;
   final double padAngle;
   late final double maxRadius;
-
-  Path? _path;
 
   Arc({
     this.innerRadius = 0,
@@ -64,30 +64,34 @@ class Arc {
     );
   }
 
-  Path get path {
-    final pp = _path;
-    if (pp != null) {
-      return pp;
-    }
+  @override
+  late final Rect bbox = _onBuildBound();
+
+  @override
+  late final double length = annularSector.perimeter;
+
+  @override
+  late final double area = annularSector.area;
+
+  @override
+  Path onBuildPath() {
     final double ir = innerRadius <= 0.001 ? 0 : innerRadius.toDouble();
     final double or = outRadius.toDouble();
     final bool clockwise = sweepAngle >= 0;
     final int direction = clockwise ? 1 : -1;
     if (sweepAngle.abs() >= circleMinAngle) {
-      _path = _buildCircle(center, startAngle, ir, or, direction);
-      return _path!;
+      return _buildCircle(center, startAngle, ir, or, direction);
     }
     var corner = m.min(cornerRadius, (or - ir) / 2);
     corner = m.max(corner, 0);
 
     ///普通扇形
     if (ir <= innerMin) {
-      _path = _buildNormalArc(center, startAngle.toDouble(), sweepAngle.toDouble(), or, corner.toDouble());
-      return _path!;
+      return _buildNormalArc(center, startAngle.toDouble(), sweepAngle.toDouble(), or, corner.toDouble());
     }
 
     /// 空心扇形
-    _path = _buildEmptyArc(
+    return _buildEmptyArc(
       center,
       startAngle.toDouble(),
       sweepAngle.toDouble(),
@@ -97,10 +101,9 @@ class Arc {
       padAngle.toDouble(),
       maxRadius.toDouble(),
     );
-    return _path!;
   }
 
-  Rect onBuildBound() {
+  Rect _onBuildBound() {
     return Rect.fromCircle(center: center, radius: outRadius.toDouble());
   }
 
@@ -123,9 +126,7 @@ class Arc {
     return circlePoint(r, a, center);
   }
 
-  double centerAngle() {
-    return startAngle + (sweepAngle / 2);
-  }
+  double centerAngle() => startAngle + (sweepAngle / 2);
 
   double get startRadian => startAngle * angleUnit;
 
@@ -135,20 +136,7 @@ class Arc {
 
   double get sweepRadian => sweepAngle * angleUnit;
 
-  bool get isEmpty {
-    return (sweepAngle.abs()) == 0 || (outRadius - innerRadius).abs() == 0;
-  }
-
-  bool contains(Offset offset) {
-    double d1 = offset.distance2(center);
-    if (d1 > outRadius || d1 < innerRadius) {
-      return false;
-    }
-    if (sweepAngle.abs() >= 360) {
-      return true;
-    }
-    return path.contains(offset);
-  }
+  bool get isEmpty => (sweepAngle.abs()) == 0 || (outRadius - innerRadius).abs() == 0;
 
   @override
   String toString() {
@@ -192,7 +180,7 @@ class Arc {
       return outPath;
     }
 
-    //  if (!isWeb) {
+    //在html模式下 不会生效
     Rect irRect = Rect.fromCircle(center: center, radius: ir);
     Path innerPath = Path();
     o1 = circlePoint(ir, startAngle, center);
@@ -200,7 +188,6 @@ class Arc {
     innerPath.arcTo(irRect, startAngle * angleUnit, sweep, true);
     innerPath.close();
     return Path.combine(PathOperation.difference, outPath, innerPath);
-    //   }
 
     ///由于Flutter中的Path.combine 在Web环境下会出现剪切错误的BUG，
     ///因此这里我们自行实现一个路径
@@ -223,7 +210,6 @@ class Arc {
     // return rp;
   }
 
-  ///构建普通的扇形
   static Path _buildNormalArc(Offset center, double startAngle, double sweepAngle, double or, double corner) {
     Path path = Path();
     path.moveTo(center.dx, center.dy);
@@ -248,8 +234,8 @@ class Arc {
     final endAngle = startAngle + sweepAngle;
 
     ///扇形外部有圆角
-    InnerOffset lt = _computeLT(center, or, corner, startAngle);
-    InnerOffset rt = _computeRT(center, or, corner, endAngle);
+    _InnerOffset lt = _computeLT(center, or, corner, startAngle);
+    _InnerOffset rt = _computeRT(center, or, corner, endAngle);
     path.lineTo2(clockwise ? lt.p1 : rt.p2);
     path.arcToPoint(clockwise ? lt.p2 : rt.p1, radius: cr, largeArc: false, clockwise: clockwise);
 
@@ -447,25 +433,25 @@ class Arc {
     return [sa, ea];
   }
 
-  static InnerOffset _computeLT(Offset center, num outRadius, num corner, num angle) {
+  static _InnerOffset _computeLT(Offset center, num outRadius, num corner, num angle) {
     return _computeCornerPoint(center, outRadius, corner, angle, true, true);
   }
 
-  static InnerOffset _computeRT(Offset center, num outRadius, num corner, num angle) {
+  static _InnerOffset _computeRT(Offset center, num outRadius, num corner, num angle) {
     return _computeCornerPoint(center, outRadius, corner, angle, false, true);
   }
 
-  static InnerOffset _computeLB(Offset center, num innerRadius, num corner, num angle) {
+  static _InnerOffset _computeLB(Offset center, num innerRadius, num corner, num angle) {
     return _computeCornerPoint(center, innerRadius, corner, angle, true, false);
   }
 
-  static InnerOffset _computeRB(Offset center, num innerRadius, num corner, num angle) {
+  static _InnerOffset _computeRB(Offset center, num innerRadius, num corner, num angle) {
     return _computeCornerPoint(center, innerRadius, corner, angle, false, false);
   }
 
   ///计算切点位置
-  static InnerOffset _computeCornerPoint(Offset center, num r, num corner, num angle, bool left, bool top) {
-    InnerOffset result = InnerOffset();
+  static _InnerOffset _computeCornerPoint(Offset center, num r, num corner, num angle, bool left, bool top) {
+    _InnerOffset result = _InnerOffset();
     num dis = (r + corner * (top ? -1 : 1)).abs();
     double x = m.sqrt(dis * dis - corner * corner);
     Offset c = Offset(x, corner.toDouble() * (left ? 1 : -1));
@@ -514,9 +500,107 @@ class Arc {
 
     return Offset(x1, y1);
   }
+
+  @override
+  bool contains(BasicGeometry geom) {
+    if (geom is Arc) {
+      return _containsArc(geom);
+    }
+    if (geom is Circle) {
+      return _containsCircle(geom.radius, geom.center.x, geom.center.y);
+    }
+    return asGeometry.contains(geom.asGeometry);
+  }
+
+  @override
+  bool containsPoint(Offset p, {double eps = 1e-9}) => annularSector.contains(p, epsilon: eps);
+
+  @override
+  bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) {
+    if (geom is Arc) {
+      final a1 = AnnularSector(
+        center: center,
+        innerRadius: innerRadius,
+        outerRadius: outRadius,
+        startAngle: startAngle * pi / 180,
+        endAngle: endAngle * pi / 180,
+      );
+      final a2 = AnnularSector(
+        center: geom.center,
+        innerRadius: geom.innerRadius,
+        outerRadius: geom.outRadius,
+        startAngle: geom.startAngle * pi / 180,
+        endAngle: geom.endAngle * pi / 180,
+      );
+      return AnnularSector.intersect(a1, a2);
+    }
+    if (geom is BasicLine) {
+      return annularSector.isIntersectsLine(geom.start, geom.end);
+    }
+    if (geom is Circle) {
+      return annularSector.isIntersectsCircle(geom.center, geom.radius);
+    }
+    if (geom is Polygon) {
+      return annularSector.isIntersectsPolygon(geom.lines);
+    }
+
+    if (geom is Triangle) {
+      return annularSector.isIntersectsPolygon(geom.lines);
+    }
+
+    return super.isOverlap(geom, eps: eps);
+  }
+
+  AnnularSector get annularSector {
+    return AnnularSector(
+      center: center,
+      innerRadius: innerRadius,
+      outerRadius: outRadius,
+      startAngle: startAngle * pi / 180,
+      endAngle: endAngle * pi / 180,
+    );
+  }
+
+  bool _containsArc(Arc arc) {
+    if (arc.innerRadius < innerRadius || arc.outRadius > outRadius) return false;
+    return _angleContains(startAngle, endAngle, arc.startAngle, arc.endAngle);
+  }
+
+  bool _angleContains(double aStart, double aEnd, double bStart, double bEnd) {
+    aStart = aStart % 360;
+    aEnd = aEnd % 360;
+    bStart = bStart % 360;
+    bEnd = bEnd % 360;
+
+    if (aEnd >= aStart) {
+      return (bStart >= aStart && bEnd <= aEnd);
+    } else {
+      return (bStart >= aStart || bEnd <= aEnd);
+    }
+  }
+
+  bool _containsCircle(double rCircle, double x, double y) {
+    final A = annularSector;
+    final dx = x - center.x;
+    final dy = y - center.y;
+    final dist = sqrt(dx * dx + dy * dy);
+    if (dist - rCircle < A.innerRadius || dist + rCircle > A.outerRadius) return false;
+    if (dist == 0) {
+      return rCircle <= (A.outerRadius) && rCircle >= (A.innerRadius);
+    }
+    final angleCenter = atan2(dy, dx) * 180 / pi;
+    final deltaAngle = asin(rCircle / dist) * 180 / pi;
+    final circleStart = angleCenter - deltaAngle;
+    final circleEnd = angleCenter + deltaAngle;
+    return _angleContains(A.startAngle, A.endAngle, circleStart, circleEnd);
+  }
+
+  @override
+  Geometry buildGeometry() =>
+      AnnularSectorFactory.createAnnularSector(center, innerRadius, outRadius, startAngle, endAngle);
 }
 
-class InnerOffset {
+final class _InnerOffset {
   Offset center = Offset.zero;
   Offset p1 = Offset.zero;
   Offset p2 = Offset.zero;

@@ -2,13 +2,14 @@ library;
 
 export 'package:d_util/d_util.dart';
 
+export 'src/geomtry/annular_sector.dart';
 export 'src/geomtry/arc.dart';
+export 'src/geomtry/basic.dart';
+export 'src/geomtry/circle.dart';
 export 'src/geomtry/line.dart';
 export 'src/geomtry/multi_line.dart';
-export 'src/geomtry/offset_ext.dart';
-export 'src/geomtry/path_ext.dart';
 export 'src/geomtry/polygon.dart';
-export 'src/geomtry/rect_ext.dart';
+export 'src/geomtry/triangle.dart';
 
 export 'src/graph/a_star.dart';
 export 'src/graph/bellman_ford.dart';
@@ -36,3 +37,9 @@ export 'src/index/kd_tree.dart';
 export 'src/index/quad_tree.dart';
 export 'src/index/r_tree.dart';
 export 'src/index/tree.dart';
+
+export 'src/util/basic.dart';
+export 'src/util/boundary_util.dart';
+export 'src/util/contains_util.dart';
+export 'src/util/intersect_util.dart';
+export 'src/extensions.dart';
