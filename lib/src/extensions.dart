@@ -1,13 +1,12 @@
 import 'dart:math' as m;
 import 'dart:ui';
-import 'package:flutter/gestures.dart';
-import 'package:flutter/painting.dart';
 
 import 'package:dart_graph/dart_graph.dart';
 import 'package:dts/dts.dart' as dt;
+import 'package:flutter/gestures.dart';
+import 'package:flutter/painting.dart';
 
 extension RectExt on Rect {
-
   bool contains2(Offset offset) {
     return offset.dx >= left && offset.dx <= right && offset.dy >= top && offset.dy <= bottom;
   }
@@ -218,7 +217,6 @@ extension DTSRectExt on dt.Envelope {
   Rect get asRect => Rect.fromLTRB(minX, minY, maxX, maxY);
 }
 
-
 extension PathExt on Path {
   void lineTo2(Offset p) => lineTo(p.x, p.y);
 
@@ -249,11 +247,7 @@ extension PathExt on Path {
     }
     num dashLength = dash[0];
     num dashGapLength = dashLength >= 2 ? dash[1] : dash[0];
-    _DashedProperties properties = _DashedProperties(
-      path: Path(),
-      dashLength: dashLength,
-      dashGapLength: dashGapLength,
-    );
+    final properties = _DashedProperties(path: Path(), dashLength: dashLength, dashGapLength: dashGapLength);
     final metricsIterator = computeMetrics().iterator;
     while (metricsIterator.moveNext()) {
       final metric = metricsIterator.current;
@@ -267,6 +261,97 @@ extension PathExt on Path {
       }
     }
     return properties.path;
+  }
+
+  List<Offset> dashPath2(
+    List<num> dash, {
+    double phase = 0.0,
+    bool startWithDraw = true,
+    bool resetOnSubpath = false,
+    bool closeSegment = true,
+  }) {
+    final result = <Offset>[];
+    if (dash.isEmpty) return result;
+    final pattern = dash.map((d) => d.toDouble()).toList();
+
+    int patIndex = 0;
+    double patRemaining = pattern[0];
+    bool draw = startWithDraw;
+    Offset? pendingStart;
+
+    void resetPatternState() {
+      patIndex = 0;
+      patRemaining = pattern[0];
+      draw = startWithDraw;
+      pendingStart = null;
+    }
+
+    const double eps = 1e-9;
+
+    for (final pm in computeMetrics()) {
+      double localPos = 0.0;
+      final double subLen = pm.length;
+      if (resetOnSubpath) {
+        resetPatternState();
+      }
+
+      if (phase > 0) {
+        double skipped = 0.0;
+        while (skipped + eps < phase) {
+          final double consume = (patRemaining <= (phase - skipped)) ? patRemaining : (phase - skipped);
+          skipped += consume;
+          patRemaining -= consume;
+
+          if (patRemaining <= eps) {
+            patIndex = (patIndex + 1) % pattern.length;
+            patRemaining = pattern[patIndex];
+            draw = !draw;
+          }
+        }
+        localPos = phase.clamp(0.0, subLen);
+        phase = 0.0;
+      }
+
+      while (localPos + eps < subLen) {
+        final double available = subLen - localPos;
+        final double consume = (patRemaining <= available) ? patRemaining : available;
+
+        if (draw && pendingStart == null) {
+          final t = pm.getTangentForOffset(localPos);
+          if (t != null) pendingStart = t.position;
+        }
+
+        localPos += consume;
+        patRemaining -= consume;
+
+        if (draw && patRemaining <= eps) {
+          final tEnd = pm.getTangentForOffset(localPos.clamp(0.0, subLen));
+          final end = tEnd?.position;
+          if (pendingStart != null && end != null) {
+            result.add(pendingStart!);
+            result.add(end);
+            pendingStart = null;
+          }
+        }
+
+        if (patRemaining <= eps) {
+          patIndex = (patIndex + 1) % pattern.length;
+          patRemaining = pattern[patIndex];
+          draw = !draw;
+        }
+      }
+
+      if (closeSegment && pendingStart != null) {
+        final tend = pm.getTangentForOffset(pm.length)?.position;
+        if (tend != null) {
+          result.add(pendingStart!);
+          result.add(tend);
+        }
+        pendingStart = null;
+      }
+    }
+
+    return result;
   }
 
   /// 给定一个Path和路径百分比返回给定百分比路径
@@ -462,12 +547,8 @@ class _DashedProperties {
     Tangent tangent = metric.getTangentForOffset(end.toDouble())!;
     path.moveTo(tangent.position.dx, tangent.position.dy);
     final delta = end - extractedPathLength;
-    _remainingDashGapLength = _updateRemainingLength(
-      delta: delta,
-      end: end,
-      availableEnd: availableEnd,
-      initialLength: dashGapLength,
-    );
+    _remainingDashGapLength =
+        _updateRemainingLength(delta: delta, end: end, availableEnd: availableEnd, initialLength: dashGapLength);
     extractedPathLength = end;
     _previousWasDash = false;
   }
