@@ -1,8 +1,7 @@
-import 'dart:typed_data';
 import 'dart:ui';
-
 import 'package:bezier/bezier.dart';
 import 'package:dart_graph/dart_graph.dart';
+import 'package:dart_graph/src/curve/even_spacer.dart';
 import 'package:vector_math/vector_math.dart';
 
 class Curve {
@@ -13,6 +12,7 @@ class Curve {
   final Offset c2;
   final CubicBezier bezier;
   late final Rect boundary;
+  late final EvenSpacer2 evenSpacer = EvenSpacer2(bezier);
 
   Curve({required this.start, required this.end, required this.c1, required this.c2})
       : bezier = CubicBezier([
@@ -65,6 +65,11 @@ class Curve {
     }
     final v = bezier.pointAt(t);
     return Offset(v.x, v.y);
+  }
+
+  Offset pointAtLength(double len) {
+    final vv = evenSpacer.pointAtLength(len);
+    return Offset(vv.x, vv.y);
   }
 
   List<Curve> splitAtT(double t) {
@@ -134,43 +139,4 @@ class Curve {
     _length = bezier.length;
     return _length;
   }
-
-  Float32List? _dashPath;
-
-  void setDashSegment(List<Offset> dashSegList) {
-    Float32List list = Float32List(dashSegList.length * 2);
-    int k = 0;
-    for (int i = 0; i < dashSegList.length; i += 2) {
-      final start = dashSegList[i];
-      final end = dashSegList[i + 1];
-      list[k] = start.dx;
-      list[k + 1] = start.dy;
-      list[k + 2] = end.dx;
-      list[k + 3] = end.dy;
-      k += 4;
-    }
-    _dashPath = list;
-  }
-
-  void clearDashSegment() {
-    _dashPath = null;
-  }
-
-  void draw(Canvas canvas, Paint paint) {
-    final obj = _dashPath;
-    if (obj != null) {
-      canvas.drawRawPoints(PointMode.lines, obj, paint);
-    } else {
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  void drawDashPath(Canvas canvas, Paint paint) {
-    final obj = _dashPath;
-    if (obj != null) {
-      canvas.drawRawPoints(PointMode.lines, obj, paint);
-    }
-  }
-
-  bool get hasDashPath => _dashPath != null;
 }
