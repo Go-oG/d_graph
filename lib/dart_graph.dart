@@ -4,7 +4,9 @@ export 'package:d_util/d_util.dart';
 
 export 'src/curve/curve.dart';
 export 'src/curve/curve_util.dart';
+export 'src/curve/even_spacer.dart';
 export 'src/curve/line_style.dart';
+
 export 'src/extensions.dart';
 export 'src/geomtry/annular_sector.dart';
 export 'src/geomtry/arc.dart';
