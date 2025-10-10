@@ -42,6 +42,8 @@ export 'src/index/quad_tree.dart';
 export 'src/index/r_tree.dart';
 export 'src/index/tree.dart';
 export 'src/util/basic.dart';
+
+export 'src/util/angle.dart';
 export 'src/util/boundary_util.dart';
 export 'src/util/contains_util.dart';
 export 'src/util/intersect_util.dart';

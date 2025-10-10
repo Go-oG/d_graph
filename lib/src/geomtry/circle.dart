@@ -266,7 +266,7 @@ final class Circle extends BasicGeometry {
 
   @override
   dt.Geometry buildGeometry() {
-    List<Offset> list = AnnularSectorFactory.buildPoints(radius, 0, 2 * pi - 0.0001, center);
+    List<Offset> list = AnnularSectorFactory.buildPoints(radius, Angle.zero, Angle.radians(2 * pi - 0.0001), center);
     return geomFactory.createPolygon5(list);
   }
 }

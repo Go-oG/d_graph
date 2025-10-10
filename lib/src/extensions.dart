@@ -117,23 +117,23 @@ extension OffsetExt on Offset {
   bool inSector(
     num innerRadius,
     num outerRadius,
-    num startAngle,
-    num sweepAngle, {
+    Angle startAngle,
+    Angle sweepAngle, {
     Offset center = Offset.zero,
   }) {
     double d1 = distance2(center);
     if (d1 > outerRadius || d1 < innerRadius) {
       return false;
     }
-    if (sweepAngle.abs() >= 360) {
+    if (sweepAngle.radians >= 2 * m.pi) {
       return true;
     }
     return inArc(
       Arc(
         innerRadius: innerRadius.toDouble(),
         outRadius: outerRadius.toDouble(),
-        sweepAngle: sweepAngle.toDouble(),
-        startAngle: startAngle.toDouble(),
+        sweepAngle: sweepAngle,
+        startAngle: startAngle,
         center: center,
       ),
     );
@@ -154,22 +154,21 @@ extension OffsetExt on Offset {
     return a * a + b * b < radius * radius;
   }
 
-  double angle([Offset center = Offset.zero]) {
+  Angle angle([Offset center = Offset.zero]) {
     double d = m.atan2(dy - center.dy, dx - center.dx);
     if (d < 0) {
       d += 2 * m.pi;
     }
-    return d * 180 / m.pi;
+    return d.asRadians;
   }
 
   ///返回绕center点旋转angle角度后的位置坐标
   ///逆时针 angle 为负数
   ///顺时针 angle 为正数
-  Offset rotate(num angle, {Offset center = Offset.zero}) {
-    angle = angle % 360;
-    num t = angle * Arc.angleUnit;
-    double x = (dx - center.dx) * m.cos(t) - (dy - center.dy) * m.sin(t) + center.dx;
-    double y = (dx - center.dx) * m.sin(t) + (dy - center.dy) * m.cos(t) + center.dy;
+  Offset rotate(Angle angle, {Offset center = Offset.zero}) {
+    angle = angle.normalized;
+    double x = (dx - center.dx) * angle.cos - (dy - center.dy) * angle.sin + center.dx;
+    double y = (dx - center.dx) * angle.sin + (dy - center.dy) * angle.cos + center.dy;
     return Offset(x, y);
   }
 
@@ -221,6 +220,10 @@ extension PathExt on Path {
   void lineTo2(Offset p) => lineTo(p.x, p.y);
 
   void moveTo2(Offset p) => moveTo(p.x, p.y);
+
+  void arcTo2(Rect rect, Angle startAngle, Angle sweepAngle, bool forceMoveTo) {
+    arcTo(rect, startAngle.radians, sweepAngle.radians, forceMoveTo);
+  }
 
   void drawShadows(Canvas canvas, Path path, List<BoxShadow> shadows) {
     for (final BoxShadow shadow in shadows) {

@@ -7,13 +7,9 @@ import 'package:flutter/material.dart';
 final geomFactory = dt.GeometryFactory();
 
 ///给定一个半径和圆心计算给定角度对应的位置坐标
-Offset circlePoint(num radius, num angle, [Offset center = Offset.zero]) {
-  return circlePointRadian(radius, angle * Arc.angleUnit, center);
-}
-
-Offset circlePointRadian(num radius, num radian, [Offset center = Offset.zero]) {
-  double x = center.dx + radius * m.cos(radian);
-  double y = center.dy + radius * m.sin(radian);
+Offset circlePoint(num radius, Angle radian, [Offset center = Offset.zero]) {
+  double x = center.dx + radius * radian.cos;
+  double y = center.dy + radius * radian.sin;
   return Offset(x, y);
 }
 

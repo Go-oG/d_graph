@@ -5,9 +5,6 @@ import 'dart:ui';
 
 import 'package:dart_graph/dart_graph.dart';
 
-const _kRadianToAngle = 180 / pi;
-const _kAngleToRadian = pi / 180;
-
 final class ContainsUtil {
   ContainsUtil._();
 
@@ -16,10 +13,10 @@ final class ContainsUtil {
     double innerRadius = 0,
     Offset center = Offset.zero,
     required double outerRadius,
-    required double startAngle,
-    required double sweepAngle,
+    required Angle startAngle,
+    required Angle sweepAngle,
   }) {
-    if (sweepAngle.abs() == 0 || (outerRadius - innerRadius) <= 0) {
+    if (sweepAngle.isZero || (outerRadius - innerRadius) <= 0) {
       return false;
     }
     final dx = point.dx - center.dx;
@@ -29,20 +26,11 @@ final class ContainsUtil {
       return false;
     }
 
-    startAngle = startAngle * _kAngleToRadian;
-    sweepAngle = sweepAngle * _kAngleToRadian;
-
-    double angle = math.atan2(dy, dx);
-    if (angle < 0) angle += 2 * math.pi;
-
-    double start = startAngle % (2 * math.pi);
-    if (start < 0) start += 2 * math.pi;
-
-    double end = (start + sweepAngle) % (2 * math.pi);
-    if (end < 0) end += 2 * math.pi;
-
+    Angle angle = math.atan2(dy, dx).asRadians.normalized;
+    Angle start = startAngle.normalized;
+    Angle end = (start + sweepAngle).normalized;
     bool angleInSweep;
-    if (sweepAngle >= 0) {
+    if (sweepAngle.radians >= 0) {
       angleInSweep = start <= end ? (angle >= start && angle <= end) : (angle >= start || angle <= end);
     } else {
       angleInSweep = start >= end ? (angle <= start && angle >= end) : (angle <= start || angle >= end);
@@ -89,7 +77,7 @@ final class ContainsUtil {
   }
 
   static bool pointIsOnArc(
-      Offset p, Offset center, double innerRadius, double outerRadius, double startAngle, double endAngle) {
+      Offset p, Offset center, double innerRadius, double outerRadius, Angle startAngle, Angle endAngle) {
     num disSquared = pow(p.dx - center.dx, 2) + pow(p.dy - center.dy, 2);
     num irSquared = pow(innerRadius, 2);
     num orSquared = pow(outerRadius, 2);
@@ -97,11 +85,7 @@ final class ContainsUtil {
     if (disSquared < irSquared || disSquared > orSquared) {
       return false;
     }
-    double angle = (atan2(p.dy - center.dy, p.dx - center.dx)) * _kRadianToAngle;
-    if (angle < 0) {
-      angle += 360;
-    }
-
+    Angle angle = atan2(p.dy - center.dy, p.dx - center.dx).asRadians.normalized;
     if (startAngle <= endAngle) {
       return angle >= startAngle && angle <= endAngle;
     } else {

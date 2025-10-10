@@ -5,8 +5,6 @@ import 'dart:ui';
 
 import 'package:dart_graph/dart_graph.dart';
 
-const _kAngleToRadian = pi / 180;
-
 final class IntersectUtil {
   IntersectUtil._();
 
@@ -60,27 +58,18 @@ final class IntersectUtil {
     required Offset center,
     required double ir,
     required double or,
-    required double startAngle,
-    required double endAngle,
+    required Angle startAngle,
+    required Angle endAngle,
     double epsilon = 1e-9,
   }) {
-    startAngle *= _kAngleToRadian;
-    endAngle *= _kAngleToRadian;
-    bool angleInRange(double a, double s, double e) {
-      double twoPi = math.pi * 2;
-      double norm(double x) {
-        x %= twoPi;
-        if (x < 0) x += twoPi;
-        return x;
-      }
-
-      double aa = norm(a), ss = norm(s), ee = norm(e);
-      double span = (ee - ss) % twoPi;
-      if (span < 0) span += twoPi;
-      if (span <= epsilon) span = twoPi; // 满圆
-      double rel = (aa - ss) % twoPi;
-      if (rel < 0) rel += twoPi;
-      return rel <= span + epsilon;
+    final epsAngle = epsilon.asRadians;
+    final twoPi = pi * 2;
+    bool angleInRange(Angle a, Angle s, Angle e) {
+      Angle aa = a.normalized, ss = s.normalized, ee = e.normalized;
+      Angle span = (ee - ss).normalized;
+      if (span <= epsAngle) span = twoPi.asRadians;
+      Angle rel = (aa - ss).normalized;
+      return rel <= span + epsilon.asRadians;
     }
 
     final corners = <Offset>[
@@ -93,7 +82,9 @@ final class IntersectUtil {
     for (final p in corners) {
       final d2 = p.dx * p.dx + p.dy * p.dy;
       final d = math.sqrt(d2);
-      if (d >= ir - epsilon && d <= or + epsilon && angleInRange(math.atan2(p.dy, p.dx), startAngle, endAngle)) {
+      if (d >= ir - epsilon &&
+          d <= or + epsilon &&
+          angleInRange(math.atan2(p.dy, p.dx).asRadians, startAngle, endAngle)) {
         return true;
       }
     }
@@ -122,7 +113,7 @@ final class IntersectUtil {
         if (dlen < ir - epsilon || dlen > or + epsilon) {
           return false;
         }
-        return angleInRange(math.atan2(p.dy, p.dx), startAngle, endAngle);
+        return angleInRange(math.atan2(p.dy, p.dx).asRadians, startAngle, endAngle);
       }
 
       final t1 = (-B - sqrtDisc) / (2 * A);
@@ -138,15 +129,12 @@ final class IntersectUtil {
         return true;
       }
     }
-    bool segmentRayHit(Offset a, Offset b, double theta) {
-      final u = Offset(math.cos(theta), math.sin(theta));
+    bool segmentRayHit(Offset a, Offset b, Angle theta) {
+      final u = Offset(theta.cos, theta.sin);
       final d = b - a;
-
-      double cross(Offset p, Offset q) => p.dx * q.dy - p.dy * q.dx;
-
-      final denom = cross(d, u);
+      final denom = d.cross(u);
       if (denom.abs() < epsilon) return false;
-      final t = -cross(a, u) / denom;
+      final t = -a.cross(u) / denom;
       if (t < -epsilon || t > 1 + epsilon) return false;
 
       final p = a + d * t;
