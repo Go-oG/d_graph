@@ -3,9 +3,6 @@ import 'dart:math';
 import 'dart:ui';
 
 import 'package:dart_graph/dart_graph.dart';
-import 'package:vector_math/vector_math.dart';
-
-import "curve.dart";
 
 abstract class CurveUtil {
   CurveUtil._();
@@ -21,11 +18,12 @@ abstract class CurveUtil {
   }
 
   ///所有单位都为弧度
-  static Curve ofArc(Rect rect, double startAngle, double sweepAngle, bool forceMoveTo) {
-    final sinA = sin(startAngle);
-    final cosA = cos(startAngle);
-    final sinE = sin(startAngle + sweepAngle);
-    final cosE = cos(startAngle + sweepAngle);
+  static Curve ofArc(Rect rect, Angle startAngle, Angle sweepAngle, bool forceMoveTo) {
+    final sinA = startAngle.sin;
+
+    final cosA = startAngle.cos;
+    final sinE = (startAngle + sweepAngle).sin;
+    final cosE = (startAngle + sweepAngle).cos;
 
     final a = max(rect.width, rect.height) / 2;
     final b = min(rect.width, rect.height) / 2;
@@ -36,7 +34,7 @@ abstract class CurveUtil {
 
     final start = Offset(center.dx + a * cosA, center.dy + b * sinA);
     final end = Offset(center.dx + a * cosE, center.dy + b * sinE);
-    final v = 1.3333333 * tan(sweepAngle * 0.25);
+    final v = 1.3333333 * (sweepAngle * 0.25).tan;
     var c1x = cx + a * cosA - v * b * sinA;
     var c1y = cy + b * sinA + v * a * cosA;
     var c2x = cx + a * cosE + v * b * sinE;
@@ -169,18 +167,18 @@ abstract class CurveUtil {
     return Curve(start: s, end: e, c1: c1, c2: c2);
   }
 
-  static List<Curve> fromArc(Offset center, double radius, double startAngle, double sweepAngle) {
-    startAngle = startAngle * degrees2Radians;
-    sweepAngle = sweepAngle * degrees2Radians;
+  static List<Curve> fromArc(Offset center, double radius, Angle startAngle, Angle sweepAngle) {
+    double sa = startAngle.radians;
+    double swa = sweepAngle.radians;
 
     const maxSweep = pi / 2;
     final List<Curve> beziers = [];
 
-    final int segments = (sweepAngle.abs() / maxSweep).ceil();
-    final double delta = sweepAngle / segments;
+    final int segments = (swa.abs() / maxSweep).ceil();
+    final double delta = swa / segments;
 
     for (int i = 0; i < segments; i++) {
-      final double theta1 = startAngle + i * delta;
+      final double theta1 = sa + i * delta;
       final double theta2 = theta1 + delta;
 
       final p0 = Offset(center.dx + radius * cos(theta1), center.dy + radius * sin(theta1));

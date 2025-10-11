@@ -7,16 +7,18 @@ extension AngleExt on num {
   Angle get asDegrees => Angle.degrees(toDouble());
 }
 
+const pi2 = math.pi * 2;
+const halfPi = math.pi * 0.5;
+const piPow = math.pi * math.pi;
+
 class Angle implements Comparable<Angle> {
-  static const _pi2 = math.pi * 2;
-  static const _halfPi = math.pi / 2;
   static const _degToRad = math.pi / 180.0;
   static const _radToDeg = 180.0 / math.pi;
 
   static const zero = Angle.radians(0);
-  static const full = Angle.radians(_pi2);
+  static const full = Angle.radians(pi2);
   static const half = Angle.radians(math.pi);
-  static const quarter = Angle.radians(_halfPi);
+  static const quarter = Angle.radians(halfPi);
 
   final double radians;
 
@@ -27,11 +29,11 @@ class Angle implements Comparable<Angle> {
   double get degrees => radians * _radToDeg;
 
   Angle get normalized {
-    if (radians >= 0 && radians <= _pi2) {
+    if (radians >= 0 && radians <= pi2) {
       return this;
     }
-    var value = radians % _pi2;
-    if (value < 0) value += _pi2;
+    var value = radians % pi2;
+    if (value < 0) value += pi2;
     return Angle.radians(value);
   }
 
@@ -47,7 +49,7 @@ class Angle implements Comparable<Angle> {
   ///
   /// [t] in [0,1].
   static Angle lerp(Angle a, Angle b, double t) {
-    final da = ((b.radians - a.radians + math.pi) % _pi2) - math.pi;
+    final da = ((b.radians - a.radians + math.pi) % pi2) - math.pi;
     return Angle.radians(a.radians + da * t);
   }
 
@@ -105,7 +107,7 @@ class Angle implements Comparable<Angle> {
 
   bool get isZero => radians.abs() <= 1e-9;
 
-  bool get isFull => (radians - _pi2).abs() <= 1e-9;
+  bool get isFull => (radians - pi2).abs() <= 1e-9;
 
   /// Compare equality with tolerance.
   bool equals(Angle other, [double epsilon = 1e-10]) => (radians - other.radians).abs() < epsilon;

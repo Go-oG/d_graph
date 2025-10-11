@@ -235,9 +235,9 @@ extension PathExt on Path {
         double xScale = (zone.width + shadow.spreadRadius) / zone.width;
         double yScale = (zone.height + shadow.spreadRadius) / zone.height;
         Matrix4 m4 = Matrix4.identity();
-        m4.translate(zone.width / 2, zone.height / 2);
-        m4.scale(xScale, yScale);
-        m4.translate(-zone.width / 2, -zone.height / 2);
+        m4.translateByDouble(zone.width / 2, zone.height / 2, 0, 1);
+        m4.scaleByDouble(xScale, yScale, 1, 1);
+        m4.translateByDouble(-zone.width / 2, -zone.height / 2, 0, 1);
         canvas.drawPath(path.shift(shadow.offset).transform(m4.storage), shadowPainter);
       }
     }
