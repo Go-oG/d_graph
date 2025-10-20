@@ -165,21 +165,7 @@ class Arc extends BasicGeometry {
   @override
   bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) {
     if (geom is Arc) {
-      final a1 = AnnularSector(
-        center: center,
-        innerRadius: innerRadius,
-        outerRadius: outRadius,
-        startAngle: startAngle * pi / 180,
-        endAngle: endAngle * pi / 180,
-      );
-      final a2 = AnnularSector(
-        center: geom.center,
-        innerRadius: geom.innerRadius,
-        outerRadius: geom.outRadius,
-        startAngle: geom.startAngle * pi / 180,
-        endAngle: geom.endAngle * pi / 180,
-      );
-      return AnnularSector.intersect(a1, a2);
+      return AnnularSector.intersect(annularSector, geom.annularSector);
     }
     if (geom is BasicLine) {
       return annularSector.isIntersectsLine(geom.start, geom.end);
@@ -200,12 +186,7 @@ class Arc extends BasicGeometry {
 
   AnnularSector get annularSector {
     return AnnularSector(
-      center: center,
-      innerRadius: innerRadius,
-      outerRadius: outRadius,
-      startAngle: startAngle * pi / 180,
-      endAngle: endAngle * pi / 180,
-    );
+        center: center, innerRadius: innerRadius, outerRadius: outRadius, startAngle: startAngle, endAngle: endAngle);
   }
 
   bool _containsArc(Arc arc) {
