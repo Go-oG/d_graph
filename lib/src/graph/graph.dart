@@ -1,306 +1,436 @@
-import 'package:d_util/d_util.dart';
-import 'package:dart_graph/dart_graph.dart';
-import 'package:flutter/foundation.dart';
-import 'package:quiver/collection.dart';
+final class Vertex {
+  final String id;
+  final Object? data;
+  final String? label;
+  final Map<String, dynamic> meta = {};
 
-enum GraphType { directed, undirected }
-
-class Graph<T> {
-  late final GraphType type;
-  final BiMap<T, Vertex<T>> _vertexMap = BiMap();
-  final UniqueList<Vertex<T>> _allVertices = UniqueList();
-  final List<Edge<T>> _allEdges = [];
-
-  double width = -1;
-  double height = -1;
-
-  Graph({this.type = GraphType.undirected, Iterable<Vertex<T>>? vertices, Iterable<Edge<T>>? edges}) {
-    if (vertices != null) {
-      for (final vertex in vertices) {
-        addVertex(vertex);
-      }
-    }
-    if (edges != null) {
-      for (final edge in edges) {
-        addEdgeNode(edge);
-      }
+  Vertex({
+    required this.id,
+    Map<String, dynamic>? meta,
+    this.label,
+    this.data,
+  }) {
+    if (meta != null) {
+      this.meta.addAll(meta);
     }
   }
 
-  Graph.of(Graph<T> g) {
-    type = g.type;
-    for (Vertex<T> v in g._allVertices) {
-      _allVertices.add(Vertex<T>.of(v));
-    }
-    for (Vertex<T> v in vertices) {
-      _allEdges.addAll(v.edges);
-    }
+  Map<String, dynamic> toMap() {
+    return {'id': id, 'label': label, 'data': data, 'meta': meta};
   }
 
-  UniqueList<Vertex<T>> get vertices => _allVertices;
-
-  List<Edge<T>> get edges {
-    return _allEdges;
-  }
-
-  bool get isEmpty => _allVertices.isEmpty;
-
-  bool get isNotEmpty => _allVertices.isNotEmpty;
-
-  void adds(Iterable<T> datas) {
-    for (final data in datas) {
-      add(data);
-    }
-  }
-
-  void add(T data) {
-    final old = _vertexMap[data];
-    if (old != null) {
-      debugPrint("当前已存在相同数据");
-      return;
-    }
-    final vertex = Vertex(data);
-    _vertexMap[data] = vertex;
-    _allVertices.add(vertex);
-  }
-
-  void addVertex(Vertex<T> vertex) {
-    final old = _vertexMap.inverse[vertex];
-    if (old != null) {
-      debugPrint("当前已存在相同数据");
-      return;
-    }
-    _vertexMap[vertex.data] = vertex;
-    _allVertices.add(vertex);
-  }
-
-  void addVertexs(Iterable<Vertex<T>> vertexs) {
-    for(final vertex in vertexs){
-      addVertex(vertex);
-    }
-  }
-
-  void addEdge(T source, T target, [double cost = 0]) {
-    var edge = Edge<T>(cost, Vertex(source), Vertex(target));
-    addEdgeNode(edge);
-  }
-
-  void addEdgeNode(Edge<T> e) {
-    final Vertex<T> from = e.from;
-    final Vertex<T> to = e.to;
-    addVertex(from);
-    addVertex(to);
-
-    from.addEdge(e);
-    _allEdges.add(e);
-
-    if (type == GraphType.undirected) {
-      final edge2 = Edge<T>(e.value, to, from);
-      to.addEdge(edge2);
-      _allEdges.add(edge2);
-    }
-  }
-
-  void remove(T data) {
-    final old = _vertexMap[data];
-    if (old == null) {
-      return;
-    }
-    removeVertex(old);
-  }
-
-  void removeVertex(Vertex<T> v, [bool clearSelfEdge = true]) {
-    if (_allVertices.remove(v)) {
-      _vertexMap.remove(v.data);
-      _allEdges.removeWhere((e) => e.from == v || e.to == v);
-    }
-    if (clearSelfEdge) {
-      v.edges.clear();
-    }
-  }
-
-  void clear() {
-    _allEdges.clear();
-    _allVertices.clear();
-    _vertexMap.clear();
-  }
-
-  @override
-  int get hashCode {
-    int code = type.hashCode + _allVertices.length + _allEdges.length;
-    return Object.hash(code, Object.hashAll(_allVertices), Object.hashAll(_allEdges));
-  }
-
-  @override
-  bool operator ==(Object g) {
-    if (identical(g, this)) {
-      return true;
-    }
-    if (g is! Graph<T>) {
-      return false;
-    }
-
-    if (type != g.type) {
-      return false;
-    }
-
-    if (_allVertices.length != g._allVertices.length) {
-      return false;
-    }
-
-    if (_allEdges.length != g._allEdges.length) {
-      return false;
-    }
-
-    var l1 = List.from(_allVertices);
-    l1.sort((a, b) {
-      return a.compareTo(b);
-    });
-    var l2 = List.from(g._allVertices);
-    l2.sort((a, b) {
-      return a.compareTo(b);
-    });
-    if (!listEquals(l1, l2)) {
-      return false;
-    }
-
-    var l3 = List.from(_allEdges);
-    l3.sort((a, b) {
-      return a.compareTo(b);
-    });
-    var l4 = List.from(g._allEdges);
-    l4.sort((a, b) {
-      return a.compareTo(b);
-    });
-    return listEquals(l3, l4);
+  static Vertex fromMap(Map<String, dynamic> map) {
+    return Vertex(id: map['id'], label: map['label'], data: map['data'], meta: map['meta']);
   }
 }
 
-///顶点唯一性只和边关联
-class Vertex<T> implements Comparable<Vertex<T>> {
-  late final T data;
-  final UniqueList<Edge<T>> _edges = UniqueList();
+final class Edge {
+  final String id;
+  final String from;
+  final String to;
+  final bool? directed;
+  final Map<String, dynamic> meta = {};
+  final Object? data;
 
-  double weight = 0;
+  double value;
 
-  Vertex(this.data, [this.weight = 0]);
-
-  Vertex.of(Vertex<T> vertex) {
-    data = vertex.data;
-    weight = vertex.weight;
-    edges.addAll(vertex.edges);
+  Edge({
+    required this.id,
+    required this.from,
+    required this.to,
+    Map<String, dynamic>? meta,
+    this.directed,
+    this.value = 0,
+    this.data,
+  }) {
+    if (meta != null) {
+      this.meta.addAll(meta);
+    }
   }
 
-  UniqueList<Edge<T>> get edges => _edges;
+  Map<String, dynamic> toMap() {
+    return {'id': id, 'from': from, 'to': to, 'directed': directed, 'weight': value, 'data': data, 'meta': meta};
+  }
 
-  void addEdge(Edge<T> e) => _edges.add(e);
+  static Edge fromMap<T>(Map<String, dynamic> map) {
+    return Edge(
+      id: map['id'],
+      from: map['from'],
+      to: map['to'],
+      directed: map['directed'],
+      meta: map['meta'],
+      data: map['data'],
+      value: map['weight'],
+    );
+  }
 
-  Edge<T>? getEdge(Vertex<T> v) {
-    for (Edge<T> e in _edges) {
-      if (e.to == v) {
+  bool isDirected(bool graphDirected) => directed ?? graphDirected;
+}
+
+final class Graph {
+  final String id;
+  final bool directed;
+  final bool allowMultiEdge;
+  final bool allowSelfLoop;
+  final Map<String, dynamic> meta = {};
+
+  final Map<String, Vertex> _vertexMap = {};
+  final Map<String, Edge> _edgeMap = {};
+
+  final Map<String, Map<String, Edge>> _vertexOutEdges = {};
+  final Map<String, Map<String, Edge>> _vertexInEdges = {};
+
+  late final GraphDegree _degree;
+
+  Graph({
+    required this.id,
+    required this.directed,
+    required this.allowMultiEdge,
+    required this.allowSelfLoop,
+    Iterable<Vertex>? vertices,
+    Iterable<Edge>? edges,
+    Map<String, dynamic>? meta,
+  }) {
+    if (vertices != null) {
+      addVertexs(vertices);
+    }
+    if (edges != null) {
+      addEdges(edges);
+    }
+    if (meta != null) {
+      this.meta.addAll(meta);
+    }
+    _degree = GraphDegree(this);
+  }
+
+  static Graph of(Graph g, {String? id}) {
+    return Graph(
+      id: id ?? g.id,
+      directed: g.directed,
+      allowMultiEdge: g.allowMultiEdge,
+      allowSelfLoop: g.allowSelfLoop,
+      meta: g.meta,
+      vertices: g.vertexIterator,
+      edges: g.edgeIterator,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'directed': directed,
+      'allowMultiEdge': allowMultiEdge,
+      'allowSelfLoop': allowSelfLoop,
+      'meta': meta,
+      'vertices': _vertexMap.values.map((v) => v.toMap()).toList(),
+      'edges': _edgeMap.values.map((e) => e.toMap()).toList(),
+    };
+  }
+
+  static Graph fromMap(Map<String, dynamic> graph) {
+    return Graph(
+      id: graph['id'],
+      directed: graph['directed'],
+      allowMultiEdge: graph['allowMultiEdge'] ?? false,
+      allowSelfLoop: graph['allowSelfLoop'] ?? false,
+      meta: graph['meta'] != null ? Map<String, dynamic>.from(graph['meta']) : null,
+      vertices: (graph['vertices'] as List).map((v) => Vertex.fromMap(Map<String, dynamic>.from(v))).toList(),
+      edges: (graph['edges'] as List).map((e) => Edge.fromMap(Map<String, dynamic>.from(e))).toList(),
+    );
+  }
+
+  Vertex getVertex(String id) => getVertexOrNull(id)!;
+
+  Vertex? getVertexOrNull(String id) => _vertexMap[id];
+
+  Edge getEdge(String id) => getEdgeOrNull(id)!;
+
+  Edge? getEdgeOrNull(String id) => _edgeMap[id];
+
+  Edge? getEdge2(String from, String to) {
+    for (var e in edges(from)) {
+      if (e.to == to) {
         return e;
       }
     }
     return null;
   }
 
-  bool pathTo(Vertex<T> v) {
-    for (Edge<T> e in _edges) {
-      if (e.to == v) {
-        return true;
+  void addVertex(Vertex vertex) {
+    if (_vertexMap.containsKey(vertex.id)) {
+      return;
+    }
+    _vertexMap[vertex.id] = vertex;
+    _degree._onVertexAdded(vertex);
+  }
+
+  void addVertexs(Iterable<Vertex> vertexs) {
+    for (var v in vertexs) {
+      addVertex(v);
+    }
+  }
+
+  void removeVertex(Vertex vertex) {
+    final id = vertex.id;
+    if (!_vertexMap.containsKey(id)) return;
+    _degree._onVertexRemoved(vertex);
+
+    final edgesToRemove = <Edge>{};
+    _vertexOutEdges[id]?.values.forEach((e) => edgesToRemove.add(e));
+    _vertexInEdges[id]?.values.forEach((e) => edgesToRemove.add(e));
+
+    for (final e in edgesToRemove) {
+      removeEdge(e);
+    }
+
+    _vertexOutEdges.remove(id);
+    _vertexInEdges.remove(id);
+    _vertexMap.remove(id);
+  }
+
+  void removeVertexs(Iterable<Vertex> vertexs) {
+    for (var v in vertexs) {
+      removeVertex(v);
+    }
+  }
+
+  void addEdges(Iterable<Edge> edges) {
+    for (var e in edges) {
+      addEdge(e);
+    }
+  }
+
+  void addEdge(Edge edge) {
+    // if (!_vertexMap.containsKey(edge.from) || !_vertexMap.containsKey(edge.to)) {
+    //   throw StateError('Edge endpoint does not exist');
+    // }
+
+    if (_edgeMap.containsKey(edge.id)) {
+      return;
+    }
+    if (!allowSelfLoop && edge.from == edge.to) {
+      throw StateError('Self-loop is not allowed');
+    }
+    if (!allowMultiEdge) {
+      for (final e in _edgeMap.values) {
+        if (e.from == edge.from && e.to == edge.to) {
+          throw StateError('Multi-edge is not allowed');
+        }
       }
     }
-    return false;
+
+    _edgeMap[edge.id] = edge;
+    _vertexOutEdges.putIfAbsent(edge.from, () => {})[edge.id] = edge;
+    _vertexInEdges.putIfAbsent(edge.to, () => {})[edge.id] = edge;
+
+    if (!edge.isDirected(directed)) {
+      _vertexOutEdges.putIfAbsent(edge.to, () => {})[edge.id] = edge;
+      _vertexInEdges.putIfAbsent(edge.from, () => {})[edge.id] = edge;
+    }
+
+    _degree._onEdgeAdded(edge);
   }
 
-  @override
-  int get hashCode => data.hashCode;
+  void removeEdge(Edge edge) {
+    if (!_edgeMap.containsKey(edge.id)) return;
 
-  @override
-  bool operator ==(Object other) {
-    if (identical(other, this)) {
-      return true;
+    _degree._onEdgeRemoved(edge);
+
+    _edgeMap.remove(edge.id);
+    _vertexOutEdges[edge.from]?.remove(edge.id);
+    _vertexInEdges[edge.to]?.remove(edge.id);
+
+    if (!edge.isDirected(directed)) {
+      _vertexOutEdges[edge.to]?.remove(edge.id);
+      _vertexInEdges[edge.from]?.remove(edge.id);
     }
-    if (other is! Vertex<T>) {
-      return false;
-    }
-    return data == other.data;
   }
 
-  @override
-  int compareTo(Vertex<T> v) {
-    if (T is Comparable) {
-      return (data as Comparable).compareTo(v.data);
+  void removeEdges(Iterable<Edge> edges) {
+    for (var v in edges) {
+      removeEdge(v);
     }
-    return -1;
   }
+
+  void clear() {
+    _vertexMap.clear();
+    _edgeMap.clear();
+    _vertexInEdges.clear();
+    _vertexOutEdges.clear();
+  }
+
+  bool hasEdge(Edge edge) => _edgeMap.containsKey(edge.id);
+
+  bool hasVertex(Vertex vertex) => _vertexMap.containsKey(vertex.id);
+
+  Degree degreeOf(String vertexId) => _degree.degreeOf(vertexId);
+
+  WeightDegree weightDegreeOf(String vertexId) => _degree.weightDegreeOf(vertexId);
+
+  Map<String, Edge> inEdges(Vertex vertex) => _vertexInEdges[vertex.id] ?? const {};
+
+  Map<String, Edge> outEdges(Vertex vertex) => _vertexOutEdges[vertex.id] ?? const {};
+
+  List<Edge> edges(String vertexId) {
+    Vertex? vertex = _vertexMap[vertexId];
+    if (vertex == null) {
+      return [];
+    }
+    return edges2(vertex);
+  }
+
+  List<Edge> edges2(Vertex vertex) {
+    Set<Edge> edges = <Edge>{};
+    edges.addAll(inEdges(vertex).values);
+    edges.addAll(outEdges(vertex).values);
+    return edges.toList();
+  }
+
+  Iterable<Edge> get edgeIterator => _edgeMap.values;
+
+  Iterable<Vertex> get vertexIterator => _vertexMap.values;
+
+  Map<String, Vertex> get vertexMap => _vertexMap;
+
+  Map<String, Edge> get edgeMap => _edgeMap;
+
+  Map<String, Map<String, Edge>> get vertexsOutEdges => _vertexOutEdges;
+
+  Map<String, Map<String, Edge>> get vertexsInEdges => _vertexInEdges;
 }
 
-///边唯一性判断只和顶点关联
-class Edge<T> implements Comparable<Edge<T>> {
-  late final String id;
-  late final Vertex<T> from;
-  late final Vertex<T> to;
+final class GraphDegree {
+  final Graph graph;
 
-  dynamic extraLayoutResult;
-  dynamic extra;
-  dynamic extra2;
+  final Map<String, Degree> _degreeMap = {};
+  final Map<String, WeightDegree> _weightedDegreeMap = {};
 
-  double value = 0;
+  bool _frozen = false;
+  bool _dirty = false;
 
-  Edge(this.value, this.from, this.to, {String? id}) {
-    this.id = id ?? "";
-    this.value = value;
-    this.from = from;
-    this.to = to;
+  GraphDegree(this.graph) {
+    _initialize();
   }
 
-  Edge.of(Edge<T> e, {String? id}) {
-    this.id = id ?? "";
-    from = e.from;
-    to = e.to;
-    value = e.value;
+  void _initialize() {
+    for (final v in graph.vertexIterator) {
+      _degreeMap[v.id] = Degree();
+      _weightedDegreeMap[v.id] = WeightDegree();
+    }
+
+    for (final e in graph.edgeIterator) {
+      _applyEdge(e, 1);
+    }
   }
 
-  @override
-  int get hashCode {
-    return Object.hash(id, from, to);
+  void freeze() => _frozen = true;
+
+  void thaw() {
+    if (!_frozen) return;
+    _frozen = false;
+    if (_dirty) {
+      rebuild();
+      _dirty = false;
+    }
   }
 
-  @override
-  int compareTo(Edge<T> e) => this.value.compareTo(e.value);
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(other, this)) {
-      return true;
+  void rebuild() {
+    for (final d in _degreeMap.values) {
+      d.inDegree = 0;
+      d.outDegree = 0;
     }
-    if (other is! Edge<T>) {
-      return false;
+    for (final wd in _weightedDegreeMap.values) {
+      wd.clear();
     }
-    final Edge<T> e = other;
-    if (id != other.id) {
-      return false;
+    for (final e in graph.edgeIterator) {
+      _applyEdge(e, 1);
     }
-
-    if (from != e.from) {
-      return false;
-    }
-    return to == e.to;
   }
 
-  T get source => from.data;
+  void _onVertexAdded(Vertex v) {
+    _degreeMap[v.id] = Degree();
+    _weightedDegreeMap[v.id] = WeightDegree();
+  }
 
-  set source(T v) => from.data = v;
+  void _onVertexRemoved(Vertex v) {
+    _degreeMap.remove(v.id);
+    _weightedDegreeMap.remove(v.id);
+  }
 
-  T get target => to.data;
+  void _onEdgeAdded(Edge e) => _applyEdge(e, 1);
 
-  set target(T v) => to.data = v;
+  void _onEdgeRemoved(Edge e) => _applyEdge(e, -1);
+
+  void _applyEdge(Edge e, int delta) {
+    if (_frozen) {
+      _dirty = true;
+      return;
+    }
+
+    final w = (e.value) * delta;
+    final isDirected = e.isDirected(graph.directed);
+
+    final fromDegree = _degreeMap[e.from];
+    final toDegree = _degreeMap[e.to];
+    final fromWeighted = _weightedDegreeMap[e.from];
+    final toWeighted = _weightedDegreeMap[e.to];
+
+    if (fromDegree == null || toDegree == null) return;
+
+    // 更新 Degree
+    fromDegree.outDegree += delta;
+    toDegree.inDegree += delta;
+
+    if (!isDirected) {
+      fromDegree.inDegree += delta;
+      toDegree.outDegree += delta;
+    }
+
+    // 更新 WeightedDegree
+    if (fromWeighted == null || toWeighted == null) return;
+
+    fromWeighted.outWeight += w;
+    toWeighted.inWeight += w;
+
+    if (!isDirected) {
+      fromWeighted.inWeight += w;
+      toWeighted.outWeight += w;
+    }
+  }
+
+  Degree degreeOf(String vid) => _degreeMap[vid] ?? Degree();
+
+  WeightDegree weightDegreeOf(String vid) => _weightedDegreeMap[vid] ?? WeightDegree();
 }
 
-class CostPath<T> {
+final class Degree {
+  int inDegree = 0;
+  int outDegree = 0;
+
+  int get total => inDegree + outDegree;
+
+  @override
+  String toString() => 'Degree(in: $inDegree, out: $outDegree)';
+}
+
+final class WeightDegree {
+  double inWeight = 0.0;
+  double outWeight = 0.0;
+
+  double get total => inWeight + outWeight;
+
+  void clear() {
+    inWeight = 0.0;
+    outWeight = 0.0;
+  }
+
+  @override
+  String toString() => 'WeightedDegree(in: $inWeight, out: $outWeight, total: $total)';
+}
+
+class CostPath {
   final double cost;
-  final List<Edge<T>> path;
+  final List<Edge> path;
 
   const CostPath(this.cost, this.path);
 
@@ -315,15 +445,14 @@ class CostPath<T> {
       return true;
     }
 
-    if ((other is! CostPath<T>)) {
+    if ((other is! CostPath)) {
       return false;
     }
 
-    final CostPath<T> pair = other;
-    if (this.cost != pair.cost) {
+    final CostPath pair = other;
+    if (cost != pair.cost) {
       return false;
     }
-
     var iter1 = path.iterator;
     var iter2 = pair.path.iterator;
     while (iter1.moveNext() && iter2.moveNext()) {
@@ -335,8 +464,8 @@ class CostPath<T> {
   }
 }
 
-class CostVertex<T> implements Comparable<CostVertex<T>> {
-  final Vertex<T> vertex;
+class CostVertex implements Comparable<CostVertex> {
+  final Vertex vertex;
   double cost;
 
   CostVertex(this.cost, this.vertex);
@@ -347,7 +476,7 @@ class CostVertex<T> implements Comparable<CostVertex<T>> {
   }
 
   @override
-  int compareTo(CostVertex<T> p) {
+  int compareTo(CostVertex p) {
     if (this.cost < p.cost) {
       return -1;
     }
@@ -362,7 +491,7 @@ class CostVertex<T> implements Comparable<CostVertex<T>> {
     if (identical(other, this)) {
       return true;
     }
-    if (other is! CostVertex<T>) {
+    if (other is! CostVertex) {
       return false;
     }
 

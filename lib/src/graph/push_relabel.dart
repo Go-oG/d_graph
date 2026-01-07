@@ -17,12 +17,11 @@ final class PushRelabel {
   late final _Vertex _source;
   late final _Vertex _sink;
 
-  static int getMaximumFlow<T>(
-      Map<g.Edge<T>, int> edgesToCapacities, g.Vertex<T> source, g.Vertex<T> sink) {
-    final Map<g.Vertex<T>, _Vertex> vertexMap = SplayTreeMap<g.Vertex<T>, _Vertex>();
-    for (g.Edge<T> edge in edgesToCapacities.keys) {
-      vertexMap.put(edge.from, _Vertex());
-      vertexMap.put(edge.to, _Vertex());
+  static int getMaximumFlow(g.Graph graph, Map<g.Edge, int> edgesToCapacities, g.Vertex source, g.Vertex sink) {
+    final Map<g.Vertex, _Vertex> vertexMap = SplayTreeMap<g.Vertex, _Vertex>();
+    for (g.Edge edge in edgesToCapacities.keys) {
+      vertexMap.put(graph.getVertex(edge.from), _Vertex());
+      vertexMap.put(graph.getVertex(edge.to), _Vertex());
     }
 
     final _Vertex s = _Vertex();
@@ -32,11 +31,10 @@ final class PushRelabel {
     vertexMap.put(sink, t);
 
     final PushRelabel pushRelabel = PushRelabel._(vertexMap.values, s, t);
-    for (MapEntry<g.Edge<T>, int> edgeWithCapacity in edgesToCapacities.entries) {
-      final g.Edge<T> e = edgeWithCapacity.key;
-      _addEdge(vertexMap.get(e.from)!, vertexMap.get(e.to)!, edgeWithCapacity.value);
+    for (MapEntry<g.Edge, int> edgeWithCapacity in edgesToCapacities.entries) {
+      final g.Edge e = edgeWithCapacity.key;
+      _addEdge(vertexMap.get(graph.getVertex(e.from))!, vertexMap.get(graph.getVertex(e.to))!, edgeWithCapacity.value);
     }
-
     return pushRelabel._maxFlow();
   }
 

@@ -6,53 +6,43 @@ import 'graph.dart';
 
 /// Johnson 算法是一种查找所有稀疏有向图中的顶点。
 /// 它允许一些边权重为负数，但不存在负权重循环.
-extension Johnson<T> on Graph<T> {
-  Map<Vertex<T>, Map<Vertex<T>, List<Edge<T>>>> shortestPathsByJohnson(T maxData) {
-    final Graph<T> graph = Graph.of(this);
+extension Johnson on Graph {
+  Map<Vertex, Map<Vertex, List<Edge>>> shortestPathsByJohnson(Object maxData) {
+    final Graph graph = Graph.of(this);
+    final Vertex connector = Vertex(data: maxData, id: "\$connector_${maxData.hashCode}\$");
 
-    final Vertex<T> connector = Vertex<T>(maxData);
-
-    for (Vertex<T> v in graph.vertices) {
-      final int indexOfV = graph.vertices.indexOf(v);
-      final Edge<T> edge = Edge<T>(0, connector, graph.vertices[indexOfV]);
-      connector.addEdge(edge);
-      graph.edges.add(edge);
+    for (Vertex v in graph.vertexIterator) {
+      final Edge edge = Edge(value: 0, from: connector.id, to: v.id, id: "\$id${connector.id}_${v.id}\$");
+      graph.addEdge(edge);
     }
 
-    graph.vertices.add(connector);
+    graph.addVertex(connector);
 
-    final Map<Vertex<T>, CostPath<T>> costs = graph.shortestPathsByBellmanFord(connector);
+    final Map<Vertex, CostPath> costs = graph.shortestPathsByBellmanFord(connector);
 
-    for (Edge<T> e in graph.edges) {
-      final  weight = e.value;
-      final Vertex<T> u = e.from;
-      final Vertex<T> v = e.to;
-
+    for (Edge e in graph.edgeIterator) {
+      final weight = e.value;
+      final Vertex u = graph.getVertex(e.from);
+      final Vertex v = graph.getVertex(e.to);
       if (u == connector || v == connector) {
         continue;
       }
 
-      // Adjust the costs
-      final  uCost = costs.get(u)!.cost;
-      final  vCost = costs.get(v)!.cost;
-      final  newWeight = weight + uCost - vCost;
+      final uCost = costs.get(u)!.cost;
+      final vCost = costs.get(v)!.cost;
+      final newWeight = weight + uCost - vCost;
       e.value = newWeight;
     }
 
-    final int indexOfConnector = graph.vertices.indexOf(connector);
-    graph.vertices.removeAt(indexOfConnector);
-    for (Edge<T> e in connector.edges) {
-      final int indexOfConnectorEdge = graph.edges.indexOf(e);
-      graph.edges.removeAt(indexOfConnectorEdge);
-    }
+    graph.removeVertex(connector);
 
-    final Map<Vertex<T>, Map<Vertex<T>, List<Edge<T>>>> allShortestPaths = {};
+    final Map<Vertex, Map<Vertex, List<Edge>>> allShortestPaths = {};
 
-    for (Vertex<T> v in graph.vertices) {
-      final Map<Vertex<T>, CostPath<T>> costPaths = graph.shortestPathsByDijkstra(v);
-      final Map<Vertex<T>, List<Edge<T>>> paths = {};
-      for (Vertex<T> v2 in costPaths.keys) {
-        final CostPath<T> pair = costPaths.get(v2)!;
+    for (Vertex v in graph.vertexIterator) {
+      final Map<Vertex, CostPath> costPaths = graph.shortestPathsByDijkstra(v);
+      final Map<Vertex, List<Edge>> paths = {};
+      for (Vertex v2 in costPaths.keys) {
+        final CostPath pair = costPaths.get(v2)!;
         paths.put(v2, pair.path);
       }
       allShortestPaths.put(v, paths);

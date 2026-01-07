@@ -1,26 +1,24 @@
-import 'package:d_util/d_util.dart';
 import 'package:dart_graph/dart_graph.dart';
 
-extension DFSG<T> on Graph<T> {
-  List<Vertex<T>> dfs(Vertex<T> source) {
-    final List<Vertex<T>> vertices = [];
-    vertices.addAll(this.vertices);
+extension DFSG on Graph {
+  List<Vertex> dfs(Vertex source) {
+    final List<Vertex> vertices = vertexIterator.toList();
 
     final int n = vertices.size;
-    final Map<Vertex<T>, int> vertexToIndex = {};
+    final Map<Vertex, int> vertexToIndex = {};
     for (var i = 0; i < n; i++) {
-      final Vertex<T> v = vertices.get(i);
+      final Vertex v = vertices.get(i);
       vertexToIndex.put(v, i);
     }
 
     final Array<Array<int>> adj = Array(n);
     for (var i = 0; i < n; i++) {
-      final Vertex<T> v = vertices.get(i);
+      final Vertex v = vertices.get(i);
       final int idx = vertexToIndex.get(v)!;
       final Array<int> array = Array(n);
       adj[idx] = array;
-      for (Edge<T> e in v.edges) {
-        array[vertexToIndex.get(e.to)!] = 1;
+      for (Edge e in edges2(v)) {
+        array[vertexToIndex[getVertex(e.to)]!] = 1;
       }
     }
 
@@ -29,9 +27,9 @@ extension DFSG<T> on Graph<T> {
       visited[i] = -1;
     }
 
-    final Array<Vertex<T>> arr = Array(n);
+    final Array<Vertex> arr = Array(n);
 
-    Vertex<T> element = source;
+    Vertex element = source;
     int c = 0;
     int i = vertexToIndex.get(element)!;
     int k = 0;
@@ -40,7 +38,7 @@ extension DFSG<T> on Graph<T> {
     arr[k] = element;
     k++;
 
-    final List<Vertex<T>> stack = [];
+    final List<Vertex> stack = [];
     stack.add(source);
     while (stack.isNotEmpty) {
       element = stack.last;
@@ -48,7 +46,7 @@ extension DFSG<T> on Graph<T> {
       i = 0;
       while (i < n) {
         if (adj[c][i] == 1 && visited[i] == -1) {
-          final Vertex<T> v = vertices.get(i);
+          final Vertex v = vertices.get(i);
           stack.add(v);
           visited[i] = 1;
 

@@ -1,6 +1,5 @@
 import 'dart:collection';
 
-import 'package:d_util/d_util.dart';
 import 'package:dart_graph/dart_graph.dart';
 
 /// 广度优先搜索 （BFS） 是一种用于遍历或搜索树或图形数据结构的算法。它从树根（或图形的某个任意节点，有时称为
@@ -9,27 +8,27 @@ import 'package:dart_graph/dart_graph.dart';
 /// @see <a href="https://en.wikipedia.org/wiki/Breadth-first_search">Breadth-First Search (Wikipedia)</a>
 /// <br>
 /// @author Justin Wetherell <phishman3579@gmail.com>
-extension BFSGE<T> on Graph<T> {
-  List<Vertex<T>> bfs(Vertex<T> source) {
-    final List<Vertex<T>> vertices = [];
-    vertices.addAll(this.vertices);
+extension BFSGE on Graph {
+  List<Vertex> bfs(Vertex source) {
+    final List<Vertex> vertices = [];
+    vertices.addAll(vertexIterator);
 
     final n = vertices.size;
-    final Map<Vertex<T>, int> vertexToIndex = {};
+    final Map<Vertex, int> vertexToIndex = {};
     for (var i = 0; i < n; i++) {
-      final Vertex<T> v = vertices.get(i);
+      final Vertex v = vertices.get(i);
       vertexToIndex.put(v, i);
     }
 
     final Array<Array<int>> adj = Array(n);
 
     for (var i = 0; i < n; i++) {
-      final Vertex<T> v = vertices.get(i);
+      final Vertex v = vertices.get(i);
       final idx = vertexToIndex.get(v)!;
       final Array<int> array = Array(n);
       adj[idx] = array;
-      for (Edge<T> e in v.edges) {
-        array[vertexToIndex.get(e.to)!] = 1;
+      for (Edge e in edges2(v)) {
+        array[vertexToIndex.get(getVertex(e.to))!] = 1;
       }
     }
 
@@ -37,8 +36,8 @@ extension BFSGE<T> on Graph<T> {
     for (var i = 0; i < visited.length; i++) {
       visited[i] = -1;
     }
-    final Array<Vertex<T>> arr = Array(n);
-    Vertex<T> element = source;
+    final Array<Vertex> arr = Array(n);
+    Vertex element = source;
     int c = 0;
     int i = vertexToIndex.get(element)!;
     int k = 0;
@@ -47,7 +46,7 @@ extension BFSGE<T> on Graph<T> {
     visited[i] = 1;
     k++;
 
-    final Queue<Vertex<T>> queue = Queue();
+    final Queue<Vertex> queue = Queue();
     queue.add(source);
     while (queue.isNotEmpty) {
       element = queue.first;
@@ -55,7 +54,7 @@ extension BFSGE<T> on Graph<T> {
       i = 0;
       while (i < n) {
         if (adj[c][i] == 1 && visited[i] == -1) {
-          final Vertex<T> v = vertices.get(i);
+          final Vertex v = vertices.get(i);
           queue.add(v);
           visited[i] = 1;
 
