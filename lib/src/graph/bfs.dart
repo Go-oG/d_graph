@@ -2,104 +2,35 @@ import 'dart:collection';
 
 import 'package:dart_graph/dart_graph.dart';
 
-/// 广度优先搜索 （BFS） 是一种用于遍历或搜索树或图形数据结构的算法。它从树根（或图形的某个任意节点，有时称为
-/// 'search key'） 并首先探索邻居节点，然后再移动到下一级别的邻居.
-/// <p>
-/// @see <a href="https://en.wikipedia.org/wiki/Breadth-first_search">Breadth-First Search (Wikipedia)</a>
-/// <br>
-/// @author Justin Wetherell <phishman3579@gmail.com>
-extension BFSGE on Graph {
-  List<Vertex> bfs(Vertex source) {
-    final List<Vertex> vertices = [];
-    vertices.addAll(vertexIterator);
+import 'graph.dart';
 
-    final n = vertices.size;
-    final Map<Vertex, int> vertexToIndex = {};
-    for (var i = 0; i < n; i++) {
-      final Vertex v = vertices.get(i);
-      vertexToIndex.put(v, i);
-    }
+/// 基于邻接表遍历，性能为 O(V+E)
+extension BFSExtension on Graph {
+  List<Vertex> bfs(Vertex start) {
+    if (!hasVertex(start)) return [];
 
-    final Array<Array<int>> adj = Array(n);
-
-    for (var i = 0; i < n; i++) {
-      final Vertex v = vertices.get(i);
-      final idx = vertexToIndex.get(v)!;
-      final Array<int> array = Array(n);
-      adj[idx] = array;
-      for (Edge e in edges2(v)) {
-        array[vertexToIndex.get(getVertex(e.to))!] = 1;
-      }
-    }
-
-    final Array<int> visited = Array(n);
-    for (var i = 0; i < visited.length; i++) {
-      visited[i] = -1;
-    }
-    final Array<Vertex> arr = Array(n);
-    Vertex element = source;
-    int c = 0;
-    int i = vertexToIndex.get(element)!;
-    int k = 0;
-
-    arr[k] = element;
-    visited[i] = 1;
-    k++;
-
+    final Set<String> visited = {};
+    final List<Vertex> result = [];
     final Queue<Vertex> queue = Queue();
-    queue.add(source);
+    visited.add(start.id);
+    queue.add(start);
+    result.add(start);
     while (queue.isNotEmpty) {
-      element = queue.first;
-      c = vertexToIndex.get(element)!;
-      i = 0;
-      while (i < n) {
-        if (adj[c][i] == 1 && visited[i] == -1) {
-          final Vertex v = vertices.get(i);
-          queue.add(v);
-          visited[i] = 1;
+      final Vertex current = queue.removeFirst();
+      final edgeMap = outEdges(current);
 
-          arr[k] = v;
-          k++;
+      for (final edge in edgeMap.values) {
+        final String neighborId = (edge.from == current.id) ? edge.to : edge.from;
+        if (!visited.contains(neighborId)) {
+          final neighbor = getVertexOrNull(neighborId);
+          if (neighbor != null) {
+            visited.add(neighborId);
+            queue.add(neighbor);
+            result.add(neighbor);
+          }
         }
-        i++;
       }
-      queue.removeFirst();
     }
-    return arr.toList();
-  }
-
-  List<int> bfs2(int n, Array<Array<int>> adjacencyMatrix, int source) {
-    final Array<int> visited = Array(n);
-    for (var i = 0; i < visited.length; i++) {
-      visited[i] = -1;
-    }
-
-    int element = source;
-    int i = source;
-    Array<int> arr = Array(n);
-    int k = 0;
-
-    arr[k] = element;
-    visited[i] = 1;
-    k++;
-
-    final Queue<int> queue = Queue();
-    queue.add(source);
-    while (queue.isNotEmpty) {
-      element = queue.first;
-      i = 0;
-      while (i < n) {
-        if (adjacencyMatrix[element][i] == 1 && visited[i] == -1) {
-          queue.add(i);
-          visited[i] = 1;
-
-          arr[k] = i;
-          k++;
-        }
-        i++;
-      }
-      queue.removeFirst();
-    }
-    return arr.toList();
+    return result;
   }
 }

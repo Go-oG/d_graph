@@ -1,665 +1,380 @@
-import 'dart:collection';
-import 'dart:core';
-import 'package:d_util/d_util.dart';
-import 'i_tree.dart';
+class _BTreeNode<T> {
+  final List<T?> keys;
+  final List<_BTreeNode<T>?> children;
+  int count = 0;
+  bool isLeaf = true;
 
+  _BTreeNode(int maxKeys)
+      : keys = List<T?>.filled(maxKeys, null),
+        children = List<_BTreeNode<T>?>.filled(maxKeys + 1, null);
 
-class BTree<T extends Comparable<T>> extends ITree<T> {
-  late final int _minKeySize;
-
-  late final int _minChildrenSize;
-
-  late final int _maxKeySize;
-
-  late final int _maxChildrenSize;
-
-  _Node<T>? _root;
-  int _size = 0;
-
-  BTree([int order = 1]) {
-    _minKeySize = order;
-    _minChildrenSize = _minKeySize + 1;
-    _maxKeySize = 2 * _minKeySize;
-    _maxChildrenSize = _maxKeySize + 1;
+  /// 在节点内部使用二分查找
+  /// 返回 index: 如果 >= 0，表示找到；如果 < 0，表示 -(插入点) - 1
+  int search(T value, Comparator<T> compare) {
+    int low = 0;
+    int high = count - 1;
+    while (low <= high) {
+      int mid = (low + high) >>> 1;
+      int cmp = compare(keys[mid] as T, value);
+      if (cmp < 0) {
+        low = mid + 1;
+      } else if (cmp > 0) {
+        high = mid - 1;
+      } else {
+        return mid;
+      }
+    }
+    return -(low + 1);
   }
 
   @override
-  bool add(T value) {
-    if (_root == null) {
-      _root = _Node<T>(null, _maxKeySize, _maxChildrenSize);
-      _root!.addKey(value);
-    } else {
-      _Node<T>? node = _root;
-      while (node != null) {
-        if (node.numberOfChildren() == 0) {
-          node.addKey(value);
-          if (node.numberOfKeys() <= _maxKeySize) {
-            // A-OK
-            break;
-          }
-          _split(node);
-          break;
-        }
-        T lesser = node.getKey(0);
-        if (value.compareTo(lesser) <= 0) {
-          node = node.getChild(0);
-          continue;
-        }
-
-        // Greater
-        int numberOfKeys = node.numberOfKeys();
-        int last = numberOfKeys - 1;
-        T greater = node.getKey(last);
-        if (value.compareTo(greater) > 0) {
-          node = node.getChild(numberOfKeys);
-          continue;
-        }
-
-        for (int i = 1; i < node!.numberOfKeys(); i++) {
-          T prev = node.getKey(i - 1);
-          T next = node.getKey(i);
-          if (value.compareTo(prev) > 0 && value.compareTo(next) <= 0) {
-            node = node.getChild(i);
-            break;
-          }
-        }
-      }
-    }
-    _size++;
-    return true;
-  }
-
-  void _split(_Node<T> nodeToSplit) {
-    _Node<T> node = nodeToSplit;
-    int numberOfKeys = node.numberOfKeys();
-    int medianIndex = numberOfKeys ~/ 2;
-    T medianValue = node.getKey(medianIndex);
-
-    _Node<T> left = _Node<T>(null, _maxKeySize, _maxChildrenSize);
-    for (int i = 0; i < medianIndex; i++) {
-      left.addKey(node.getKey(i));
-    }
-    if (node.numberOfChildren() > 0) {
-      for (int j = 0; j <= medianIndex; j++) {
-        _Node<T> c = node.getChild(j)!;
-        left.addChild(c);
-      }
-    }
-
-    _Node<T> right = _Node<T>(null, _maxKeySize, _maxChildrenSize);
-    for (int i = medianIndex + 1; i < numberOfKeys; i++) {
-      right.addKey(node.getKey(i));
-    }
-    if (node.numberOfChildren() > 0) {
-      for (int j = medianIndex + 1; j < node.numberOfChildren(); j++) {
-        _Node<T> c = node.getChild(j)!;
-        right.addChild(c);
-      }
-    }
-
-    if (node.parent == null) {
-      _Node<T> newRoot = _Node<T>(null, _maxKeySize, _maxChildrenSize);
-      newRoot.addKey(medianValue);
-      node.parent = newRoot;
-      _root = newRoot;
-      node = _root!;
-      node.addChild(left);
-      node.addChild(right);
-    } else {
-      _Node<T> parent = node.parent!;
-      parent.addKey(medianValue);
-      parent.removeChild(node);
-      parent.addChild(left);
-      parent.addChild(right);
-
-      if (parent.numberOfKeys() > _maxKeySize) _split(parent);
-    }
-  }
-
-  @override
-  T? remove(T value) {
-    T? removed;
-    _Node<T>? node = _getNode(value)!;
-    removed = _remove(value, node);
-    return removed;
-  }
-
-  T? _remove(T value, _Node<T>? node) {
-    if (node == null) return null;
-
-    T? removed;
-    int index = node.indexOf(value);
-    removed = node.removeKey(value);
-    if (node.numberOfChildren() == 0) {
-      // leaf node
-      if (node.parent != null && node.numberOfKeys() < _minKeySize) {
-        _combined(node);
-      } else if (node.parent == null && node.numberOfKeys() == 0) {
-        // Removing root node with no keys or children
-        _root = null;
-      }
-    } else {
-      // internal node
-      _Node<T> lesser = node.getChild(index)!;
-      _Node<T> greatest = _getGreatestNode(lesser);
-      T replaceValue = _removeGreatestValue(greatest)!;
-      node.addKey(replaceValue);
-      if (greatest.parent != null && greatest.numberOfKeys() < _minKeySize) {
-        _combined(greatest);
-      }
-      if (greatest.numberOfChildren() > _maxChildrenSize) {
-        _split(greatest);
-      }
-    }
-
-    _size--;
-
-    return removed;
-  }
-
-  T? _removeGreatestValue(_Node<T> node) {
-    T? value;
-    if (node.numberOfKeys() > 0) {
-      value = node.removeKey2(node.numberOfKeys() - 1);
-    }
-    return value;
-  }
-
-  @override
-  void clear() {
-    _root = null;
-    _size = 0;
-  }
-
-  @override
-  bool contains(T value) {
-    _Node<T>? node = _getNode(value);
-    return (node != null);
-  }
-
-  _Node<T>? _getNode(T value) {
-    _Node<T>? node = _root;
-    while (node != null) {
-      T lesser = node.getKey(0);
-      if (value.compareTo(lesser) < 0) {
-        if (node.numberOfChildren() > 0)
-          node = node.getChild(0);
-        else
-          node = null;
-        continue;
-      }
-
-      int numberOfKeys = node.numberOfKeys();
-      int last = numberOfKeys - 1;
-      T greater = node.getKey(last);
-      if (value.compareTo(greater) > 0) {
-        if (node.numberOfChildren() > numberOfKeys)
-          node = node.getChild(numberOfKeys);
-        else
-          node = null;
-        continue;
-      }
-      for (int i = 0; i < numberOfKeys; i++) {
-        T currentValue = node!.getKey(i);
-        if (currentValue.compareTo(value) == 0) {
-          return node;
-        }
-        int next = i + 1;
-        if (next <= last) {
-          T nextValue = node.getKey(next);
-          if (currentValue.compareTo(value) < 0 && nextValue.compareTo(value) > 0) {
-            if (next < node.numberOfChildren()) {
-              node = node.getChild(next);
-              break;
-            }
-            return null;
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  _Node<T> _getGreatestNode(_Node<T> nodeToGet) {
-    _Node<T> node = nodeToGet;
-    while (node.numberOfChildren() > 0) {
-      node = node.getChild(node.numberOfChildren() - 1)!;
-    }
-    return node;
-  }
-
-  bool _combined(_Node<T> node) {
-    _Node<T> parent = node.parent!;
-    int index = parent.indexOf2(node);
-    int indexOfLeftNeighbor = index - 1;
-    int indexOfRightNeighbor = index + 1;
-
-    _Node<T>? rightNeighbor;
-    int rightNeighborSize = -_minChildrenSize;
-    if (indexOfRightNeighbor < parent.numberOfChildren()) {
-      rightNeighbor = parent.getChild(indexOfRightNeighbor);
-      rightNeighborSize = rightNeighbor!.numberOfKeys();
-    }
-
-    if (rightNeighbor != null && rightNeighborSize > _minKeySize) {
-      // Try to borrow from right neighbor
-      T removeValue = rightNeighbor.getKey(0);
-      int prev = _getIndexOfPreviousValue(parent, removeValue);
-      T parentValue = parent.removeKey2(prev)!;
-      T neighborValue = rightNeighbor.removeKey2(0)!;
-      node.addKey(parentValue);
-      parent.addKey(neighborValue);
-      if (rightNeighbor.numberOfChildren() > 0) {
-        node.addChild(rightNeighbor.removeChild2(0)!);
-      }
-    } else {
-      _Node<T>? leftNeighbor;
-      int leftNeighborSize = -_minChildrenSize;
-      if (indexOfLeftNeighbor >= 0) {
-        leftNeighbor = parent.getChild(indexOfLeftNeighbor);
-        leftNeighborSize = leftNeighbor!.numberOfKeys();
-      }
-      if (leftNeighbor != null && leftNeighborSize > _minKeySize) {
-        T removeValue = leftNeighbor.getKey(leftNeighbor.numberOfKeys() - 1);
-        int prev = _getIndexOfNextValue(parent, removeValue);
-        T parentValue = parent.removeKey2(prev)!;
-        T neighborValue = leftNeighbor.removeKey2(leftNeighbor.numberOfKeys() - 1)!;
-        node.addKey(parentValue);
-        parent.addKey(neighborValue);
-        if (leftNeighbor.numberOfChildren() > 0) {
-          node.addChild(leftNeighbor.removeChild2(leftNeighbor.numberOfChildren() - 1)!);
-        }
-      } else if (rightNeighbor != null && parent.numberOfKeys() > 0) {
-        T removeValue = rightNeighbor.getKey(0);
-        int prev = _getIndexOfPreviousValue(parent, removeValue);
-        T parentValue = parent.removeKey2(prev)!;
-        parent.removeChild(rightNeighbor);
-        node.addKey(parentValue);
-        for (int i = 0; i < rightNeighbor._keysSize; i++) {
-          T v = rightNeighbor.getKey(i);
-          node.addKey(v);
-        }
-        for (int i = 0; i < rightNeighbor._childrenSize; i++) {
-          _Node<T> c = rightNeighbor.getChild(i)!;
-          node.addChild(c);
-        }
-
-        if (parent.parent != null && parent.numberOfKeys() < _minKeySize) {
-          // removing key made parent too small, combined up tree
-          _combined(parent);
-        } else if (parent.numberOfKeys() == 0) {
-          // parent no longer has keys, make this node the new root
-          // which decreases the height of the tree
-          node.parent = null;
-          _root = node;
-        }
-      } else if (leftNeighbor != null && parent.numberOfKeys() > 0) {
-        // Can't borrow from neighbors, try to combined with left neighbor
-        T removeValue = leftNeighbor.getKey(leftNeighbor.numberOfKeys() - 1);
-        int prev = _getIndexOfNextValue(parent, removeValue);
-        T parentValue = parent.removeKey2(prev)!;
-        parent.removeChild(leftNeighbor);
-        node.addKey(parentValue);
-        for (int i = 0; i < leftNeighbor._keysSize; i++) {
-          T v = leftNeighbor.getKey(i);
-          node.addKey(v);
-        }
-        for (int i = 0; i < leftNeighbor._childrenSize; i++) {
-          _Node<T> c = leftNeighbor.getChild(i)!;
-          node.addChild(c);
-        }
-
-        if (parent.parent != null && parent.numberOfKeys() < _minKeySize) {
-          _combined(parent);
-        } else if (parent.numberOfKeys() == 0) {
-          node.parent = null;
-          _root = node;
-        }
-      }
-    }
-    return true;
-  }
-
-  int _getIndexOfPreviousValue(_Node<T> node, T value) {
-    for (int i = 1; i < node.numberOfKeys(); i++) {
-      T t = node.getKey(i);
-      if (t.compareTo(value) >= 0) {
-        return i - 1;
-      }
-    }
-    return node.numberOfKeys() - 1;
-  }
-
-  int _getIndexOfNextValue(_Node<T> node, T value) {
-    for (int i = 0; i < node.numberOfKeys(); i++) {
-      T t = node.getKey(i);
-      if (t.compareTo(value) >= 0) {
-        return i;
-      }
-    }
-    return node.numberOfKeys() - 1;
-  }
-
-  @override
-  int get size {
-    return _size;
-  }
-
-  @override
-  bool validate() {
-    if (_root == null) return true;
-    return _validateNode(_root!);
-  }
-
-  bool _validateNode(_Node<T> node) {
-    int keySize = node.numberOfKeys();
-    if (keySize > 1) {
-      for (int i = 1; i < keySize; i++) {
-        T p = node.getKey(i - 1);
-        T n = node.getKey(i);
-        if (p.compareTo(n) > 0) {
-          return false;
-        }
-      }
-    }
-    int childrenSize = node.numberOfChildren();
-    if (node.parent == null) {
-      if (keySize > _maxKeySize) {
-        return false;
-      } else if (childrenSize == 0) {
-        return true;
-      } else if (childrenSize < 2) {
-        return false;
-      } else if (childrenSize > _maxChildrenSize) {
-        return false;
-      }
-    } else {
-      if (keySize < _minKeySize) {
-        return false;
-      } else if (keySize > _maxKeySize) {
-        return false;
-      } else if (childrenSize == 0) {
-        return true;
-      } else if (keySize != (childrenSize - 1)) {
-        return false;
-      } else if (childrenSize < _minChildrenSize) {
-        return false;
-      } else if (childrenSize > _maxChildrenSize) {
-        return false;
-      }
-    }
-
-    _Node<T> first = node.getChild(0)!;
-    if (first.getKey(first.numberOfKeys() - 1).compareTo(node.getKey(0)) > 0) {
-      return false;
-    }
-
-    _Node<T> last = node.getChild(node.numberOfChildren() - 1)!;
-    if (last.getKey(0).compareTo(node.getKey(node.numberOfKeys() - 1)) < 0) {
-      return false;
-    }
-
-    for (int i = 1; i < node.numberOfKeys(); i++) {
-      T p = node.getKey(i - 1);
-      T n = node.getKey(i);
-      _Node<T> c = node.getChild(i)!;
-      if (p.compareTo(c.getKey(0)) > 0) {
-        return false;
-      }
-      if (n.compareTo(c.getKey(c.numberOfKeys() - 1)) < 0) {
-        return false;
-      }
-    }
-
-    for (int i = 0; i < node._childrenSize; i++) {
-      _Node<T> c = node.getChild(i)!;
-      if (!_validateNode(c)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  @override
-  Iterable<T> toCollection() {
-    return JavaCompatibleBTree<T>(this);
-  }
+  String toString() => 'Node(count: $count, keys: ${keys.sublist(0, count)})';
 }
 
-class _Node<T extends Comparable<T>> {
-  late Array<T?> keys;
+class BTree<T extends Comparable<T>> extends Iterable<T> {
+  final int order;
+  final int _maxKeys;
+  final int _maxChildren;
+  final int _minKeys;
 
-  int _keysSize = 0;
+  _BTreeNode<T>? _root;
+  int _length = 0;
 
-  late Array<_Node<T>?> children;
-
-  int _childrenSize = 0;
-
-  final Comparator<_Node<T>?> _comparator = (a, b) {
-    return a!.getKey(0).compareTo(b!.getKey(0));
-  };
-
-  _Node<T>? parent;
-
-  _Node(this.parent, int maxKeySize, int maxChildrenSize) {
-    keys = Array(maxKeySize + 1);
-    this._keysSize = 0;
-    children = Array(maxChildrenSize + 1);
-    _childrenSize = 0;
+  BTree([this.order = 2])
+      : _maxKeys = 2 * order - 1,
+        _maxChildren = 2 * order,
+        _minKeys = order - 1 {
+    if (order < 2) throw ArgumentError("Order must be at least 2");
   }
 
-  T getKey(int index) {
-    return keys[index]!;
+  @override
+  bool get isEmpty => _length == 0;
+
+  @override
+  int get length => _length;
+
+  void clear() {
+    _root = null;
+    _length = 0;
   }
 
-  int indexOf(T value) {
-    for (int i = 0; i < _keysSize; i++) {
-      if (keys[i] == value) return i;
+  int _compare(T a, T b) => a.compareTo(b);
+
+  @override
+  bool contains(Object? element) {
+    if (element is! T) return false;
+    _BTreeNode<T>? x = _root;
+    while (x != null) {
+      int i = x.search(element, _compare);
+      if (i >= 0) return true;
+      i = -(i + 1);
+      if (x.isLeaf) return false;
+      x = x.children[i];
     }
-    return -1;
+    return false;
   }
 
-  void addKey(T value) {
-    keys[_keysSize++] = value;
-    keys.sort();
-  }
-
-  T? removeKey(T value) {
-    T? removed;
-    bool found = false;
-    if (_keysSize == 0) return null;
-    for (int i = 0; i < _keysSize; i++) {
-      if (keys[i] == value) {
-        found = true;
-        removed = keys[i];
-      } else if (found) {
-        keys[i - 1] = keys[i];
-      }
+  bool add(T value) {
+    if (_root == null) {
+      _root = _BTreeNode<T>(_maxKeys);
+      _root!.keys[0] = value;
+      _root!.count = 1;
+      _length++;
+      return true;
     }
-    if (found) {
-      _keysSize--;
-      keys[_keysSize] = null;
-    }
-    return removed;
-  }
 
-  T? removeKey2(int index) {
-    if (index >= _keysSize) {
-      return null;
+    _BTreeNode<T> root = _root!;
+    if (root.count == _maxKeys) {
+      _BTreeNode<T> s = _BTreeNode<T>(_maxKeys);
+      _root = s;
+      s.isLeaf = false;
+      s.children[0] = root;
+      _splitChild(s, 0, root);
+      _insertNonFull(s, value);
+    } else {
+      _insertNonFull(root, value);
     }
-    T value = keys[index]!;
-    for (int i = index + 1; i < _keysSize; i++) {
-      keys[i - 1] = keys[i];
-    }
-    _keysSize--;
-    keys[_keysSize] = null;
-    return value;
-  }
-
-  int numberOfKeys() {
-    return _keysSize;
-  }
-
-  _Node<T>? getChild(int index) {
-    if (index >= _childrenSize) {
-      return null;
-    }
-    return children[index];
-  }
-
-  int indexOf2(_Node<T> child) {
-    for (int i = 0; i < _childrenSize; i++) {
-      if (children[i] == child) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  bool addChild(_Node<T> child) {
-    child.parent = this;
-    children[_childrenSize++] = child;
-    Array.sortRange(children, 0, _childrenSize, _comparator);
     return true;
   }
 
-  bool removeChild(_Node<T> child) {
-    bool found = false;
-    if (_childrenSize == 0) {
-      return found;
-    }
-    for (int i = 0; i < _childrenSize; i++) {
-      if (children[i] == child) {
-        found = true;
-      } else if (found) {
-        children[i - 1] = children[i];
+  void _insertNonFull(_BTreeNode<T> node, T value) {
+    _BTreeNode<T>? curr = node;
+    while (true) {
+      int i = curr!.count - 1;
+      if (curr.isLeaf) {
+        while (i >= 0 && _compare(curr.keys[i] as T, value) > 0) {
+          curr.keys[i + 1] = curr.keys[i];
+          i--;
+        }
+        if (i >= 0 && _compare(curr.keys[i] as T, value) == 0) {
+          return;
+        }
+        curr.keys[i + 1] = value;
+        curr.count++;
+        _length++;
+        return;
       }
+
+      while (i >= 0 && _compare(curr.keys[i] as T, value) > 0) {
+        i--;
+      }
+      i++;
+      if (i > 0 && _compare(curr.keys[i - 1] as T, value) == 0) return;
+      _BTreeNode<T> child = curr.children[i]!;
+      if (child.count == _maxKeys) {
+        _splitChild(curr, i, child);
+        int cmp = _compare(curr.keys[i] as T, value);
+        if (cmp == 0) return;
+        if (cmp < 0) {
+          curr = curr.children[i + 1];
+        } else {
+          curr = curr.children[i];
+        }
+      } else {
+        curr = child;
+      }
+
     }
+  }
+
+  void _splitChild(_BTreeNode<T> parent, int i, _BTreeNode<T> y) {
+    _BTreeNode<T> z = _BTreeNode<T>(_maxKeys);
+    z.isLeaf = y.isLeaf;
+    z.count = _minKeys;
+    List.copyRange(z.keys, 0, y.keys, order, _maxKeys);
+    if (!y.isLeaf) {
+      List.copyRange(z.children, 0, y.children, order, _maxChildren);
+    }
+
+    y.count = _minKeys;
+    y.keys.fillRange(order, _maxKeys, null);
+
+    List.copyRange(parent.children, i + 2, parent.children, i + 1, parent.count + 1);
+    parent.children[i + 1] = z;
+
+    List.copyRange(parent.keys, i + 1, parent.keys, i, parent.count);
+    parent.keys[i] = y.keys[order - 1];
+    parent.count++;
+
+    y.keys[order - 1] = null;
+  }
+
+  bool remove(Object? value) {
+    if (value is! T) return false;
+    if (_root == null) return false;
+
+    bool found = _delete(_root!, value);
     if (found) {
-      _childrenSize--;
-      children[_childrenSize] = null;
+      _length--;
+      if (_root!.count == 0) {
+        if (_root!.isLeaf) {
+          _root = null;
+        } else {
+          _root = _root!.children[0];
+        }
+      }
     }
     return found;
   }
 
-  _Node<T>? removeChild2(int index) {
-    if (index >= _childrenSize) {
-      return null;
+  bool _delete(_BTreeNode<T> node, T key) {
+    int idx = node.search(key, _compare);
+    if (idx >= 0) {
+      if (node.isLeaf) {
+        _arrayRemoveAt(node.keys, idx, node.count);
+        node.count--;
+        return true;
+      } else {
+        _BTreeNode<T> left = node.children[idx]!;
+        _BTreeNode<T> right = node.children[idx + 1]!;
+
+        if (left.count >= order) {
+          T pred = _getPredecessor(left);
+          node.keys[idx] = pred;
+          return _delete(left, pred);
+        } else if (right.count >= order) {
+          T succ = _getSuccessor(right);
+          node.keys[idx] = succ;
+          return _delete(right, succ);
+        } else {
+          _merge(node, idx);
+          return _delete(left, key);
+        }
+      }
+    } else {
+      if (node.isLeaf) return false;
+      idx = -(idx + 1);
+      _BTreeNode<T> child = node.children[idx]!;
+
+      if (child.count == _minKeys) {
+        _BTreeNode<T>? leftSib = (idx > 0) ? node.children[idx - 1] : null;
+        _BTreeNode<T>? rightSib = (idx < node.count) ? node.children[idx + 1] : null;
+
+        if (leftSib != null && leftSib.count >= order) {
+          _borrowFromLeft(node, idx, child, leftSib);
+        } else if (rightSib != null && rightSib.count >= order) {
+          _borrowFromRight(node, idx, child, rightSib);
+        } else {
+          if (leftSib != null) {
+            _merge(node, idx - 1);
+            child = leftSib;
+          } else {
+            _merge(node, idx);
+            child = node.children[idx]!;
+          }
+        }
+      }
+      return _delete(child, key);
     }
-    _Node<T> value = children[index]!;
-    children[index] = null;
-    for (int i = index + 1; i < _childrenSize; i++) {
-      children[i - 1] = children[i];
-    }
-    _childrenSize--;
-    children[_childrenSize] = null;
-    return value;
   }
 
-  int numberOfChildren() {
-    return _childrenSize;
+  void _arrayRemoveAt(List<T?> list, int index, int length) {
+    List.copyRange(list, index, list, index + 1, length);
+    list[length - 1] = null;
+  }
+
+  void _merge(_BTreeNode<T> parent, int idx) {
+    _BTreeNode<T> left = parent.children[idx]!;
+    _BTreeNode<T> right = parent.children[idx + 1]!;
+    T median = parent.keys[idx]!;
+    left.keys[left.count] = median;
+    List.copyRange(left.keys, left.count + 1, right.keys, 0, right.count);
+
+    if (!left.isLeaf) {
+      List.copyRange(left.children, left.count + 1, right.children, 0, right.count + 1);
+    }
+
+    left.count += right.count + 1;
+    _arrayRemoveAt(parent.keys, idx, parent.count);
+    List.copyRange(parent.children, idx + 1, parent.children, idx + 2, parent.count + 1);
+    parent.children[parent.count] = null;
+    parent.keys[parent.count - 1] = null;
+    parent.count--;
+  }
+
+  void _borrowFromLeft(_BTreeNode<T> parent, int idx, _BTreeNode<T> child, _BTreeNode<T> left) {
+    List.copyRange(child.keys, 1, child.keys, 0, child.count);
+    if (!child.isLeaf) {
+      List.copyRange(child.children, 1, child.children, 0, child.count + 1);
+    }
+
+    child.keys[0] = parent.keys[idx - 1];
+    parent.keys[idx - 1] = left.keys[left.count - 1];
+
+    if (!left.isLeaf) {
+      child.children[0] = left.children[left.count];
+      left.children[left.count] = null;
+    }
+
+    left.keys[left.count - 1] = null;
+    child.count++;
+    left.count--;
+  }
+
+  void _borrowFromRight(_BTreeNode<T> parent, int idx, _BTreeNode<T> child, _BTreeNode<T> right) {
+    child.keys[child.count] = parent.keys[idx];
+    parent.keys[idx] = right.keys[0];
+
+    if (!right.isLeaf) {
+      child.children[child.count + 1] = right.children[0];
+    }
+
+    List.copyRange(right.keys, 0, right.keys, 1, right.count);
+    if (!right.isLeaf) {
+      List.copyRange(right.children, 0, right.children, 1, right.count + 1);
+    }
+    right.children[right.count] = null;
+    right.keys[right.count - 1] = null;
+
+    child.count++;
+    right.count--;
+  }
+
+  T _getPredecessor(_BTreeNode<T> node) {
+    while (!node.isLeaf) {
+      node = node.children[node.count]!;
+    }
+    return node.keys[node.count - 1]!;
+  }
+
+  T _getSuccessor(_BTreeNode<T> node) {
+    while (!node.isLeaf) {
+      node = node.children[0]!;
+    }
+    return node.keys[0]!;
+  }
+
+  @override
+  Iterator<T> get iterator => _BTreeIterator(_root);
+
+  bool validate() => _validateNode(_root, null, null);
+
+  bool _validateNode(_BTreeNode<T>? node, T? min, T? max) {
+    if (node == null) return true;
+
+    if (node != _root) {
+      if (node.count < _minKeys || node.count > _maxKeys) return false;
+    }
+
+    for (int i = 0; i < node.count; i++) {
+      final k = node.keys[i]!;
+      if (min != null && _compare(k, min) <= 0) return false;
+      if (max != null && _compare(k, max) >= 0) return false;
+    }
+
+    if (!node.isLeaf) {
+      for (int i = 0; i <= node.count; i++) {
+        final left = i == 0 ? min : node.keys[i - 1];
+        final right = i == node.count ? max : node.keys[i];
+        if (!_validateNode(node.children[i], left, right)) return false;
+      }
+    }
+    return true;
   }
 }
 
-class JavaCompatibleBTree<T extends Comparable<T>> extends Iterable<T> {
-  BTree<T> tree;
+class _BTreeIterator<T> implements Iterator<T> {
+  final List<_BTreeNode<T>> nodeStack = [];
+  final List<int> indexStack = [];
+  T? _currentValue;
 
-  JavaCompatibleBTree(this.tree);
-
-  bool add(T value) {
-    return tree.add(value);
-  }
-
-  bool remove(Object value) {
-    if (value is! T) {
-      return false;
-    }
-    return (tree.remove(value) != null);
-  }
-
-  @override
-  bool contains(Object? element) {
-    if (element is! T) {
-      return false;
-    }
-    return tree.contains(element);
-  }
-
-  int get size {
-    return tree.size;
-  }
-
-  @override
-  Iterator<T> get iterator {
-    return _BTreeIterator<T>(this.tree);
-  }
-}
-
-class _BTreeIterator<C extends Comparable<C>> implements Iterator<C> {
-  BTree<C> tree;
-
-  _Node<C>? lastNode;
-
-  C? lastValue;
-
-  int index = 0;
-
-  Queue<_Node<C>> toVisit = DoubleLinkedQueue<_Node<C>>();
-
-  _BTreeIterator(this.tree) {
-    if (tree._root != null && tree._root!._keysSize > 0) {
-      toVisit.add(tree._root!);
+  _BTreeIterator(_BTreeNode<T>? root) {
+    if (root != null) {
+      _pushLeftmost(root);
     }
   }
 
-  bool hasNext() {
-    if ((lastNode != null && index < lastNode!._keysSize) || (toVisit.isNotEmpty)) return true;
-    return false;
-  }
-
-  C? next() {
-    if (lastNode != null && (index < lastNode!._keysSize)) {
-      lastValue = lastNode!.getKey(index++);
-      return lastValue!;
-    }
-    while (toVisit.isNotEmpty) {
-      _Node<C> n = toVisit.removeFirst();
-      for (int i = 0; i < n._childrenSize; i++) {
-        toVisit.add(n.getChild(i)!);
-      }
-      index = 0;
-      lastNode = n;
-      lastValue = lastNode!.getKey(index++);
-      return lastValue;
-    }
-    return null;
-  }
-
-  void remove() {
-    if (lastNode != null && lastValue != null) {
-      // On remove, reset the iterator (very inefficient, I know)
-      tree._remove(lastValue!, lastNode!);
-
-      lastNode = null;
-      lastValue = null;
-      index = 0;
-      toVisit.clear();
-      if (tree._root != null && tree._root!._keysSize > 0) {
-        toVisit.add(tree._root!);
-      }
+  void _pushLeftmost(_BTreeNode<T> node) {
+    _BTreeNode<T>? curr = node;
+    while (curr != null) {
+      nodeStack.add(curr);
+      indexStack.add(0);
+      if (curr.isLeaf) break;
+      curr = curr.children[0];
     }
   }
 
   @override
-  C get current {
-    return next()!;
-  }
+  T get current => _currentValue as T;
 
   @override
   bool moveNext() {
-    if (hasNext()) {
+    if (nodeStack.isEmpty) return false;
+
+    _BTreeNode<T> node = nodeStack.last;
+    int idx = indexStack.last;
+
+    if (idx < node.count) {
+      _currentValue = node.keys[idx];
+      indexStack[indexStack.length - 1] = idx + 1;
+      if (!node.isLeaf) {
+        _pushLeftmost(node.children[idx + 1]!);
+      }
       return true;
+    } else {
+      nodeStack.removeLast();
+      indexStack.removeLast();
+      return moveNext();
     }
-    return false;
   }
 }

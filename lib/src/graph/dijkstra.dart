@@ -1,106 +1,135 @@
-import '../../dart_graph.dart';
+import 'package:collection/collection.dart';
 
-extension Dijkstra on Graph {
-  Map<Vertex, CostPath> shortestPathsByDijkstra(Vertex start) {
-    final Map<Vertex, List<Edge>> paths = {};
-    final Map<Vertex, CostVertex> costs = {};
-    _getShortestPath2(this, start, null, paths, costs);
+import 'graph.dart';
 
-    final Map<Vertex, CostPath> map = {};
-    for (CostVertex pair in costs.values) {
-      double cost = pair.cost;
-      Vertex vertex = pair.vertex;
-      List<Edge> path = paths[vertex]!;
-      map[vertex] = CostPath(cost, path);
+final class PathResult {
+  final double cost;
+  final List<Edge> path;
+
+  PathResult(this.cost, this.path);
+
+  @override
+  String toString() => 'Cost: $cost, Path: ${path.map((e) => e.id).toList()}';
+}
+
+class _NodeCost implements Comparable<_NodeCost> {
+  final String vertexId;
+  final double cost;
+
+  _NodeCost(this.vertexId, this.cost);
+
+  @override
+  int compareTo(_NodeCost other) => cost.compareTo(other.cost);
+}
+
+extension DijkstraExtension on Graph {
+  Map<String, PathResult> shortestPaths(Vertex start) {
+    _checkNegativeEdges();
+
+    final Map<String, double> distances = {};
+    final Map<String, Edge> predecessors = {};
+
+    for (final v in vertexIterator) {
+      distances[v.id] = double.infinity;
     }
-    return map;
-  }
+    distances[start.id] = 0;
 
-  CostPath? shortestPathsByDijkstra2(Vertex start, Vertex end) {
-    final bool hasNegativeEdge = _checkForNegativeEdges(this, vertexIterator);
-    if (hasNegativeEdge) {
-      throw "Negative cost Edges are not allowed.";
-    }
+    final PriorityQueue<_NodeCost> pq = PriorityQueue();
+    pq.add(_NodeCost(start.id, 0));
 
-    final Map<Vertex, List<Edge>> paths = {};
-    final Map<Vertex, CostVertex> costs = {};
-    return _getShortestPath2(this, start, end, paths, costs);
-  }
+    while (pq.isNotEmpty) {
+      final _NodeCost current = pq.removeFirst();
+      final uId = current.vertexId;
+      final currentCost = current.cost;
 
-  static CostPath? _getShortestPath2(
-    Graph graph,
-    Vertex start,
-    Vertex? end,
-    Map<Vertex, List<Edge>> paths,
-    Map<Vertex, CostVertex> costs,
-  ) {
-    bool hasNegativeEdge = _checkForNegativeEdges(graph, graph.vertexIterator);
-    if (hasNegativeEdge) {
-      throw "Negative cost Edges are not allowed.";
-    }
+      if (currentCost > distances[uId]!) continue;
 
-    for (var v in graph.vertexIterator) {
-      paths[v] = [];
-    }
+      final u = vertexMap[uId];
+      if (u == null) continue;
 
-    for (var v in graph.vertexIterator) {
-      if (v == start) {
-        costs[v] = CostVertex(0, v);
-      } else {
-        costs[v] = CostVertex(Double.maxValue, v);
-      }
-    }
-
-    final PriorityQueue<CostVertex> unvisited = PriorityQueue();
-    unvisited.add(costs[start]!);
-
-    while (unvisited.isNotEmpty) {
-      final CostVertex pair = unvisited.removeFirst();
-      final Vertex vertex = pair.vertex;
-      for (Edge e in graph.edges2(vertex)) {
-        final CostVertex toPair = costs[graph.getVertex(e.to)]!;
-        final CostVertex lowestCostToThisVertex = costs[vertex]!;
-        final cost = lowestCostToThisVertex.cost + e.value;
-        if (toPair.cost == Integer.maxValue) {
-          unvisited.remove(toPair);
-          toPair.cost = cost;
-          unvisited.add(toPair);
-          List<Edge> set = paths[graph.getVertex(e.to)]!;
-          set.addAll(paths[graph.getVertex(e.from)]!);
-          set.add(e);
-        } else if (cost < toPair.cost) {
-          unvisited.remove(toPair);
-          toPair.cost = cost;
-          unvisited.add(toPair);
-
-          List<Edge> set = paths[graph.getVertex(e.to)]!;
-          set.clear();
-          set.addAll(paths[graph.getVertex(e.from)]!);
-          set.add(e);
+      for (final edge in _getOutEdges(u)) {
+        final vId = edge.to == uId ? edge.from : edge.to;
+        final newDist = currentCost + edge.weight;
+        if (newDist < distances[vId]!) {
+          distances[vId] = newDist;
+          predecessors[vId] = edge;
+          pq.add(_NodeCost(vId, newDist));
         }
       }
+    }
 
-      if (end != null && vertex == end) {
-        break;
+    final Map<String, PathResult> results = {};
+    for (final vId in distances.keys) {
+      if (distances[vId] == double.infinity) continue;
+      results[vId] = _buildPath(start.id, vId, predecessors, distances[vId]!);
+    }
+
+    return results;
+  }
+
+  PathResult? shortestPathTo(Vertex start, Vertex end) {
+    _checkNegativeEdges();
+
+    final Map<String, double> distances = {};
+    final Map<String, Edge> predecessors = {};
+
+    distances[start.id] = 0;
+
+    final pq = PriorityQueue<_NodeCost>();
+    pq.add(_NodeCost(start.id, 0));
+
+    while (pq.isNotEmpty) {
+      final current = pq.removeFirst();
+      final uId = current.vertexId;
+      final currentCost = current.cost;
+
+      if (uId == end.id) {
+        return _buildPath(start.id, end.id, predecessors, currentCost);
+      }
+
+      if (currentCost > (distances[uId] ?? double.infinity)) continue;
+
+      final u = vertexMap[uId];
+      if (u == null) continue;
+
+      for (final edge in _getOutEdges(u)) {
+        final vId = edge.to == uId ? edge.from : edge.to;
+        final newDist = currentCost + edge.weight;
+
+        if (newDist < (distances[vId] ?? double.infinity)) {
+          distances[vId] = newDist;
+          predecessors[vId] = edge;
+          pq.add(_NodeCost(vId, newDist));
+        }
       }
     }
 
-    if (end != null) {
-      final CostVertex pair = costs[end]!;
-      final List<Edge> set = paths[end]!;
-      return CostPath(pair.cost, set);
-    }
     return null;
   }
 
-  static bool _checkForNegativeEdges(Graph g, Iterable<Vertex> vertices) {
-    for (Vertex v in vertices) {
-      for (Edge e in g.edges(v.id)) {
-        if (e.value < 0) {
-          return true;
-        }
+  PathResult _buildPath(String startId, String endId, Map<String, Edge> predecessors, double totalCost) {
+    final List<Edge> path = [];
+    String? currentId = endId;
+
+    while (currentId != startId && currentId != null) {
+      final edge = predecessors[currentId];
+      if (edge == null) break;
+      path.add(edge);
+      currentId = (edge.to == currentId) ? edge.from : edge.to;
+    }
+
+    return PathResult(totalCost, path.reversed.toList());
+  }
+
+  Iterable<Edge> _getOutEdges(Vertex v) {
+    return outEdges(v).values;
+  }
+
+  void _checkNegativeEdges() {
+    for (final edge in edgeIterator) {
+      if (edge.weight < 0) {
+        throw StateError("Dijkstra algorithm does not support negative weight edges. Edge ID: ${edge.id}");
       }
     }
-    return false;
   }
 }

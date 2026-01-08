@@ -45,24 +45,24 @@ class BinarySearchTree<T> extends ITree<T> {
 
     BSNode<T>? node = root;
     while (node != null) {
-      if (compareFun.call(newNode.id, node.id) <= 0) {
-        if (node.lesser == null) {
-          node.lesser = newNode;
+      if (compareFun.call(newNode.value, node.value) <= 0) {
+        if (node.left == null) {
+          node.left = newNode;
           newNode.parent = node;
           mSize++;
           return newNode;
         }
-        node = node.lesser;
+        node = node.left;
       } else {
         // Greater than goes right
-        if (node.greater == null) {
+        if (node.right == null) {
           // New right node
-          node.greater = newNode;
+          node.right = newNode;
           newNode.parent = node;
           mSize++;
           return newNode;
         }
-        node = node.greater;
+        node = node.right;
       }
     }
     return newNode;
@@ -76,12 +76,12 @@ class BinarySearchTree<T> extends ITree<T> {
 
   BSNode<T>? getNode(T value) {
     BSNode<T>? node = root;
-    while (node != null && node.id != null) {
-      final cc = compareFun.call(value, node.id);
+    while (node != null && node.value != null) {
+      final cc = compareFun.call(value, node.value);
       if (cc < 0) {
-        node = node.lesser;
+        node = node.left;
       } else if (cc > 0) {
-        node = node.greater;
+        node = node.right;
       } else if (cc == 0) {
         return node;
       }
@@ -91,21 +91,21 @@ class BinarySearchTree<T> extends ITree<T> {
 
   void rotateLeft(BSNode<T> node) {
     BSNode<T>? parent = node.parent;
-    BSNode<T>? greater = node.greater;
-    BSNode<T>? lesser = greater?.lesser;
+    BSNode<T>? greater = node.right;
+    BSNode<T>? lesser = greater?.left;
 
-    greater?.lesser = node;
+    greater?.left = node;
     node.parent = greater;
-    node.greater = lesser;
+    node.right = lesser;
     if (lesser != null) {
       lesser.parent = node;
     }
 
     if (parent != null) {
-      if (node == parent.lesser) {
-        parent.lesser = greater;
-      } else if (node == parent.greater) {
-        parent.greater = greater;
+      if (node == parent.left) {
+        parent.left = greater;
+      } else if (node == parent.right) {
+        parent.right = greater;
       } else {
         throw ("Yikes! I'm not related to my parent. $node");
       }
@@ -118,22 +118,22 @@ class BinarySearchTree<T> extends ITree<T> {
 
   void rotateRight(BSNode<T> node) {
     BSNode<T>? parent = node.parent;
-    BSNode<T> lesser = node.lesser!;
-    BSNode<T>? greater = lesser.greater;
+    BSNode<T> lesser = node.left!;
+    BSNode<T>? greater = lesser.right;
 
-    lesser.greater = node;
+    lesser.right = node;
     node.parent = lesser;
-    node.lesser = greater;
+    node.left = greater;
 
     if (greater != null) {
       greater.parent = node;
     }
 
     if (parent != null) {
-      if (node == parent.lesser) {
-        parent.lesser = lesser;
-      } else if (node == parent.greater) {
-        parent.greater = lesser;
+      if (node == parent.left) {
+        parent.left = lesser;
+      } else if (node == parent.right) {
+        parent.right = lesser;
       } else {
         throw ("Yikes! I'm not related to my parent. $node");
       }
@@ -149,10 +149,10 @@ class BinarySearchTree<T> extends ITree<T> {
       return null;
     }
 
-    BSNode<T>? greater = startingNode.greater;
-    while (greater != null && greater.id != null) {
-      BSNode<T>? node = greater.greater;
-      if (node != null && node.id != null) {
+    BSNode<T>? greater = startingNode.right;
+    while (greater != null && greater.value != null) {
+      BSNode<T>? node = greater.right;
+      if (node != null && node.value != null) {
         greater = node;
       } else {
         break;
@@ -166,10 +166,10 @@ class BinarySearchTree<T> extends ITree<T> {
       return null;
     }
 
-    BSNode<T>? lesser = startingNode.lesser;
-    while (lesser != null && lesser.id != null) {
-      BSNode<T>? node = lesser.lesser;
-      if (node != null && node.id != null) {
+    BSNode<T>? lesser = startingNode.left;
+    while (lesser != null && lesser.value != null) {
+      BSNode<T>? node = lesser.left;
+      if (node != null && node.value != null) {
         lesser = node;
       } else {
         break;
@@ -180,8 +180,8 @@ class BinarySearchTree<T> extends ITree<T> {
 
   @override
   T? remove(T value) {
-    BSNode<T>? nodeToRemove = this.removeValue(value);
-    return ((nodeToRemove != null) ? nodeToRemove.id : null);
+    BSNode<T>? nodeToRemove = removeValue(value);
+    return ((nodeToRemove != null) ? nodeToRemove.value : null);
   }
 
   BSNode<T>? removeValue(T value) {
@@ -202,19 +202,19 @@ class BinarySearchTree<T> extends ITree<T> {
 
   BSNode<T>? getReplacementNode(BSNode<T> nodeToRemoved) {
     BSNode<T>? replacement;
-    if (nodeToRemoved.greater != null && nodeToRemoved.lesser != null) {
+    if (nodeToRemoved.right != null && nodeToRemoved.left != null) {
       if (modifications % 2 != 0) {
-        replacement = this.getGreatest(nodeToRemoved.lesser);
-        replacement ??= nodeToRemoved.lesser;
+        replacement = this.getGreatest(nodeToRemoved.left);
+        replacement ??= nodeToRemoved.left;
       } else {
-        replacement = this.getLeast(nodeToRemoved.greater);
-        replacement ??= nodeToRemoved.greater;
+        replacement = this.getLeast(nodeToRemoved.right);
+        replacement ??= nodeToRemoved.right;
       }
       modifications++;
-    } else if (nodeToRemoved.lesser != null && nodeToRemoved.greater == null) {
-      replacement = nodeToRemoved.lesser;
-    } else if (nodeToRemoved.greater != null && nodeToRemoved.lesser == null) {
-      replacement = nodeToRemoved.greater;
+    } else if (nodeToRemoved.left != null && nodeToRemoved.right == null) {
+      replacement = nodeToRemoved.left;
+    } else if (nodeToRemoved.right != null && nodeToRemoved.left == null) {
+      replacement = nodeToRemoved.right;
     }
     return replacement;
   }
@@ -222,33 +222,33 @@ class BinarySearchTree<T> extends ITree<T> {
   void replaceNodeWithNode(BSNode<T> nodeToRemoved, BSNode<T>? replacementNode) {
     if (replacementNode != null) {
       // Save for later
-      BSNode<T>? replacementNodeLesser = replacementNode.lesser;
-      BSNode<T>? replacementNodeGreater = replacementNode.greater;
+      BSNode<T>? replacementNodeLesser = replacementNode.left;
+      BSNode<T>? replacementNodeGreater = replacementNode.right;
 
       // Replace replacementNode's branches with nodeToRemove's branches
-      BSNode<T>? nodeToRemoveLesser = nodeToRemoved.lesser;
+      BSNode<T>? nodeToRemoveLesser = nodeToRemoved.left;
       if (nodeToRemoveLesser != null && nodeToRemoveLesser != replacementNode) {
-        replacementNode.lesser = nodeToRemoveLesser;
+        replacementNode.left = nodeToRemoveLesser;
         nodeToRemoveLesser.parent = replacementNode;
       }
-      BSNode<T>? nodeToRemoveGreater = nodeToRemoved.greater;
+      BSNode<T>? nodeToRemoveGreater = nodeToRemoved.right;
       if (nodeToRemoveGreater != null && nodeToRemoveGreater != replacementNode) {
-        replacementNode.greater = nodeToRemoveGreater;
+        replacementNode.right = nodeToRemoveGreater;
         nodeToRemoveGreater.parent = replacementNode;
       }
 
       // Remove link from replacementNode's parent to replacement
       BSNode<T>? replacementParent = replacementNode.parent;
       if (replacementParent != null && replacementParent != nodeToRemoved) {
-        BSNode<T>? replacementParentLesser = replacementParent.lesser;
-        BSNode<T>? replacementParentGreater = replacementParent.greater;
+        BSNode<T>? replacementParentLesser = replacementParent.left;
+        BSNode<T>? replacementParentGreater = replacementParent.right;
         if (replacementParentLesser != null && replacementParentLesser == replacementNode) {
-          replacementParent.lesser = replacementNodeGreater;
+          replacementParent.left = replacementNodeGreater;
           if (replacementNodeGreater != null) {
             replacementNodeGreater.parent = replacementParent;
           }
         } else if (replacementParentGreater != null && replacementParentGreater == replacementNode) {
-          replacementParent.greater = replacementNodeLesser;
+          replacementParent.right = replacementNodeLesser;
           if (replacementNodeLesser != null) {
             replacementNodeLesser.parent = replacementParent;
           }
@@ -262,13 +262,13 @@ class BinarySearchTree<T> extends ITree<T> {
       if (root != null) {
         root!.parent = null;
       }
-    } else if (parent.lesser != null && (compareFun.call(parent.lesser!.id, nodeToRemoved.id) == 0)) {
-      parent.lesser = replacementNode;
+    } else if (parent.left != null && (compareFun.call(parent.left!.value, nodeToRemoved.value) == 0)) {
+      parent.left = replacementNode;
       if (replacementNode != null) {
         replacementNode.parent = parent;
       }
-    } else if (parent.greater != null && (compareFun.call(parent.greater!.id, nodeToRemoved.id) == 0)) {
-      parent.greater = replacementNode;
+    } else if (parent.right != null && (compareFun.call(parent.right!.value, nodeToRemoved.value) == 0)) {
+      parent.right = replacementNode;
       if (replacementNode != null) {
         replacementNode.parent = parent;
       }
@@ -293,11 +293,11 @@ class BinarySearchTree<T> extends ITree<T> {
 
   @protected
   bool validateNode(BSNode<T> node) {
-    BSNode<T>? lesser = node.lesser;
-    BSNode<T>? greater = node.greater;
+    BSNode<T>? lesser = node.left;
+    BSNode<T>? greater = node.right;
     bool lesserCheck = true;
-    if (lesser != null && lesser.id != null) {
-      lesserCheck = (compareFun.call(lesser.id, node.id) <= 0);
+    if (lesser != null && lesser.value != null) {
+      lesserCheck = (compareFun.call(lesser.value, node.value) <= 0);
       if (lesserCheck) {
         lesserCheck = validateNode(lesser);
       }
@@ -307,8 +307,8 @@ class BinarySearchTree<T> extends ITree<T> {
     }
 
     bool greaterCheck = true;
-    if (greater != null && greater.id != null) {
-      greaterCheck = (compareFun.call(greater.id, node.id) > 0);
+    if (greater != null && greater.value != null) {
+      greaterCheck = (compareFun.call(greater.value, node.value) > 0);
       if (greaterCheck) {
         greaterCheck = validateNode(greater);
       }
@@ -327,12 +327,12 @@ class BinarySearchTree<T> extends ITree<T> {
     int count = 0;
     BSNode<T>? node = start;
     while (node != null) {
-      values[count++] = node.id;
-      if (node.lesser != null) {
-        queue.add(node.lesser!);
+      values[count++] = node.value;
+      if (node.left != null) {
+        queue.add(node.left!);
       }
-      if (node.greater != null) {
-        queue.add(node.greater!);
+      if (node.right != null) {
+        queue.add(node.right!);
       }
       if (queue.isNotEmpty) {
         node = queue.removeFirst();
@@ -362,12 +362,12 @@ class BinarySearchTree<T> extends ITree<T> {
     BSNode<T>? node = start;
     while (index < size && node != null) {
       BSNode<T>? parent = node.parent;
-      BSNode<T>? lesser = (node.lesser != null && !added.contains(node.lesser)) ? node.lesser : null;
-      BSNode<T>? greater = (node.greater != null && !added.contains(node.greater)) ? node.greater : null;
+      BSNode<T>? lesser = (node.left != null && !added.contains(node.left)) ? node.left : null;
+      BSNode<T>? greater = (node.right != null && !added.contains(node.right)) ? node.right : null;
 
       if (parent == null && lesser == null && greater == null) {
         if (!added.contains(node)) {
-          nodes[index++] = node.id;
+          nodes[index++] = node.value;
         }
         break;
       }
@@ -377,7 +377,7 @@ class BinarySearchTree<T> extends ITree<T> {
           node = lesser;
         } else {
           if (!added.contains(node)) {
-            nodes[index++] = node.id;
+            nodes[index++] = node.value;
             added.add(node);
           }
           if (greater != null) {
@@ -390,7 +390,7 @@ class BinarySearchTree<T> extends ITree<T> {
         }
       } else if (order == DepthFirstSearchOrder.preOrder) {
         if (!added.contains(node)) {
-          nodes[index++] = node.id;
+          nodes[index++] = node.value;
           added.add(node);
         }
         if (lesser != null) {
@@ -409,7 +409,7 @@ class BinarySearchTree<T> extends ITree<T> {
           if (greater != null) {
             node = greater;
           } else {
-            nodes[index++] = node.id;
+            nodes[index++] = node.value;
             added.add(node);
             node = parent;
           }
@@ -434,46 +434,34 @@ class BinarySearchTree<T> extends ITree<T> {
 
 enum DepthFirstSearchOrder { inOrder, preOrder, postOrder }
 
-class BinarySearchTreeIterator<C> implements Iterator<C> {
-  late BinarySearchTree<C> tree;
+class BinarySearchTreeIterator<T> implements Iterator<T> {
+  final List<BSNode<T>> _stack = [];
+  BSNode<T>? _current;
 
-  BSNode<C>? last;
-
-  Queue<BSNode<C>> toVisit = DoubleLinkedQueue<BSNode<C>>();
-
-  BinarySearchTreeIterator(this.tree) {
-    if (tree.root != null) toVisit.add(tree.root!);
+  BinarySearchTreeIterator(BinarySearchTree<T> tree) {
+    _pushLeft(tree.root);
   }
 
-  bool hasNext() {
-    if (toVisit.isNotEmpty) return true;
-    return false;
-  }
-
-  C? next() {
-    while (toVisit.isNotEmpty) {
-      BSNode<C> n = toVisit.removeFirst();
-      if (n.lesser != null) toVisit.add(n.lesser!);
-      if (n.greater != null) toVisit.add(n.greater!);
-      last = n;
-      return n.id;
+  void _pushLeft(BSNode<T>? node) {
+    while (node != null) {
+      _stack.add(node);
+      node = node.left;
     }
-    return null;
-  }
-
-  void remove() {
-    tree.removeNode(last);
   }
 
   @override
-  C get current => last!.id;
+  T get current => _current!.value;
 
   @override
   bool moveNext() {
-    if (toVisit.isEmpty) {
-      return false;
+    if (_stack.isEmpty) return false;
+
+    _current = _stack.removeLast();
+    // 访问当前节点后，尝试处理其右子树
+    if (_current!.right != null) {
+      _pushLeft(_current!.right);
     }
-    next();
+
     return true;
   }
 }
@@ -512,13 +500,13 @@ class _JavaCompatibleBinarySearchTree<T> extends Iterable<T> {
 typedef INodeCreator<T> = BSNode<T> Function(BSNode<T>? parent, T id);
 
 class BSNode<T> {
-  late T id;
+  late T value;
 
   BSNode<T>? parent;
 
-  BSNode<T>? lesser;
+  BSNode<T>? left;
 
-  BSNode<T>? greater;
+  BSNode<T>? right;
 
-  BSNode(this.parent, this.id);
+  BSNode(this.parent, this.value);
 }

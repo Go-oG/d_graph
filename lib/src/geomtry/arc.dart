@@ -174,11 +174,11 @@ class Arc extends BasicGeometry {
       return annularSector.isIntersectsCircle(geom.center, geom.radius);
     }
     if (geom is Polygon) {
-      return annularSector.isIntersectsPolygon(geom.lines);
+      return annularSector.isIntersectsPolygon(geom.vertices);
     }
 
     if (geom is Triangle) {
-      return annularSector.isIntersectsPolygon(geom.lines);
+      return annularSector.isIntersectsPolygon(geom.vertices);
     }
 
     return super.isOverlap(geom, eps: eps);

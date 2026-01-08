@@ -1,104 +1,41 @@
 import 'package:dart_graph/dart_graph.dart';
 
-extension DFSG on Graph {
+extension DFSExtension on Graph {
   List<Vertex> dfs(Vertex source) {
-    final List<Vertex> vertices = vertexIterator.toList();
-
-    final int n = vertices.size;
-    final Map<Vertex, int> vertexToIndex = {};
-    for (var i = 0; i < n; i++) {
-      final Vertex v = vertices.get(i);
-      vertexToIndex.put(v, i);
+    if (!vertexMap.containsKey(source.id)) {
+      throw ArgumentError('Source vertex ${source.id} does not exist in the graph.');
     }
 
-    final Array<Array<int>> adj = Array(n);
-    for (var i = 0; i < n; i++) {
-      final Vertex v = vertices.get(i);
-      final int idx = vertexToIndex.get(v)!;
-      final Array<int> array = Array(n);
-      adj[idx] = array;
-      for (Edge e in edges2(v)) {
-        array[vertexToIndex[getVertex(e.to)]!] = 1;
-      }
-    }
-
-    final Array<int> visited = Array(n);
-    for (var i = 0; i < visited.length; i++) {
-      visited[i] = -1;
-    }
-
-    final Array<Vertex> arr = Array(n);
-
-    Vertex element = source;
-    int c = 0;
-    int i = vertexToIndex.get(element)!;
-    int k = 0;
-
-    visited[i] = 1;
-    arr[k] = element;
-    k++;
-
+    final List<Vertex> result = [];
+    final Set<String> visited = {};
     final List<Vertex> stack = [];
     stack.add(source);
+    visited.add(source.id);
+
     while (stack.isNotEmpty) {
-      element = stack.last;
-      c = vertexToIndex.get(element)!;
-      i = 0;
-      while (i < n) {
-        if (adj[c][i] == 1 && visited[i] == -1) {
-          final Vertex v = vertices.get(i);
-          stack.add(v);
-          visited[i] = 1;
-
-          element = v;
-          c = vertexToIndex.get(element)!;
-          i = 0;
-
-          arr[k] = v;
-          k++;
-          continue;
+      final current = stack.removeLast();
+      result.add(current);
+      final neighbors = _getNeighbors(current).toList();
+      for (var i = neighbors.length - 1; i >= 0; i--) {
+        final neighbor = neighbors[i];
+        if (!visited.contains(neighbor.id)) {
+          visited.add(neighbor.id);
+          stack.add(neighbor);
         }
-        i++;
       }
-      stack.removeLast();
     }
-    return arr.toList();
+    return result;
   }
 
-  List<int> dfs2(int n, Array<Array<int>> adjacencyMatrix, int source) {
-    final Array<int> visited = Array(n);
-    for (int i = 0; i < visited.length; i++) {
-      visited[i] = -1;
-    }
-
-    int element = source;
-    int i = source;
-    Array<int> arr = Array(n);
-    int k = 0;
-
-    visited[source] = 1;
-    arr[k] = element;
-    k++;
-
-    final List<int> stack = [];
-    stack.add(source);
-    while (stack.isNotEmpty) {
-      element = stack.last;
-      i = 0;
-      while (i < n) {
-        if (adjacencyMatrix[element][i] == 1 && visited[i] == -1) {
-          stack.add(i);
-          visited[i] = 1;
-          element = i;
-          i = 0;
-          arr[k] = element;
-          k++;
-          continue;
-        }
-        i++;
+  Iterable<Vertex> _getNeighbors(Vertex v) sync* {
+    final out = outEdges(v);
+    if (out.isNotEmpty) {
+      for (final edge in out.values) {
+        final targetId = edge.to;
+        if (targetId == v.id && !allowSelfLoop) continue;
+        final target = vertexMap[targetId];
+        if (target != null) yield target;
       }
-      stack.removeLast();
     }
-    return arr.toList();
   }
 }

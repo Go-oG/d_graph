@@ -1,12 +1,9 @@
 library;
 
-export 'package:d_util/d_util.dart';
-
 export 'src/curve/curve.dart';
 export 'src/curve/curve_util.dart';
 export 'src/curve/even_spacer.dart';
 export 'src/curve/line_style.dart';
-
 export 'src/extensions.dart';
 export 'src/geomtry/annular_sector.dart';
 export 'src/geomtry/arc.dart';
@@ -19,6 +16,7 @@ export 'src/geomtry/triangle.dart';
 export 'src/graph/a_star.dart';
 export 'src/graph/bellman_ford.dart';
 export 'src/graph/bfs.dart';
+export 'src/graph/blossom.dart';
 export 'src/graph/connected_components.dart';
 export 'src/graph/cycle_detection.dart';
 export 'src/graph/dfs.dart';
@@ -32,6 +30,7 @@ export 'src/graph/prim.dart';
 export 'src/graph/push_relabel.dart';
 export 'src/graph/topological_sort.dart';
 export 'src/graph/turbo_matching.dart';
+export 'src/graph/utils.dart';
 export 'src/index/avl_tree.dart';
 export 'src/index/b_tree.dart';
 export 'src/index/binary_heap.dart';
@@ -41,9 +40,8 @@ export 'src/index/kd_tree.dart';
 export 'src/index/quad_tree.dart';
 export 'src/index/r_tree.dart';
 export 'src/index/tree.dart';
-export 'src/util/basic.dart';
-
 export 'src/util/angle.dart';
+export 'src/util/basic.dart';
 export 'src/util/boundary_util.dart';
 export 'src/util/contains_util.dart';
 export 'src/util/intersect_util.dart';

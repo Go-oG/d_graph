@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 
 class Polygon extends BasicGeometry {
   static final Polygon zero = Polygon([]);
-  late final List<Offset> vertex;
+  late final List<Offset> vertices;
   late final List<SegmentLine> lines;
 
   @override
@@ -22,28 +22,28 @@ class Polygon extends BasicGeometry {
   late final List<Offset> hull = _getHull();
 
   Polygon(Iterable<Offset> vertex) {
-    this.vertex = List.unmodifiable(vertex);
-    int n = this.vertex.length;
+    this.vertices = List.unmodifiable(vertex);
+    int n = this.vertices.length;
     List<SegmentLine> tmp = [];
     for (int i = 0; i < n; i++) {
-      tmp.add(SegmentLine(this.vertex[i], this.vertex[(i + 1) % n]));
+      tmp.add(SegmentLine(this.vertices[i], this.vertices[(i + 1) % n]));
     }
     lines = List.unmodifiable(tmp);
   }
 
   Offset operator [](int index) {
-    return vertex[index];
+    return vertices[index];
   }
 
   @override
-  int get hashCode => Object.hashAll(vertex);
+  int get hashCode => Object.hashAll(vertices);
 
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) {
       return true;
     }
-    return other is Polygon && listEquals(vertex, other.vertex);
+    return other is Polygon && listEquals(vertices, other.vertices);
   }
 
   bool containsRect(Rect rect) {
@@ -79,11 +79,11 @@ class Polygon extends BasicGeometry {
   Path onBuildPath() {
     Path path = Path();
     bool hasMove = false;
-    for (final p in vertex) {
+    for (final p in vertices) {
       hasMove ? path.lineTo(p.x, p.y) : path.moveTo(p.x, p.y);
       hasMove = true;
     }
-    if (vertex.first == vertex.last) {
+    if (vertices.first == vertices.last) {
       path.close();
     }
     return path;
@@ -100,6 +100,6 @@ class Polygon extends BasicGeometry {
 
   @override
   dt.Geometry buildGeometry() {
-      return geomFactory.createPolygon5(vertex,false);
+      return geomFactory.createPolygon5(vertices,false);
   }
 }

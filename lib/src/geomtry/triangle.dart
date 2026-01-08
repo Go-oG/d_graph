@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:ui';
+
 import 'package:dart_graph/dart_graph.dart';
 import 'package:dts/dts.dart' as dt;
 
@@ -16,6 +17,8 @@ final class Triangle extends BasicGeometry {
       SegmentLine(c, a),
     ]);
   }
+
+  List<Offset> get vertices => [a, b, c];
 
   @override
   bool operator ==(Object other) =>

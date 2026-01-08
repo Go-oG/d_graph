@@ -1,90 +1,109 @@
-import 'package:d_util/d_util.dart';
-
 import 'graph.dart';
 
-/// 贝尔曼-福特的最短路径。
+/// 最短路径：贝尔曼-福特算法
 /// 适用于负加权和正加权边。还可以检测负权重循环。返回最短路径和路径。
-extension BellmanFord on Graph {
-  Map<Vertex, CostPath> shortestPathsByBellmanFord(Vertex start) {
-    final Map<Vertex, List<Edge>> paths = {};
-    final Map<Vertex, CostVertex> costs = {};
+extension BellmanFordExtension on Graph {
+  /// Map<VertexId, CostPath>
+  Map<String, CostPath> shortestPathsByBellmanFord(Vertex start) {
+    if (!hasVertex(start)) return {};
 
-    _getShortestPath2(this, start, paths, costs);
+    final Map<String, double> dist = {};
+    final Map<String, Edge> cameFrom = {};
 
-    final Map<Vertex, CostPath> map = {};
-    for (CostVertex pair in costs.values) {
-      final cost = pair.cost;
-      final Vertex vertex = pair.vertex;
-      final List<Edge> path = paths[vertex]!;
-      map.put(vertex, CostPath(cost, path));
+    for (final v in vertexIterator) {
+      dist[v.id] = double.infinity;
     }
-    return map;
-  }
+    dist[start.id] = 0.0;
 
-  CostPath shortestPathsByBellmanFord2(Vertex start, Vertex end) {
-    final Map<Vertex, List<Edge>> paths = {};
-    final Map<Vertex, CostVertex> costs = {};
-    return _getShortestPath(this, start, end, paths, costs);
-  }
+    final int vertexCount = vertexMap.length;
 
-  static CostPath _getShortestPath(
-    Graph graph,
-    Vertex start,
-    Vertex end,
-    Map<Vertex, List<Edge>> paths,
-    Map<Vertex, CostVertex> costs,
-  ) {
-    _getShortestPath2(graph, start, paths, costs);
-    final CostVertex pair = costs.get(end)!;
-    final List<Edge> list = paths.get(end)!;
-    return CostPath(pair.cost, list);
-  }
-
-  static void _getShortestPath2(
-    Graph graph,
-    Vertex start,
-    Map<Vertex, List<Edge>> paths,
-    Map<Vertex, CostVertex> costs,
-  ) {
-    for (Vertex v in graph.vertexIterator) {
-      paths.put(v, []);
-    }
-
-    for (Vertex v in graph.vertexIterator) {
-      if (v == start) {
-        costs.put(v, CostVertex(0, v));
-      } else {
-        costs.put(v, CostVertex(Double.maxValue, v));
-      }
-    }
-
-    final verticesList = graph.vertexIterator.toList();
-    bool negativeCycleCheck = false;
-    for (int i = 0; i < verticesList.length; i++) {
-      if (i == (verticesList.length - 1)) {
-        negativeCycleCheck = true;
-      }
-
-      for (Edge e in graph.edgeIterator) {
-        final CostVertex pair = costs.get(graph.getVertex(e.to))!;
-        final CostVertex lowestCostToThisVertex = costs.get(graph.getVertex(e.from))!;
-
-        if (lowestCostToThisVertex.cost == Integer.maxValue) {
-          continue;
+    for (int i = 0; i < vertexCount - 1; i++) {
+      bool changed = false;
+      for (final edge in edgeIterator) {
+        if (_relax(edge, edge.from, edge.to, dist, cameFrom)) {
+          changed = true;
         }
-
-        final cost = lowestCostToThisVertex.cost + e.value;
-        if (cost < pair.cost) {
-          pair.cost = cost;
-          if (negativeCycleCheck) {
-            throw "Graph contains a negative weight cycle.";
+        if (!edge.isDirected(directed)) {
+          if (_relax(edge, edge.to, edge.from, dist, cameFrom)) {
+            changed = true;
           }
-          final List<Edge> list = paths.get(graph.getVertex(e.to))!;
-          list.clear();
-          list.addAll(paths.get(graph.getVertex(e.from))!);
-          list.add(e);
         }
       }
+      if (!changed) break;
     }
+
+    for (final edge in edgeIterator) {
+      bool hasCycle = false;
+      if (_canRelax(edge, edge.from, edge.to, dist)) hasCycle = true;
+      if (!edge.isDirected(directed) && _canRelax(edge, edge.to, edge.from, dist)) hasCycle = true;
+
+      if (hasCycle) {
+        throw StateError("Graph contains a negative weight cycle.");
+      }
+    }
+    final Map<String, CostPath> result = {};
+    for (final v in vertexIterator) {
+      if (dist[v.id] != double.infinity) {
+        result[v.id] = CostPath(
+          dist[v.id]!,
+          _reconstructPath(cameFrom, start.id, v.id),
+        );
+      }
+    }
+    return result;
+  }
+
+  /// 计算从 [start] 到 [end] 的最短路径
+  CostPath? shortestPathByBellmanFord(Vertex start, Vertex end) {
+    final allPaths = shortestPathsByBellmanFord(start);
+    return allPaths[end.id];
+  }
+
+  /// 执行松弛操作 return true 表示距离被更新了
+  bool _relax(Edge edge, String sourceId, String targetId, Map<String, double> dist, Map<String, Edge> cameFrom) {
+    final double distU = dist[sourceId] ?? double.infinity;
+    final double distV = dist[targetId] ?? double.infinity;
+
+    if (distU.isInfinite) return false;
+
+    if (distV > distU + edge.weight) {
+      dist[targetId] = distU + edge.weight;
+      cameFrom[targetId] = edge;
+      return true;
+    }
+    return false;
+  }
+
+  /// 检查是否还可以松弛（用于检测负环）
+  bool _canRelax(Edge edge, String uId, String vId, Map<String, double> dist) {
+    final double distU = dist[uId] ?? double.infinity;
+    final double distV = dist[vId] ?? double.infinity;
+    if (distU == double.infinity) return false;
+    return distV > distU + edge.weight;
+  }
+  
+  List<Edge> _reconstructPath(Map<String, Edge> cameFrom, String startId, String endId) {
+    if (startId == endId) return [];
+
+    final List<Edge> path = [];
+    String currentId = endId;
+
+    int safeGuard = 0;
+    final int maxSteps = cameFrom.length + 10;
+
+    while (currentId != startId) {
+      final edge = cameFrom[currentId];
+      if (edge == null) {
+        return [];
+      }
+      path.add(edge);
+      currentId = (edge.to == currentId) ? edge.from : edge.to;
+
+      safeGuard++;
+      if (safeGuard > maxSteps) {
+        throw StateError("Path reconstruction failed (infinite loop detected)");
+      }
+    }
+    return path.reversed.toList();
   }
 }

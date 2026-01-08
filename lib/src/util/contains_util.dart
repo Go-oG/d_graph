@@ -92,4 +92,18 @@ final class ContainsUtil {
       return angle >= startAngle || angle <= endAngle;
     }
   }
+
+  static bool pointInPolygon(Offset p, List<Offset> polygon) {
+    bool inside = false;
+    int j = polygon.length - 1;
+    for (int i = 0; i < polygon.length; j = i++) {
+      if (((polygon[i].dy > p.dy) != (polygon[j].dy > p.dy)) &&
+          (p.dx <
+              (polygon[j].dx - polygon[i].dx) * (p.dy - polygon[i].dy) / (polygon[j].dy - polygon[i].dy) +
+                  polygon[i].dx)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
 }

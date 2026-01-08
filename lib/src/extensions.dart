@@ -40,7 +40,7 @@ extension RectExt on Rect {
     double yMin = top;
     double xMax = right;
     double yMax = bottom;
-    for (var point in polygon.vertex) {
+    for (var point in polygon.vertices) {
       if (point.dx < xMin || point.dx > xMax || point.dy < yMin || point.dy > yMax) {
         return false;
       }

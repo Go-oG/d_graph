@@ -1,359 +1,229 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 class KdTree<T> {
-  static List<Offset> toCoordinates<T>(List<KdNode<T>> nodes, [bool includeRepeated = false]) {
-    List<Offset> coordList = [];
-    for (var node in nodes) {
-      int count = (includeRepeated) ? node.getCount() : 1;
-      for (int i = 0; i < count; i++) {
-        coordList.add(node.coordinate);
-      }
-    }
-    return coordList;
-  }
-
   KdNode<T>? _root;
   int _numberOfNodes = 0;
-  double tolerance;
 
-  KdTree([this.tolerance = 0]);
+  final double tolerance;
+  final double _toleranceSq;
 
-  KdNode<T>? getRoot() {
-    return _root;
-  }
+  KdTree({this.tolerance = 1e-9}) : _toleranceSq = tolerance * tolerance;
 
-  bool isEmpty() {
-    if (_root == null) {
-      return true;
+  factory KdTree.fromNodes(List<KdNode<T>> nodes, {double tolerance = 0}) {
+    final tree = KdTree<T>(tolerance: tolerance);
+    if (nodes.isNotEmpty) {
+      tree._root = tree._buildBalanced(nodes, 0);
+      tree._numberOfNodes = tree._countNodes(tree._root);
     }
-    return false;
+    return tree;
   }
 
-  KdNode<T> insert(Offset p, [T? data]) {
-    if (_root == null) {
-      _root = KdNode.of(p, data);
-      return _root!;
-    }
-    if (tolerance > 0) {
-      final matchNode = findBestMatchNode(p);
-      if (matchNode != null) {
-        matchNode.increment();
-        return matchNode;
-      }
-    }
-    return insertExact(p, data);
-  }
-
-  KdNode<T>? findBestMatchNode(Offset p) {
-    final visitor = BestMatchVisitor<T>(p, tolerance);
-    query3(visitor.queryEnvelope(), visitor);
-    return visitor.getNode();
-  }
-
-  KdNode<T> insertExact(Offset p, [T? data]) {
-    KdNode<T>? currentNode = _root;
-    KdNode<T>? leafNode = _root;
-    bool isXLevel = true;
-    bool isLessThan = true;
-    while (currentNode != null) {
-      bool isInTolerance = (p - currentNode.coordinate).distance <= tolerance;
-      if (isInTolerance) {
-        currentNode.increment();
-        return currentNode;
-      }
-      double splitValue = currentNode.splitValue(isXLevel);
-      if (isXLevel) {
-        isLessThan = p.dx < splitValue;
+  KdNode<T>? _buildBalanced(List<KdNode<T>> nodes, int depth) {
+    if (nodes.isEmpty) return null;
+    final axis = depth % 2;
+    nodes.sort((a, b) {
+      if (axis == 0) {
+        return a.coordinate.dx.compareTo(b.coordinate.dx);
       } else {
-        isLessThan = p.dy < splitValue;
+        return a.coordinate.dy.compareTo(b.coordinate.dy);
       }
-      leafNode = currentNode;
-      if (isLessThan) {
-        currentNode = currentNode.left;
-      } else {
-        currentNode = currentNode.right;
-      }
-      isXLevel = !isXLevel;
-    }
-    _numberOfNodes = _numberOfNodes + 1;
-    KdNode<T> node = KdNode.of(p, data);
-    if (isLessThan) {
-      leafNode!._left = (node);
-    } else {
-      leafNode!._right = (node);
-    }
+    });
+
+    final mid = nodes.length ~/ 2;
+    final node = nodes[mid];
+
+    node._left = _buildBalanced(nodes.sublist(0, mid), depth + 1);
+    node._right = _buildBalanced(nodes.sublist(mid + 1), depth + 1);
+
     return node;
   }
 
-  void query3(Rect queryEnv, KdNodeVisitor visitor) {
-    List<_QueryStackFrame<T>> queryStack = [];
-    KdNode<T>? currentNode = _root;
-    bool isXLevel = true;
+  int _countNodes(KdNode<T>? node) {
+    if (node == null) return 0;
+    return 1 + _countNodes(node.left) + _countNodes(node.right);
+  }
+
+  KdNode<T>? get root => _root;
+
+  bool get isEmpty => _root == null;
+
+  int get size => _numberOfNodes;
+
+  KdNode<T> insert(Offset p, [T? data]) {
+    if (_root == null) {
+      _root = KdNode(p, data);
+      _numberOfNodes++;
+      return _root!;
+    }
+
+    if (tolerance > 0) {
+      final nearest = _nearest(_root, p, _root!, double.infinity, 0);
+      if (nearest != null) {
+        final distSq = (nearest.node.coordinate - p).distanceSquared;
+        if (distSq <= _toleranceSq) {
+          nearest.node.increment();
+          return nearest.node;
+        }
+      }
+    }
+    return _insertExact(p, data);
+  }
+
+  KdNode<T> _insertExact(Offset p, [T? data]) {
+    KdNode<T>? curr = _root;
+    if (curr == null) throw StateError("Root should not be null here");
+
+    bool isX = true;
     while (true) {
-      if (currentNode != null) {
-        queryStack.add(_QueryStackFrame(currentNode, isXLevel));
-        bool searchLeft = currentNode.isRangeOverLeft(isXLevel, queryEnv);
-        if (searchLeft) {
-          currentNode = currentNode.left;
-          if (currentNode != null) {
-            isXLevel = !isXLevel;
-          }
-        } else {
-          currentNode = null;
+      if ((curr!.coordinate - p).distanceSquared <= _toleranceSq) {
+        curr.increment();
+        return curr;
+      }
+
+      final double val = isX ? p.dx : p.dy;
+      final double currVal = isX ? curr.coordinate.dx : curr.coordinate.dy;
+
+      final bool goLeft = val < currVal;
+
+      if (goLeft) {
+        if (curr.left == null) {
+          final newNode = KdNode(p, data);
+          curr._left = newNode;
+          _numberOfNodes++;
+          return newNode;
         }
-      } else if (queryStack.isNotEmpty) {
-        final frame = queryStack.removeAt(0);
-        currentNode = frame.node;
-        isXLevel = frame.isXLevel;
-        if (queryEnv.contains(currentNode.coordinate)) {
-          visitor.visit(currentNode);
-        }
-        bool searchRight = currentNode.isRangeOverRight(isXLevel, queryEnv);
-        if (searchRight) {
-          currentNode = currentNode.right;
-          if (currentNode != null) {
-            isXLevel = !isXLevel;
-          }
-        } else {
-          currentNode = null;
-        }
+        curr = curr.left;
       } else {
-        return;
+        if (curr.right == null) {
+          final newNode = KdNode(p, data);
+          curr._right = newNode;
+          _numberOfNodes++;
+          return newNode;
+        }
+        curr = curr.right;
+      }
+      isX = !isX;
+    }
+  }
+
+  List<KdNode<T>> queryRect(Rect range) {
+    final List<KdNode<T>> results = [];
+    _queryRectRecursive(_root, range, 0, results);
+    return results;
+  }
+
+  KdNode<T>? nearest(Offset target) {
+    if (_root == null) return null;
+    return _nearest(_root, target, _root!, double.infinity, 0)?.node;
+  }
+
+  void _queryRectRecursive(KdNode<T>? node, Rect range, int depth, List<KdNode<T>> results) {
+    if (node == null) return;
+    if (range.contains(node.coordinate)) {
+      results.add(node);
+    }
+    final int axis = depth % 2;
+    final double nodeVal = axis == 0 ? node.coordinate.dx : node.coordinate.dy;
+    final double minVal = axis == 0 ? range.left : range.top;
+    final double maxVal = axis == 0 ? range.right : range.bottom;
+    if (minVal < nodeVal) {
+      _queryRectRecursive(node.left, range, depth + 1, results);
+    }
+    if (maxVal >= nodeVal) {
+      _queryRectRecursive(node.right, range, depth + 1, results);
+    }
+  }
+
+  _BestNode<T>? _nearest(
+      KdNode<T>? node, Offset target, KdNode<T> currentBestNode, double currentMinDistSq, int depth) {
+    if (node == null) return null;
+    double dSq = (node.coordinate - target).distanceSquared;
+    KdNode<T> bestNode = currentBestNode;
+    double minDistSq = currentMinDistSq;
+
+    if (dSq < minDistSq) {
+      minDistSq = dSq;
+      bestNode = node;
+    }
+    final int axis = depth % 2;
+    final double targetVal = axis == 0 ? target.dx : target.dy;
+    final double nodeVal = axis == 0 ? node.coordinate.dx : node.coordinate.dy;
+    final double diff = targetVal - nodeVal;
+
+    KdNode<T>? near = diff < 0 ? node.left : node.right;
+    KdNode<T>? far = diff < 0 ? node.right : node.left;
+
+    var bestResult = _nearest(near, target, bestNode, minDistSq, depth + 1);
+    if (bestResult != null) {
+      bestNode = bestResult.node;
+      minDistSq = bestResult.distSq;
+    }
+
+    if (diff * diff < minDistSq) {
+      var farResult = _nearest(far, target, bestNode, minDistSq, depth + 1);
+      if (farResult != null) {
+        bestNode = farResult.node;
+        minDistSq = farResult.distSq;
       }
     }
+
+    return _BestNode(bestNode, minDistSq);
   }
 
-  List<KdNode<T>> query2(Rect queryEnv) {
-    final List<KdNode<T>> result = [];
-    query4(queryEnv, result);
-    return result;
+  int get depth => _maxDepth(_root);
+
+  int _maxDepth(KdNode<T>? node) {
+    if (node == null) return 0;
+    return 1 + math.max(_maxDepth(node.left), _maxDepth(node.right));
   }
 
-  void query4(Rect queryEnv, final List<KdNode<T>> result) {
-    query3(
-      queryEnv,
-      KdNodeVisitor2<T>((node) {
-        result.add(node);
-      }),
-    );
-  }
-
-  KdNode<T>? query(Offset queryPt) {
-    KdNode<T>? currentNode = _root;
-    bool isXLevel = true;
-    while (currentNode != null) {
-      if (currentNode.coordinate == queryPt) {
-        return currentNode;
+  static List<Offset> toCoordinates<T>(List<KdNode<T>> nodes, [bool includeRepeated = false]) {
+    if (!includeRepeated) {
+      return nodes.map((e) => e.coordinate).toList();
+    }
+    List<Offset> list = [];
+    for (var node in nodes) {
+      for (int i = 0; i < node.count; i++) {
+        list.add(node.coordinate);
       }
-
-      bool searchLeft = currentNode.isPointOnLeft(isXLevel, queryPt);
-      if (searchLeft) {
-        currentNode = currentNode.left;
-      } else {
-        currentNode = currentNode.right;
-      }
-      isXLevel = !isXLevel;
     }
-    return null;
+    return list;
   }
 
-  int depth() {
-    return depthNode(_root);
-  }
-
-  int depthNode(KdNode? currentNode) {
-    if (currentNode == null) {
-      return 0;
-    }
-
-    int dL = depthNode(currentNode.left);
-    int dR = depthNode(currentNode.right);
-    return 1 + (dL > dR ? dL : dR);
-  }
-
-  int size() {
-    return sizeNode(_root);
-  }
-
-  int sizeNode(KdNode<T>? currentNode) {
-    if (currentNode == null) {
-      return 0;
-    }
-
-    int sizeL = sizeNode(currentNode.left);
-    int sizeR = sizeNode(currentNode.right);
-    return (1 + sizeL) + sizeR;
+  void clear() {
+    _root = null;
+    _numberOfNodes = 0;
   }
 }
 
-class BestMatchVisitor<T> implements KdNodeVisitor<T> {
-  final Offset p;
-  final double tolerance;
-  KdNode<T>? _matchNode;
-  double _matchDist = 0.0;
+class _BestNode<T> {
+  final KdNode<T> node;
+  final double distSq;
 
-  BestMatchVisitor(this.p, this.tolerance);
-
-  Rect queryEnvelope() {
-    Rect queryEnv = Rect.fromCircle(center: p, radius: 0);
-    queryEnv = queryEnv.inflate(tolerance);
-    return queryEnv;
-  }
-
-  KdNode<T>? getNode() {
-    return _matchNode;
-  }
-
-  @override
-  void visit(KdNode<T> node) {
-    final dOff = node.coordinate - p;
-    double dist = dOff.distance;
-    bool isInTolerance = dist <= tolerance;
-    if (!isInTolerance) {
-      return;
-    }
-
-    bool update = false;
-    if (((_matchNode == null) || (dist < _matchDist)) ||
-        (((_matchNode != null) && (dist == _matchDist)) && _compareTo(node.coordinate, _matchNode!.coordinate) < 1)) {
-      update = true;
-    }
-    if (update) {
-      _matchNode = node;
-      _matchDist = dist;
-    }
-  }
-}
-
-int _compareTo(Offset a, Offset other) {
-  if (a.dx < other.dx) {
-    return -1;
-  }
-
-  if (a.dx > other.dx) {
-    return 1;
-  }
-
-  if (a.dy < other.dy) {
-    return -1;
-  }
-
-  if (a.dy > other.dy) {
-    return 1;
-  }
-  return 0;
+  _BestNode(this.node, this.distSq);
 }
 
 class KdNode<T> {
-  late Offset _p;
-
-  final T? _data;
-
+  final Offset coordinate;
+  final T? data;
   KdNode<T>? _left;
-
   KdNode<T>? _right;
 
-  int _count = 0;
+  int _count = 1;
 
-  KdNode(double x, double y, this._data) {
-    _p = Offset(x, y);
-    _count = 1;
-  }
+  KdNode(this.coordinate, this.data);
 
-  KdNode.of(Offset p, this._data) {
-    _p = p;
-    _count = 1;
-  }
+  KdNode.of(Offset p, this.data) : coordinate = p;
 
-  double getX() => _p.dx;
+  KdNode<T>? get left => _left;
 
-  double getY() => _p.dy;
+  KdNode<T>? get right => _right;
 
-  double splitValue(bool isSplitOnX) {
-    if (isSplitOnX) {
-      return _p.dx;
-    }
-    return _p.dy;
-  }
+  int get count => _count;
 
-  Offset get coordinate => _p;
-
-  T? getData() {
-    return _data;
-  }
-
-  KdNode<T>? get left {
-    return _left;
-  }
-
-  KdNode<T>? get right {
-    return _right;
-  }
-
-  void increment() {
-    _count = _count + 1;
-  }
-
-  int getCount() {
-    return _count;
-  }
-
-  bool isRepeated() {
-    return _count > 1;
-  }
-
-  bool isRangeOverLeft(bool isSplitOnX, Rect env) {
-    double envMin;
-    if (isSplitOnX) {
-      envMin = env.left;
-    } else {
-      envMin = env.top;
-    }
-    bool isInRange = envMin < splitValue(isSplitOnX);
-    return isInRange;
-  }
-
-  bool isRangeOverRight(bool isSplitOnX, Rect env) {
-    double envMax;
-    if (isSplitOnX) {
-      envMax = env.right;
-    } else {
-      envMax = env.bottom;
-    }
-
-    return splitValue(isSplitOnX) <= envMax;
-  }
-
-  bool isPointOnLeft(bool isSplitOnX, Offset pt) {
-    double ptOrdinate;
-    if (isSplitOnX) {
-      ptOrdinate = pt.dx;
-    } else {
-      ptOrdinate = pt.dy;
-    }
-    return ptOrdinate < splitValue(isSplitOnX);
-  }
-}
-
-abstract interface class KdNodeVisitor<T> {
-  void visit(KdNode<T> node);
-}
-
-class KdNodeVisitor2<T> implements KdNodeVisitor<T> {
-  final void Function(KdNode<T> node) visitFun;
-
-  KdNodeVisitor2(this.visitFun);
+  void increment() => _count++;
 
   @override
-  void visit(KdNode<T> node) {
-    visitFun.call(node);
-  }
-}
-
-class _QueryStackFrame<T> {
-  final KdNode<T> node;
-
-  final bool isXLevel;
-
-  const _QueryStackFrame(this.node, this.isXLevel);
+  String toString() => 'KdNode($coordinate, count: $_count)';
 }

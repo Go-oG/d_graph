@@ -1,57 +1,72 @@
 
-import 'package:d_util/d_util.dart';
+import 'package:collection/collection.dart';
 import 'graph.dart';
+import 'utils.dart';
 
-/// Kruskal 的最小生成树。仅适用于无向图。它找到一个
-/// 边的子集，该子集形成一个包含每个顶点的树，其中
-/// 树中所有边的总重量最小化。
-extension Kruskal on Graph {
-  CostPath minSpanningTreeByKruskal() {
+/// Kruskal 最小生成树算法
+/// 仅适用于无向图 时间复杂度: O(E log E)
+extension KruskalExtension on Graph {
+  MSTResult minSpanningTreeByKruskal() {
     if (directed) {
-      throw "Undirected graphs only.";
-    }
-    double cost = 0;
-    final List<Edge> path = [];
-    Map<Vertex, Set<Vertex>> membershipMap = {};
-    for (Vertex v in vertexIterator) {
-      Set<Vertex> set = <Vertex>{};
-      set.add(v);
-      membershipMap.put(v, set);
+      throw StateError("Kruskal's algorithm typically requires an undirected graph.");
     }
 
-    PriorityQueue<Edge> edgeQueue = PriorityQueue();
+    final List<Edge> mstEdges = [];
+    double totalCost = 0.0;
+
+    final unionFind = _UnionFind(vertexMap.keys);
+    final edgeQueue = PriorityQueue<Edge>((a, b) => a.weight.compareTo(b.weight));
+
     edgeQueue.addAll(edgeIterator);
 
     while (edgeQueue.isNotEmpty) {
-      Edge edge = edgeQueue.removeFirst();
-      final efv= getVertex(edge.from);
-      final etv= getVertex(edge.to);
+      final edge = edgeQueue.removeFirst();
 
-      if (!_isTheSamePart(efv, etv, membershipMap)) {
-        _union(efv, etv, membershipMap);
-        path.add(edge);
-        cost += edge.value;
+      if (unionFind.find(edge.from) != unionFind.find(edge.to)) {
+        unionFind.union(edge.from, edge.to);
+        mstEdges.add(edge);
+        totalCost += edge.weight;
       }
     }
 
-    return CostPath(cost, path);
+    return MSTResult(totalCost, mstEdges);
+  }
+}
+
+/// 辅助类：优化的并查集 (Disjoint Set Union)
+/// 实现了 "路径压缩" 和 "按秩合并"
+class _UnionFind {
+  final Map<String, String> _parent = {};
+  final Map<String, int> _rank = {};
+
+  _UnionFind(Iterable<String> elements) {
+    for (final e in elements) {
+      _parent[e] = e;
+      _rank[e] = 0;
+    }
   }
 
-  static bool _isTheSamePart(Vertex v1, Vertex v2, Map<Vertex, Set<Vertex>> membershipMap) {
-    return membershipMap.get(v1) == membershipMap.get(v2);
+  String find(String item) {
+    if (_parent[item] == item) {
+      return item;
+    }
+    _parent[item] = find(_parent[item]!);
+    return _parent[item]!;
   }
 
-  static void _union(Vertex v1, Vertex v2, Map<Vertex, Set<Vertex>> membershipMap) {
-    Set<Vertex> firstSet = membershipMap.get(v1)!;
-    Set<Vertex> secondSet = membershipMap.get(v2)!;
-    if (secondSet.length > firstSet.length) {
-      Set<Vertex> tempSet = firstSet;
-      firstSet = secondSet;
-      secondSet = tempSet;
+  void union(String item1, String item2) {
+    final root1 = find(item1);
+    final root2 = find(item2);
+
+    if (root1 != root2) {
+      if (_rank[root1]! < _rank[root2]!) {
+        _parent[root1] = root2;
+      } else if (_rank[root1]! > _rank[root2]!) {
+        _parent[root2] = root1;
+      } else {
+        _parent[root2] = root1;
+        _rank[root1] = _rank[root1]! + 1;
+      }
     }
-    for (Vertex v in secondSet) {
-      membershipMap.put(v, firstSet);
-    }
-    firstSet.addAll(secondSet);
   }
 }

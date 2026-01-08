@@ -1,6 +1,6 @@
-final class Vertex {
+final class Vertex<T> {
   final String id;
-  final Object? data;
+  final T? data;
   final String? label;
   final Map<String, dynamic> meta = {};
 
@@ -22,6 +22,13 @@ final class Vertex {
   static Vertex fromMap(Map<String, dynamic> map) {
     return Vertex(id: map['id'], label: map['label'], data: map['data'], meta: map['meta']);
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is Vertex && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 final class Edge {
@@ -32,7 +39,7 @@ final class Edge {
   final Map<String, dynamic> meta = {};
   final Object? data;
 
-  double value;
+  double weight;
 
   Edge({
     required this.id,
@@ -40,7 +47,7 @@ final class Edge {
     required this.to,
     Map<String, dynamic>? meta,
     this.directed,
-    this.value = 0,
+    this.weight = 0,
     this.data,
   }) {
     if (meta != null) {
@@ -49,7 +56,7 @@ final class Edge {
   }
 
   Map<String, dynamic> toMap() {
-    return {'id': id, 'from': from, 'to': to, 'directed': directed, 'weight': value, 'data': data, 'meta': meta};
+    return {'id': id, 'from': from, 'to': to, 'directed': directed, 'weight': weight, 'data': data, 'meta': meta};
   }
 
   static Edge fromMap<T>(Map<String, dynamic> map) {
@@ -60,14 +67,14 @@ final class Edge {
       directed: map['directed'],
       meta: map['meta'],
       data: map['data'],
-      value: map['weight'],
+      weight: map['weight'],
     );
   }
 
   bool isDirected(bool graphDirected) => directed ?? graphDirected;
 }
 
-final class Graph {
+final class Graph<T> {
   final String id;
   final bool directed;
   final bool allowMultiEdge;
@@ -84,15 +91,16 @@ final class Graph {
 
   Graph({
     required this.id,
-    required this.directed,
-    required this.allowMultiEdge,
-    required this.allowSelfLoop,
+    this.directed = false,
+    this.allowMultiEdge = true,
+    this.allowSelfLoop = false,
     Iterable<Vertex>? vertices,
     Iterable<Edge>? edges,
     Map<String, dynamic>? meta,
   }) {
+    _degree = GraphDegree(this);
     if (vertices != null) {
-      addVertexs(vertices);
+      addVertices(vertices);
     }
     if (edges != null) {
       addEdges(edges);
@@ -100,7 +108,6 @@ final class Graph {
     if (meta != null) {
       this.meta.addAll(meta);
     }
-    _degree = GraphDegree(this);
   }
 
   static Graph of(Graph g, {String? id}) {
@@ -138,6 +145,19 @@ final class Graph {
       edges: (graph['edges'] as List).map((e) => Edge.fromMap(Map<String, dynamic>.from(e))).toList(),
     );
   }
+  void addVertex(Vertex vertex) {
+    if (_vertexMap.containsKey(vertex.id)) {
+      return;
+    }
+    _vertexMap[vertex.id] = vertex;
+    _degree._onVertexAdded(vertex);
+  }
+
+  void addVertices(Iterable<Vertex> vertexs) {
+    for (var v in vertexs) {
+      addVertex(v);
+    }
+  }
 
   Vertex getVertex(String id) => getVertexOrNull(id)!;
 
@@ -156,28 +176,14 @@ final class Graph {
     return null;
   }
 
-  void addVertex(Vertex vertex) {
-    if (_vertexMap.containsKey(vertex.id)) {
-      return;
-    }
-    _vertexMap[vertex.id] = vertex;
-    _degree._onVertexAdded(vertex);
-  }
-
-  void addVertexs(Iterable<Vertex> vertexs) {
-    for (var v in vertexs) {
-      addVertex(v);
-    }
-  }
-
   void removeVertex(Vertex vertex) {
     final id = vertex.id;
     if (!_vertexMap.containsKey(id)) return;
     _degree._onVertexRemoved(vertex);
 
     final edgesToRemove = <Edge>{};
-    _vertexOutEdges[id]?.values.forEach((e) => edgesToRemove.add(e));
-    _vertexInEdges[id]?.values.forEach((e) => edgesToRemove.add(e));
+    _vertexOutEdges[id]?.values.forEach(edgesToRemove.add);
+    _vertexInEdges[id]?.values.forEach(edgesToRemove.add);
 
     for (final e in edgesToRemove) {
       removeEdge(e);
@@ -188,7 +194,7 @@ final class Graph {
     _vertexMap.remove(id);
   }
 
-  void removeVertexs(Iterable<Vertex> vertexs) {
+  void removeVertices(Iterable<Vertex> vertexs) {
     for (var v in vertexs) {
       removeVertex(v);
     }
@@ -201,9 +207,9 @@ final class Graph {
   }
 
   void addEdge(Edge edge) {
-    // if (!_vertexMap.containsKey(edge.from) || !_vertexMap.containsKey(edge.to)) {
-    //   throw StateError('Edge endpoint does not exist');
-    // }
+    if (!_vertexMap.containsKey(edge.from) || !_vertexMap.containsKey(edge.to)) {
+      throw StateError('Edge endpoint does not exist');
+    }
 
     if (_edgeMap.containsKey(edge.id)) {
       return;
@@ -211,10 +217,14 @@ final class Graph {
     if (!allowSelfLoop && edge.from == edge.to) {
       throw StateError('Self-loop is not allowed');
     }
+
     if (!allowMultiEdge) {
-      for (final e in _edgeMap.values) {
-        if (e.from == edge.from && e.to == edge.to) {
-          throw StateError('Multi-edge is not allowed');
+      final outEdges = _vertexOutEdges[edge.from];
+      if (outEdges != null) {
+        for (final existing in outEdges.values) {
+          if (existing.to == edge.to) {
+            throw StateError('Multi-edge is not allowed between ${edge.from} and ${edge.to}');
+          }
         }
       }
     }
@@ -367,7 +377,7 @@ final class GraphDegree {
       return;
     }
 
-    final w = (e.value) * delta;
+    final w = (e.weight) * delta;
     final isDirected = e.isDirected(graph.directed);
 
     final fromDegree = _degreeMap[e.from];
@@ -377,7 +387,6 @@ final class GraphDegree {
 
     if (fromDegree == null || toDegree == null) return;
 
-    // 更新 Degree
     fromDegree.outDegree += delta;
     toDegree.inDegree += delta;
 
@@ -386,7 +395,6 @@ final class GraphDegree {
       toDegree.outDegree += delta;
     }
 
-    // 更新 WeightedDegree
     if (fromWeighted == null || toWeighted == null) return;
 
     fromWeighted.outWeight += w;
@@ -477,10 +485,10 @@ class CostVertex implements Comparable<CostVertex> {
 
   @override
   int compareTo(CostVertex p) {
-    if (this.cost < p.cost) {
+    if (cost < p.cost) {
       return -1;
     }
-    if (this.cost > p.cost) {
+    if (cost > p.cost) {
       return 1;
     }
     return 0;

@@ -1,52 +1,73 @@
-import 'package:d_util/d_util.dart';
-
 import 'bellman_ford.dart';
 import 'dijkstra.dart';
 import 'graph.dart';
 
-/// Johnson 算法是一种查找所有稀疏有向图中的顶点。
-/// 它允许一些边权重为负数，但不存在负权重循环.
-extension Johnson on Graph {
-  Map<Vertex, Map<Vertex, List<Edge>>> shortestPathsByJohnson(Object maxData) {
-    final Graph graph = Graph.of(this);
-    final Vertex connector = Vertex(data: maxData, id: "\$connector_${maxData.hashCode}\$");
+/// Johnson 算法
+/// 用于在包含负权边（但无负权环）的稀疏图中，计算所有顶点对之间的最短路径。
+/// 返回: Map<起点, Map<终点, 路径列表>>
+extension JohnsonExt on Graph {
+  Map<Vertex, Map<Vertex, List<Edge>>> shortestPathsByJohnson() {
+    final String connectorId = "\$_johnson_\$";
+    final Vertex connector = Vertex(id: connectorId, label: "Connector");
+    final List<Edge> tempEdges = [];
+    final Map<Edge, double> originalWeights = {};
 
-    for (Vertex v in graph.vertexIterator) {
-      final Edge edge = Edge(value: 0, from: connector.id, to: v.id, id: "\$id${connector.id}_${v.id}\$");
-      graph.addEdge(edge);
-    }
+    try {
+      addVertex(connector);
+      final existingVertices = vertexIterator.toList();
+      for (final v in existingVertices) {
+        if (v.id == connectorId) continue;
 
-    graph.addVertex(connector);
+        final edge = Edge(id: "\$${connectorId}_${v.id}\$", from: connectorId, to: v.id, weight: 0, directed: true);
+        addEdge(edge);
+        tempEdges.add(edge);
+      }
+      final Map<String, double> h = _runBellmanFordSafe(connector);
 
-    final Map<Vertex, CostPath> costs = graph.shortestPathsByBellmanFord(connector);
+      for (final edge in edgeIterator) {
+        originalWeights[edge] = edge.weight;
+        final u = vertexMap[edge.from];
+        final v = vertexMap[edge.to];
 
-    for (Edge e in graph.edgeIterator) {
-      final weight = e.value;
-      final Vertex u = graph.getVertex(e.from);
-      final Vertex v = graph.getVertex(e.to);
-      if (u == connector || v == connector) {
-        continue;
+        if (u != null && v != null) {
+          final hU = h[u.id] ?? 0.0;
+          final hV = h[v.id] ?? 0.0;
+          edge.weight = edge.weight + hU - hV;
+        }
       }
 
-      final uCost = costs.get(u)!.cost;
-      final vCost = costs.get(v)!.cost;
-      final newWeight = weight + uCost - vCost;
-      e.value = newWeight;
-    }
+      final Map<Vertex, Map<Vertex, List<Edge>>> allShortestPaths = {};
 
-    graph.removeVertex(connector);
-
-    final Map<Vertex, Map<Vertex, List<Edge>>> allShortestPaths = {};
-
-    for (Vertex v in graph.vertexIterator) {
-      final Map<Vertex, CostPath> costPaths = graph.shortestPathsByDijkstra(v);
-      final Map<Vertex, List<Edge>> paths = {};
-      for (Vertex v2 in costPaths.keys) {
-        final CostPath pair = costPaths.get(v2)!;
-        paths.put(v2, pair.path);
+      for (final u in existingVertices) {
+        final dijkstraResults = shortestPaths(u);
+        final Map<Vertex, List<Edge>> pathsFromU = {};
+        dijkstraResults.forEach((targetId, result) {
+          final targetVertex = vertexMap[targetId];
+          if (targetVertex != null) {
+            pathsFromU[targetVertex] = result.path;
+          }
+        });
+        allShortestPaths[u] = pathsFromU;
       }
-      allShortestPaths.put(v, paths);
+
+      return allShortestPaths;
+    } finally {
+      for (final entry in originalWeights.entries) {
+        entry.key.weight = entry.value;
+      }
+      for (final edge in tempEdges) {
+        removeEdge(edge);
+      }
+      removeVertex(connector);
     }
-    return allShortestPaths;
+  }
+
+  Map<String, double> _runBellmanFordSafe(Vertex start) {
+    final result = shortestPathsByBellmanFord(start);
+    final Map<String, double> costs = {};
+    for (final entry in result.entries) {
+      costs[entry.key] = entry.value.cost;
+    }
+    return costs;
   }
 }

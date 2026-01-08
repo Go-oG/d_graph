@@ -1,78 +1,89 @@
 import 'dart:collection';
 import 'dart:math';
-import 'package:d_util/d_util.dart';
 
-/// Edmonds-Karp 算法是 Ford-Fulkerson 方法的一种实现，用于
-/// 计算流网络中以 O（V*E^2） 时间内的最大流量。
-
+/// Edmonds-Karp 算法实现
+/// 使用邻接矩阵存储容量和流量
+/// 时间复杂度: O(V * E^2)
 final class EdmondsKarp {
-  late final int n, m;
-  late final Array<Array<int>> flow;
-  late final Array<Array<int>> capacity;
-  late final Array<int> parent;
-  late final Array<bool> visited;
+  late final int n;
+  late final List<List<int>> flow;
+  late final List<List<int>> capacity;
+  late final List<int> parent;
+  late final List<bool> visited;
 
-  EdmondsKarp(int numOfVertices, int numOfEdges) {
+  EdmondsKarp(int numOfVertices) {
     n = numOfVertices;
-    m = numOfEdges;
-    flow = Array.matrix(n);
-    capacity = Array.matrix(n);
-    parent = Array(n);
-    visited = Array(n);
+    flow = List.generate(n, (_) => List.filled(n, 0));
+    capacity = List.generate(n, (_) => List.filled(n, 0));
+    parent = List.filled(n, -1);
+    visited = List.filled(n, false);
   }
 
-  void addEdge(int from, int to, int capacity) {
-    assert(capacity >= 0);
-
-    this.capacity[from][to] += capacity;
+  /// 添加有向边
+  /// [from]: 起点下标 (0 到 n-1)
+  /// [to]: 终点下标 (0 到 n-1)
+  /// [cap]: 容量
+  void addEdge(int from, int to, int cap) {
+    assert(cap >= 0);
+    // 如果是多重边（两点间多条边），容量累加
+    capacity[from][to] += cap;
+    // 注意：如果是无向图，通常这里也需要 capacity[to][from] += cap;
+    // Edmonds-Karp 处理反向流是基于 flow[to][from] 的负值，
+    // 但初始容量矩阵通常是有向的。
   }
 
+  /// 计算从源点 [s] 到汇点 [t] 的最大流
   int getMaxFlow(int s, int t) {
+    if (s == t) return 0;
+
+    int maxFlow = 0;
+
     while (true) {
-      final Queue<int> Q = Queue();
-      Q.add(s);
+      final Queue<int> q = Queue();
+      q.add(s);
 
-      for (int i = 0; i < n; ++i) {
-        visited[i] = false;
-      }
+      visited.fillRange(0, n, false);
+      parent.fillRange(0, n, -1);
+
       visited[s] = true;
+      parent[s] = -1;
 
-      bool check = false;
-      int current;
-      while (Q.isNotEmpty) {
-        current = Q.first;
+      bool pathFound = false;
+
+      while (q.isNotEmpty) {
+        final int current = q.removeFirst();
         if (current == t) {
-          check = true;
+          pathFound = true;
           break;
         }
-        Q.removeFirst();
         for (int i = 0; i < n; ++i) {
-          if (!visited[i] && capacity[current][i] > flow[current][i]) {
+          if (!visited[i] && (capacity[current][i] - flow[current][i] > 0)) {
             visited[i] = true;
-            Q.add(i);
             parent[i] = current;
+            q.add(i);
           }
         }
       }
-      if (check == false) {
+      if (!pathFound) {
         break;
       }
 
-      int temp = capacity[parent[t]][t] - flow[parent[t]][t];
-      for (int i = t; i != s; i = parent[i]) {
-        temp = min(temp, (capacity[parent[i]][i] - flow[parent[i]][i]));
+      int pathFlow = 0x7FFFFFFF;
+
+      for (int v = t; v != s; v = parent[v]) {
+        int u = parent[v];
+        int residualCapacity = capacity[u][v] - flow[u][v];
+        pathFlow = min(pathFlow, residualCapacity);
       }
 
-      for (int i = t; i != s; i = parent[i]) {
-        flow[parent[i]][i] += temp;
-        flow[i][parent[i]] -= temp;
+      for (int v = t; v != s; v = parent[v]) {
+        int u = parent[v];
+        flow[u][v] += pathFlow;
+        flow[v][u] -= pathFlow;
       }
+      maxFlow += pathFlow;
     }
 
-    int result = 0;
-    for (int i = 0; i < n; ++i) {
-      result += flow[s][i];
-    }
-    return result;
+    return maxFlow;
   }
 }

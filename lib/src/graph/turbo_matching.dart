@@ -1,53 +1,62 @@
-import 'package:d_util/d_util.dart';
-
 import 'graph.dart';
+import 'utils.dart';
 
-/// 在图论学科中，匹配或独立的边集在图中是一组没有公共顶点的边。
-/// 在某些匹配中，所有顶点可能会与匹配的某些边缘发生冲突，但这不是必需的，并且只会发生在顶点数为偶数。
+/// 最大匹配算法扩展
+/// 注意：此算法主要适用于 [二分图]。
+/// 对于一般图（包含奇数长度循环的图），此算法可能无法找到最大匹配。
 extension TurboMatching on Graph {
   MatchingResult maxMatching() {
     final Map<Vertex, Vertex> mate = {};
-    while (_pathSet(this, mate));
+    while (_findAugmentingPathsPhase(this, mate)) {}
     return MatchingResult(mate);
   }
 
-  static bool _pathSet(Graph graph, Map<Vertex, Vertex> mate) {
-    final Set<Vertex> visited = <Vertex>{};
-
-    bool result = false;
-    for (Vertex vertex in graph.vertexIterator) {
-      if (mate.containsKey(vertex) == false) {
-        if (_path(graph, mate, visited, vertex)) {
-          result = true;
+  static bool _findAugmentingPathsPhase(Graph graph, Map<Vertex, Vertex> mate) {
+    final Set<String> visited = {};
+    bool phaseResult = false;
+    for (final vertex in graph.vertexIterator) {
+      if (!mate.containsKey(vertex)) {
+        if (_dfs(graph, mate, visited, vertex)) {
+          phaseResult = true;
         }
       }
     }
-    return result;
+    return phaseResult;
   }
 
-  static bool _path(Graph graph, Map<Vertex, Vertex> mate, Set<Vertex> visited, Vertex vertex) {
-    if (visited.contains(vertex)) {
+  static bool _dfs(Graph graph, Map<Vertex, Vertex> mate, Set<String> visited, Vertex u) {
+    if (visited.contains(u.id)) {
       return false;
     }
+    visited.add(u.id);
 
-    visited.add(vertex);
-    for (Edge edge in graph.edges(vertex.id)) {
-      final Vertex neighbour = graph.getVertex(edge.from == vertex.id ? edge.to : edge.from);
-      if (mate.containsKey(neighbour) == false || _path(graph, mate, visited, mate.get(neighbour)!)) {
-        mate.set(vertex, neighbour);
-        mate.set(neighbour, vertex);
+    for (final v in _getNeighbors(graph, u)) {
+      if (!mate.containsKey(v)) {
+        mate[u] = v;
+        mate[v] = u;
         return true;
+      } else {
+        final w = mate[v]!;
+        if (_dfs(graph, mate, visited, w)) {
+          mate[u] = v;
+          mate[v] = u;
+          return true;
+        }
       }
     }
     return false;
   }
-}
 
-final class MatchingResult {
-  final Map<Vertex, Vertex> mate;
-  late final int size;
+  /// 辅助方法：获取邻居 (兼容有向/无向图逻辑)
+  /// 在匹配算法中，通常将图视为无向来处理连接性
+  static Iterable<Vertex> _getNeighbors(Graph g, Vertex v) sync* {
+    final out = g.outEdges(v);
+    for (final edge in out.values) {
+      final neighborId = (edge.from == v.id) ? edge.to : edge.from;
+      if (neighborId == v.id) continue;
 
-  MatchingResult(this.mate) {
-    this.size = mate.length ~/ 2;
+      final neighbor = g.vertexMap[neighborId];
+      if (neighbor != null) yield neighbor;
+    }
   }
 }

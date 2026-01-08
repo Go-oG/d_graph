@@ -1,245 +1,211 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:math' as math;
 
 import 'binary_search_tree.dart';
 
-class AVLTree<T> extends BinarySearchTree<T> {
-  AVLTree.of(super.compareFun, super.creator) : super.of();
+class AVLNode<T> extends BSNode<T> {
+  int _height = 1;
 
-  AVLTree(super.compareFun) {
-    creator = (p, id) {
-      return (AVLNode<T>(p, id));
-    };
+  AVLNode(T value, {AVLNode<T>? parent}) : super(parent, value);
+
+  AVLNode<T>? get leftNode => left as AVLNode<T>?;
+
+  set leftNode(AVLNode<T>? node) => left = node;
+
+  AVLNode<T>? get rightNode => right as AVLNode<T>?;
+
+  set rightNode(AVLNode<T>? node) => right = node;
+
+  AVLNode<T>? get parentNode => parent as AVLNode<T>?;
+
+  set parentNode(AVLNode<T>? node) => parent = node;
+
+  int get height => _height;
+
+  void updateHeight() {
+    int leftH = leftNode?.height ?? 0;
+    int rightH = rightNode?.height ?? 0;
+    _height = 1 + math.max(leftH, rightH);
   }
+
+  int get balanceFactor {
+    int leftH = leftNode?.height ?? 0;
+    int rightH = rightNode?.height ?? 0;
+    return rightH - leftH;
+  }
+}
+
+class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
+  AVLTree([Comparator<T>? compareFun]) : super(compareFun ?? (a, b) => a.compareTo(b));
 
   @override
-  BSNode<T> addValue(T value) {
-    BSNode<T>? nodeToReturn = super.addValue(value);
-    AVLNode<T>? nodeAdded = nodeToReturn as AVLNode<T>;
-    nodeAdded.updateHeight();
-    _balanceAfterInsert(nodeAdded);
-    nodeAdded = nodeAdded.parent as AVLNode<T>?;
-    while (nodeAdded != null) {
-      int h1 = nodeAdded.height;
-
-      nodeAdded.updateHeight();
-      _balanceAfterInsert(nodeAdded);
-
-      int h2 = nodeAdded.height;
-      if (h1 == h2) {
-        break;
-      }
-      nodeAdded = nodeAdded.parent as AVLNode<T>?;
-    }
-    return nodeToReturn;
-  }
-
-  void _balanceAfterInsert(AVLNode<T> node) {
-    int balanceFactor = node.getBalanceFactor();
-    if (balanceFactor > 1 || balanceFactor < -1) {
-      AVLNode<T>? child;
-      _Balance? balance;
-      if (balanceFactor < 0) {
-        child = node.lesser as AVLNode<T>;
-        balanceFactor = child.getBalanceFactor();
-        if (balanceFactor < 0) {
-          balance = _Balance.leftLeft;
-        } else {
-          balance = _Balance.leftRight;
-        }
-      } else {
-        child = node.greater as AVLNode<T>;
-        balanceFactor = child.getBalanceFactor();
-        if (balanceFactor < 0) {
-          balance = _Balance.rightLeft;
-        } else {
-          balance = _Balance.rightRight;
-        }
-      }
-
-      if (balance == _Balance.leftRight) {
-        // Left-Right (Left rotation, right rotation)
-        rotateLeft(child);
-        rotateRight(node);
-      } else if (balance == _Balance.rightLeft) {
-        // Right-Left (Right rotation, left rotation)
-        rotateRight(child);
-        rotateLeft(node);
-      } else if (balance == _Balance.leftLeft) {
-        // Left-Left (Right rotation)
-        rotateRight(node);
-      } else {
-        // Right-Right (Left rotation)
-        rotateLeft(node);
-      }
-
-      child.updateHeight();
-      node.updateHeight();
-    }
-  }
+  AVLNode<T>? get root => super.root as AVLNode<T>?;
 
   @override
-  BSNode<T>? removeValue(T value) {
-    BSNode<T>? nodeToRemoved = getNode(value);
-    if (nodeToRemoved == null) {
-      return null;
+  bool add(T value) {
+    if (root == null) {
+      super.root = AVLNode<T>(value);
+      return true;
     }
-
-    BSNode<T>? replacementNode = getReplacementNode(nodeToRemoved);
-
-    AVLNode<T>? nodeToRefactor;
-    if (replacementNode != null) {
-      nodeToRefactor = replacementNode.parent as AVLNode<T>?;
-    }
-    nodeToRefactor ??= nodeToRemoved.parent as AVLNode<T>;
-    if (nodeToRefactor == nodeToRemoved) {
-      nodeToRefactor = replacementNode as AVLNode<T>;
-    }
-
-    // Replace the node
-    replaceNodeWithNode(nodeToRemoved, replacementNode);
-
-    // Re-balance the tree all the way up the tree
-    while (nodeToRefactor != null) {
-      nodeToRefactor.updateHeight();
-      _balanceAfterDelete(nodeToRefactor);
-      nodeToRefactor = nodeToRefactor.parent as AVLNode<T>?;
-    }
-
-    return nodeToRemoved;
-  }
-
-  void _balanceAfterDelete(AVLNode<T> node) {
-    int balanceFactor = node.getBalanceFactor();
-    if (balanceFactor == -2 || balanceFactor == 2) {
-      if (balanceFactor == -2) {
-        AVLNode<T>? ll = node.lesser?.lesser as AVLNode<T>?;
-        int lesser = (ll != null) ? ll.height : 0;
-
-        AVLNode<T>? lr = node.lesser?.greater as AVLNode<T>?;
-        int greater = (lr != null) ? lr.height : 0;
-
-        if (lesser >= greater) {
-          rotateRight(node);
-          node.updateHeight();
-          if (node.parent != null) {
-            (node.parent as AVLNode<T>).updateHeight();
-          }
-        } else {
-          rotateLeft(node.lesser!);
-          rotateRight(node);
-
-          AVLNode<T> p = node.parent as AVLNode<T>;
-          (p.lesser as AVLNode<T>?)?.updateHeight();
-          (p.greater as AVLNode<T>?)?.updateHeight();
-          p.updateHeight();
-        }
-      } else if (balanceFactor == 2) {
-        AVLNode<T>? rr = node.greater?.greater as AVLNode<T>?;
-        int greater = (rr != null) ? rr.height : 0;
-
-        AVLNode<T>? rl = node.greater?.lesser as AVLNode<T>?;
-        int lesser = (rl != null) ? rl.height : 0;
-        if (greater >= lesser) {
-          rotateLeft(node);
-          node.updateHeight();
-          if (node.parent != null) {
-            (node.parent as AVLNode<T>).updateHeight();
-          }
-        } else {
-          rotateRight(node.greater!);
-          rotateLeft(node);
-          AVLNode<T> p = node.parent as AVLNode<T>;
-          (p.lesser as AVLNode<T>?)?.updateHeight();
-          (p.greater as AVLNode<T>?)?.updateHeight();
-          p.updateHeight();
-        }
-      }
-    }
-  }
-
-  @override
-  bool validateNode(BSNode<T> node) {
-    bool bst = super.validateNode(node);
-    if (!bst) {
-      return false;
-    }
-
-    AVLNode<T> avlNode = node as AVLNode<T>;
-    int balanceFactor = avlNode.getBalanceFactor();
-    if (balanceFactor > 1 || balanceFactor < -1) {
-      return false;
-    }
-    if (avlNode.isLeaf()) {
-      if (avlNode.height != 1) {
-        return false;
-      }
-    } else {
-      AVLNode<T>? avlNodeLesser = avlNode.lesser as AVLNode<T>?;
-      int lesserHeight = 1;
-      if (avlNodeLesser != null) {
-        lesserHeight = avlNodeLesser.height;
-      }
-
-      AVLNode<T>? avlNodeGreater = avlNode.greater as AVLNode<T>?;
-      int greaterHeight = 1;
-      if (avlNodeGreater != null) {
-        greaterHeight = avlNodeGreater.height;
-      }
-
-      if (avlNode.height == (lesserHeight + 1) || avlNode.height == (greaterHeight + 1)) {
-        return true;
-      }
-      return false;
-    }
-
+    super.root = _insert(root!, value);
     return true;
   }
 
-}
-
-class AVLNode<T> extends BSNode<T> {
-  @protected
-  int height = 1;
-
-  AVLNode(super.parent, super.value);
-
-  bool isLeaf() {
-    return ((lesser == null) && (greater == null));
+  @override
+  T? remove(T value) {
+    if (root == null) return null;
+    AVLNode<T>? current = root;
+    while (current != null) {
+      int cmp = value.compareTo(current.value);
+      if (cmp == 0) break;
+      current = cmp < 0 ? current.leftNode : current.rightNode;
+    }
+    if (current == null) return null;
+    T removedValue = current.value;
+    super.root = _delete(root!, value);
+    return removedValue;
   }
 
-  int updateHeight() {
-    int lesserHeight = 0;
-    if (lesser != null) {
-      AVLNode<T> lesserAVLNode = lesser as AVLNode<T>;
-      lesserHeight = lesserAVLNode.height;
-    }
-    int greaterHeight = 0;
-    if (greater != null) {
-      AVLNode<T> greaterAVLNode = greater as AVLNode<T>;
-      greaterHeight = greaterAVLNode.height;
-    }
+  AVLNode<T> _insert(AVLNode<T> node, T value) {
+    int cmp = value.compareTo(node.value);
 
-    if (lesserHeight > greaterHeight) {
-      height = lesserHeight + 1;
+    if (cmp < 0) {
+      if (node.leftNode == null) {
+        node.leftNode = AVLNode<T>(value, parent: node);
+      } else {
+        node.leftNode = _insert(node.leftNode!, value);
+        node.leftNode!.parentNode = node;
+      }
+    } else if (cmp > 0) {
+      if (node.rightNode == null) {
+        node.rightNode = AVLNode<T>(value, parent: node);
+      } else {
+        node.rightNode = _insert(node.rightNode!, value);
+        node.rightNode!.parentNode = node;
+      }
     } else {
-      height = greaterHeight + 1;
+      node.value = value;
+      return node;
     }
-    return height;
+
+    return _rebalance(node);
   }
 
-  int getBalanceFactor() {
-    int lesserHeight = 0;
-    if (lesser != null) {
-      AVLNode<T> lesserAVLNode = lesser as AVLNode<T>;
-      lesserHeight = lesserAVLNode.height;
+  AVLNode<T>? _delete(AVLNode<T> node, T value) {
+    int cmp = value.compareTo(node.value);
+
+    if (cmp < 0) {
+      if (node.leftNode != null) {
+        node.leftNode = _delete(node.leftNode!, value);
+        if (node.leftNode != null) node.leftNode!.parentNode = node;
+      }
+    } else if (cmp > 0) {
+      if (node.rightNode != null) {
+        node.rightNode = _delete(node.rightNode!, value);
+        if (node.rightNode != null) node.rightNode!.parentNode = node;
+      }
+    } else {
+      if (node.leftNode != null && node.rightNode != null) {
+        AVLNode<T> successor = _getMin(node.rightNode!);
+        node.value = successor.value;
+        node.rightNode = _delete(node.rightNode!, successor.value);
+        if (node.rightNode != null) node.rightNode!.parentNode = node;
+      } else {
+        AVLNode<T>? child = node.leftNode ?? node.rightNode;
+        if (child == null) {
+          return null;
+        } else {
+          child.parentNode = node.parentNode;
+          return child;
+        }
+      }
     }
-    int greaterHeight = 0;
-    if (greater != null) {
-      AVLNode<T> greaterAVLNode = greater as AVLNode<T>;
-      greaterHeight = greaterAVLNode.height;
+    return _rebalance(node);
+  }
+
+  AVLNode<T> _rebalance(AVLNode<T> node) {
+    node.updateHeight();
+    int balance = node.balanceFactor;
+
+    if (balance < -1) {
+      if (node.leftNode!.balanceFactor > 0) {
+        node.leftNode = _rotateLeft(node.leftNode!);
+        node.leftNode!.parentNode = node;
+      }
+      return _rotateRight(node);
     }
-    return greaterHeight - lesserHeight;
+
+    if (balance > 1) {
+      if (node.rightNode!.balanceFactor < 0) {
+        node.rightNode = _rotateRight(node.rightNode!);
+        node.rightNode!.parentNode = node;
+      }
+      return _rotateLeft(node);
+    }
+    return node;
+  }
+
+
+  AVLNode<T> _rotateLeft(AVLNode<T> node) {
+    AVLNode<T> newRoot = node.rightNode!;
+    node.rightNode = newRoot.leftNode;
+
+    if (newRoot.leftNode != null) {
+      newRoot.leftNode!.parentNode = node;
+    }
+    newRoot.leftNode = node;
+    newRoot.parentNode = node.parentNode;
+    node.parentNode = newRoot;
+    node.updateHeight();
+    newRoot.updateHeight();
+
+    return newRoot;
+  }
+
+  AVLNode<T> _rotateRight(AVLNode<T> node) {
+    AVLNode<T> newRoot = node.leftNode!;
+    node.leftNode = newRoot.rightNode;
+
+    if (newRoot.rightNode != null) {
+      newRoot.rightNode!.parentNode = node;
+    }
+
+    newRoot.rightNode = node;
+    newRoot.parentNode = node.parentNode;
+    node.parentNode = newRoot;
+
+    node.updateHeight();
+    newRoot.updateHeight();
+    return newRoot;
+  }
+
+  AVLNode<T> _getMin(AVLNode<T> node) {
+    while (node.leftNode != null) {
+      node = node.leftNode!;
+    }
+    return node;
+  }
+
+  @override
+  bool validate() {
+    if (root == null) return true;
+    return _validateNode(root!);
+  }
+
+  bool _validateNode(AVLNode<T> node) {
+    int bf = node.balanceFactor;
+    if (bf > 1 || bf < -1) return false;
+
+    int h = node.height;
+    int lh = node.leftNode?.height ?? 0;
+    int rh = node.rightNode?.height ?? 0;
+    if (h != 1 + math.max(lh, rh)) return false;
+
+    // 验证父指针一致性 (Debug用)
+    if (node.leftNode != null && node.leftNode!.parentNode != node) return false;
+    if (node.rightNode != null && node.rightNode!.parentNode != node) return false;
+
+    bool lOk = node.leftNode == null || _validateNode(node.leftNode!);
+    bool rOk = node.rightNode == null || _validateNode(node.rightNode!);
+    return lOk && rOk;
   }
 }
-
-enum _Balance { leftLeft, leftRight, rightLeft, rightRight }

@@ -1,193 +1,191 @@
 import 'dart:collection';
 import 'dart:math';
 
-import 'package:d_util/d_util.dart';
-
 import 'graph.dart' as g;
 
-/// push-relabel 算法（或者 preflow-push algorithm） 是一种计算最大流量的算法。
-/// 名称 “push-relabel” 来自算法中使用的两个基本操作。
-/// 在整个执行过程中，算法保持 “preflow” 并通过移动逐渐将其转换为最大流量
+/// Push-Relabel 算法实现 (FIFO Vertex Selection Rule)
+/// 包含 Gap Heuristic 和 Global Relabeling 优化
 final class PushRelabel {
-  final Queue<_Vertex> _queue = Queue();
-  final List<_Vertex> _vertices = [];
-
-  late int relabelCounter;
-  late int n;
+  final Queue<_Vertex> _activeNodes = Queue();
+  final List<_Vertex> _allVertices = [];
+  int _relabelCounter = 0;
+  late int _n;
   late final _Vertex _source;
   late final _Vertex _sink;
 
   static int getMaximumFlow(g.Graph graph, Map<g.Edge, int> edgesToCapacities, g.Vertex source, g.Vertex sink) {
-    final Map<g.Vertex, _Vertex> vertexMap = SplayTreeMap<g.Vertex, _Vertex>();
-    for (g.Edge edge in edgesToCapacities.keys) {
-      vertexMap.put(graph.getVertex(edge.from), _Vertex());
-      vertexMap.put(graph.getVertex(edge.to), _Vertex());
+    if (source == sink) return double.maxFinite.toInt();
+
+    final Map<String, _Vertex> vertexMap = {};
+
+    _Vertex getOrAdd(g.Vertex v) {
+      return vertexMap.putIfAbsent(v.id, () => _Vertex(id: v.id));
     }
 
-    final _Vertex s = _Vertex();
-    vertexMap.put(source, s);
+    final s = getOrAdd(source);
+    final t = getOrAdd(sink);
 
-    final _Vertex t = _Vertex();
-    vertexMap.put(sink, t);
-
-    final PushRelabel pushRelabel = PushRelabel._(vertexMap.values, s, t);
-    for (MapEntry<g.Edge, int> edgeWithCapacity in edgesToCapacities.entries) {
-      final g.Edge e = edgeWithCapacity.key;
-      _addEdge(vertexMap.get(graph.getVertex(e.from))!, vertexMap.get(graph.getVertex(e.to))!, edgeWithCapacity.value);
+    for (final edge in edgesToCapacities.keys) {
+      final u = getOrAdd(graph.vertexMap[edge.from]!);
+      final v = getOrAdd(graph.vertexMap[edge.to]!);
+      _addEdge(u, v, edgesToCapacities[edge]!);
     }
-    return pushRelabel._maxFlow();
+
+    final pushRelabel = PushRelabel._(vertexMap.values, s, t);
+    return pushRelabel._computeMaxFlow();
   }
 
   PushRelabel._(Iterable<_Vertex> vertices, this._source, this._sink) {
-    _vertices.addAll(vertices);
-    n = vertices.length;
+    _allVertices.addAll(vertices);
+    _n = _allVertices.length;
   }
 
-  static void _addEdge(_Vertex from, _Vertex to, int cost) {
-    final int placeOfEdge = from.edges.indexOf(_Edge.of(from, to));
-    if (placeOfEdge == -1) {
-      final _Edge edge = _Edge(from, to, cost);
-      final _Edge revertedEdge = _Edge(to, from, 0);
-      edge.revertedEdge = revertedEdge;
-      revertedEdge.revertedEdge = edge;
-      from.edges.add(edge);
-      to.edges.add(revertedEdge);
+  static void _addEdge(_Vertex from, _Vertex to, int capacity) {
+    _Edge? existingEdge;
+    for (final e in from.edges) {
+      if (e.to == to) {
+        existingEdge = e;
+        break;
+      }
+    }
+
+    if (existingEdge == null) {
+      final forward = _Edge(from, to, capacity, 0);
+      final backward = _Edge(to, from, 0, 0);
+      forward.reverse = backward;
+      backward.reverse = forward;
+
+      from.edges.add(forward);
+      to.edges.add(backward);
     } else {
-      from.edges.get(placeOfEdge).cost += cost;
+      existingEdge.capacity += capacity;
     }
   }
 
-  void _recomputeHeight() {
-    final Queue<_Vertex> que = Queue();
-    for (_Vertex vertex in _vertices) {
-      vertex.visited = false;
-      vertex.height = 2 * n;
+  /// 全局重标记 (Global Relabeling / Backward BFS)
+  void _globalRelabel() {
+    for (final v in _allVertices) {
+      v.height = _n;
     }
-
+    final Queue<_Vertex> queue = Queue();
     _sink.height = 0;
-    _source.height = n;
-    _source.visited = true;
-    _sink.visited = true;
-    que.add(_sink);
-    while (que.isNotEmpty) {
-      final _Vertex act = que.removeFirst();
-      for (_Edge e in act.edges) {
-        if (!e.to.visited && e.revertedEdge.cost > e.revertedEdge.flow) {
-          e.to.height = act.height + 1;
-          que.add(e.to);
-          e.to.visited = true;
+    queue.add(_sink);
+
+    while (queue.isNotEmpty) {
+      final u = queue.removeFirst();
+      for (final edge in u.edges) {
+        final reversed = edge.reverse;
+        final v = edge.to;
+        if (v.height == _n && reversed.residualCapacity > 0) {
+          v.height = u.height + 1;
+          queue.add(v);
         }
       }
     }
-    que.add(_source);
-    while (que.isNotEmpty) {
-      final _Vertex act = que.removeFirst();
-      for (_Edge e in act.edges) {
-        if (!e.to.visited && e.revertedEdge.cost > e.revertedEdge.flow) {
-          e.to.height = act.height + 1;
-          que.add(e.to);
-          e.to.visited = true;
-        }
-      }
-    }
+    // 源点高度固定为 n (除非不可达，但也设为 n 以触发 push)
+     _source.height = _n;
   }
 
-  void _init() {
-    for (_Edge e in _source.edges) {
-      e.flow = e.cost;
-      e.revertedEdge.flow = -e.flow;
-      e.to.excess += e.flow;
-      if (e.to != _source && e.to != _sink) {
-        _queue.add(e.to);
-      }
-    }
-    _recomputeHeight();
-    relabelCounter = 0;
-  }
-
-  static void _relabel(_Vertex v) {
-    int minimum = 0;
-    for (_Edge e in v.edges) {
-      if (e.flow < e.cost) {
-        minimum = min(minimum, e.to.height);
-      }
-    }
-    v.height = minimum + 1;
-  }
-
+  /// 推流操作
   void _push(_Vertex u, _Edge e) {
-    final delta = (u.excess < e.cost - e.flow) ? u.excess : e.cost - e.flow;
+    final int delta = min(u.excess, e.residualCapacity);
     e.flow += delta;
-    e.revertedEdge.flow -= delta;
+    e.reverse.flow -= delta;
     u.excess -= delta;
-
-    if (e.to.excess == 0 && e.to != _source && e.to != _sink) {
-      _queue.add(e.to);
-    }
-
     e.to.excess += delta;
+    if (e.to.excess == delta && e.to != _source && e.to != _sink) {
+      _activeNodes.add(e.to);
+    }
   }
 
+  /// 重标记操作 将 u 的高度提升到 min(邻居高度) + 1
+  void _relabel(_Vertex u) {
+    int minHeight = 2 * _n;
+    for (final e in u.edges) {
+      if (e.residualCapacity > 0) {
+        minHeight = min(minHeight, e.to.height);
+      }
+    }
+    u.height = minHeight + 1;
+  }
+
+  /// 排放操作 对一个溢出节点 u 不断进行 push 或 relabel，直到它不再溢出
   void _discharge(_Vertex u) {
     while (u.excess > 0) {
-      if (u.currentEdge == u.edges.size) {
-        _relabel(u);
-        if ((++relabelCounter) == n) {
-          _recomputeHeight();
-          for (_Vertex vertex in _vertices) {
-            vertex.currentEdge = 0;
-          }
-          relabelCounter = 0;
-        }
-        u.currentEdge = 0;
-      } else {
-        _Edge e = u.edges.get(u.currentEdge);
-        if (e.flow < e.cost && u.height == e.to.height + 1) {
+      if (u.currentEdgeIndex < u.edges.length) {
+        final e = u.edges[u.currentEdgeIndex];
+        if (e.residualCapacity > 0 && u.height == e.to.height + 1) {
           _push(u, e);
         } else {
-          u.currentEdge++;
+          u.currentEdgeIndex++;
+        }
+      } else {
+        _relabel(u);
+        u.currentEdgeIndex = 0;
+
+        //优化 可选
+        if (++_relabelCounter >= _n) {
+          _globalRelabel();
+          _relabelCounter = 0;
         }
       }
     }
   }
 
-  int _maxFlow() {
-    _init();
-    while (_queue.isNotEmpty) {
-      _discharge(_queue.removeFirst());
+  int _computeMaxFlow() {
+    _source.height = _n;
+    _sink.height = 0;
+
+    for (final e in _source.edges) {
+      e.flow = e.capacity;
+      e.reverse.flow = -e.capacity;
+
+      e.to.excess += e.capacity;
+      _source.excess -= e.capacity;
+
+      if (e.to != _source && e.to != _sink) {
+        _activeNodes.add(e.to);
+      }
+    }
+
+    //可选
+    _globalRelabel();
+
+    while (_activeNodes.isNotEmpty) {
+      final u = _activeNodes.removeFirst();
+      _discharge(u);
     }
     return _sink.excess;
   }
 }
 
-final class _Vertex {
+class _Vertex {
+  final String id;
   final List<_Edge> edges = [];
 
-  bool visited = false;
-  late int height;
-  late int currentEdge;
-  late int excess;
+  int height = 0;
+  int excess = 0;
+  int currentEdgeIndex = 0;
+
+  _Vertex({required this.id});
+
+  @override
+  String toString() => 'V($id, h:$height, e:$excess)';
 }
 
-final class _Edge {
+class _Edge {
   final _Vertex from;
   final _Vertex to;
-  int cost = 0;
-  int flow = 0;
 
-  late _Edge revertedEdge;
+  int capacity;
+  int flow;
 
-  _Edge(this.from, this.to, this.cost);
+  late _Edge reverse;
 
-  _Edge.of(this.from, this.to);
+  _Edge(this.from, this.to, this.capacity, this.flow);
 
-  @override
-  bool operator ==(Object other) {
-    return identical(other, this) || (other is _Edge && other.to == to && other.from == from);
-  }
+  int get residualCapacity => capacity - flow;
 
   @override
-  int get hashCode {
-    return Object.hash(from, to);
-  }
+  String toString() => '${from.id}->${to.id} ($flow/$capacity)';
 }

@@ -1,52 +1,54 @@
-import 'package:d_util/d_util.dart';
+import 'dart:collection';
+
+import 'package:dart_graph/dart_graph.dart';
 
 import 'graph.dart';
 
-/// 在计算机科学中，拓扑排序（有时缩写为 topSort）或有向图的拓扑排序
-/// 对于每个顶点 使得对于每个边 UV，u 在排序中位于 v 之前。
-extension TopologicalSort on Graph {
-  ///对有向图执行拓扑排序。如果检测到循环，则返回 NULL.
-  List<Vertex>? sort() {
+///拓扑排序 (Kahn's Algorithm) 返回拓扑排序后的顶点列表。
+/// 如果检测到环 (Cycle)，则返回 null。
+/// 时间复杂度: O(V + E)
+extension TopologicalSortExtension on Graph {
+  List<Vertex>? topologicalSort() {
     if (!directed) {
-      throw "Cannot perform a topological sort on a non-directed graph. graph type = ";
+      throw StateError("Topological sort can only be performed on directed graphs.");
     }
 
-    final Graph clone = Graph.of(this);
-    final List<Vertex> sorted = [];
-    final List<Vertex> noOutgoing = [];
+    final Map<String, int> inDegrees = {};
+    for (final v in vertexIterator) {
+      inDegrees[v.id] =degreeOf(v.id).inDegree;
+    }
 
-    final List<Edge> edges = [];
-    edges.addAll(clone.edgeIterator);
-
-    for (Vertex v in clone.vertexIterator) {
-      if (clone.edges(v.id).isEmpty) {
-        noOutgoing.add(v);
+    final Queue<Vertex> queue = ListQueue();
+    for (final v in vertexIterator) {
+      if (inDegrees[v.id] == 0) {
+        queue.add(v);
       }
     }
 
-    while (noOutgoing.isNotEmpty) {
-      final Vertex current = noOutgoing.removeAt(0);
-      sorted.add(current);
+    final List<Vertex> sortedResult = [];
 
-      int i = 0;
-      while (i < edges.length) {
-        final Edge e = edges.get(i);
-        final Vertex from = clone.getVertex(e.from);
-        final Vertex to = clone.getVertex(e.to);
-        if (to == current) {
-          edges.remove(e);
-          clone.removeEdge(e);
-        } else {
-          i++;
-        }
-        if (clone.edges(from.id).isEmpty) {
-          noOutgoing.add(from);
+    while (queue.isNotEmpty) {
+      final Vertex u = queue.removeFirst();
+      sortedResult.add(u);
+      final outEdgesMap = outEdges(u);
+
+      for (final edge in outEdgesMap.values) {
+        final String vId = edge.to;
+
+        final int currentInDegree = inDegrees[vId]! - 1;
+        inDegrees[vId] = currentInDegree;
+        if (currentInDegree == 0) {
+          final v = vertexMap[vId];
+          if (v != null) {
+            queue.add(v);
+          }
         }
       }
     }
-    if (edges.isNotEmpty) {
+
+    if (sortedResult.length != vertexMap.length) {
       return null;
     }
-    return sorted;
+    return sortedResult;
   }
 }

@@ -2,36 +2,49 @@ import 'graph.dart';
 
 ///循环检测
 extension CycleDetection on Graph {
-  bool isCycle() {
-    if (directed) throw "Graph is needs to be Undirected.";
 
-    final Set<Vertex> visitedVertices = {};
-    final Set<Edge> visitedEdges = {};
-
-    final vertices = vertexIterator.toList();
-    if (vertices.isEmpty) {
-      return false;
-    }
-    return _depthFirstSearch(this, vertices[0], visitedVertices, visitedEdges);
-  }
-
-  static bool _depthFirstSearch(Graph g, Vertex vertex, Set<Vertex> visitedVertices, Set<Edge> visitedEdges) {
-    if (visitedVertices.contains(vertex)) {
-      return true;
+  bool hasCycle() {
+    if (directed) {
+      throw StateError("Current implementation only supports Undirected Graphs.");
     }
 
-    visitedVertices.add(vertex);
-    for (Edge edge in g.edges2(vertex)) {
-      final Vertex to = g.getVertex(edge.to);
-      bool result = false;
-      if (!visitedEdges.contains(edge)) {
-        visitedEdges.add(edge);
-        final recip = Edge(value: edge.value, from: edge.to, to: edge.from, id: "\$eid:${edge.value.hashCode}\$");
-        visitedEdges.add(recip);
-        result = _depthFirstSearch(g, to, visitedVertices, visitedEdges);
+    final Set<String> visited = {};
+
+    for (final vertex in vertexIterator) {
+      if (!visited.contains(vertex.id)) {
+        if (_dfsDetectCycle(this, vertex, null, visited)) {
+          return true;
+        }
       }
-      if (result == true) return true;
     }
     return false;
+  }
+
+  static bool _dfsDetectCycle(Graph g, Vertex current, Vertex? parent, Set<String> visited) {
+    visited.add(current.id);
+    final neighbors = _getNeighbors(g, current);
+
+    for (final neighbor in neighbors) {
+      if (neighbor.id == parent?.id) {
+        continue;
+      }
+      if (visited.contains(neighbor.id)) {
+        return true;
+      }
+      if (_dfsDetectCycle(g, neighbor, current, visited)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static Iterable<Vertex> _getNeighbors(Graph g, Vertex v) sync* {
+    final outEdges = g.outEdges(v);
+    for (final edge in outEdges.values) {
+      final neighborId = (edge.from == v.id) ? edge.to : edge.from;
+      if (neighborId == v.id) continue;
+      final neighbor = g.vertexMap[neighborId];
+      if (neighbor != null) yield neighbor;
+    }
   }
 }

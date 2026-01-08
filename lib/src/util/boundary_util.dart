@@ -2,7 +2,7 @@ import 'dart:core';
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:d_util/d_util.dart';
+typedef Fun2<T, R> = R Function(T t);
 
 final class BoundaryUtil {
   BoundaryUtil._();
@@ -16,15 +16,16 @@ final class BoundaryUtil {
     double bottom = double.minPositive;
     double right = double.minPositive;
 
-    rects.each((p0, p1) {
+    for (var p0 in rects) {
       if (p0 == null) {
-        return;
+        continue;
       }
       left = min(p0.dx, left);
       top = min(p0.dy, top);
       right = max(p0.dx, right);
       bottom = max(p0.dy, bottom);
-    });
+    }
+
     if (left >= right || top >= bottom) {
       return null;
     }

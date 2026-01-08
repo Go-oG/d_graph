@@ -109,7 +109,6 @@ class Angle implements Comparable<Angle> {
 
   bool get isFull => (radians - pi2).abs() <= 1e-9;
 
-  /// Compare equality with tolerance.
   bool equals(Angle other, [double epsilon = 1e-10]) => (radians - other.radians).abs() < epsilon;
 
   @override

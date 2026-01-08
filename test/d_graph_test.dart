@@ -5,7 +5,7 @@ import 'package:dart_graph/dart_graph.dart';
 
 void main() {
 
-  var tree = RTree<Rect>((e)=>e,6);
+  var tree = RTree<Rect>((e)=>e,);
   Random random = Random(1);
   List<Rect> list = [];
   for (int i = 0; i < 10000000; i++) {

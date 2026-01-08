@@ -1,88 +1,69 @@
-import 'package:d_util/d_util.dart';
+import 'package:collection/collection.dart';
 
 import 'graph.dart';
 
-///路径查找
-extension AStar on Graph {
-  List<Edge>? aStar(Vertex start, Vertex goal) {
-    final Set<Vertex> closedSet = <Vertex>{};
-    final List<Vertex> openSet = [];
-    openSet.add(start);
-    final Map<Vertex, Vertex> cameFrom = {};
+typedef HeuristicCallback = double Function(Vertex current, Vertex goal);
 
-    final Map<Vertex, double> gScore = {};
-    gScore[start] = 0;
-    final Map<Vertex, double> fScore = {};
-    for (Vertex v in vertexIterator) {
-      fScore[v] = Double.minValue;
+extension AStarExtension on Graph {
+  /// A* 路径查找算法
+  /// [heuristic] 启发函数。如果省略，算法退化为 Dijkstra。
+  List<Edge>? aStar(Vertex start, Vertex goal, {HeuristicCallback? heuristic}) {
+    if (!vertexMap.containsKey(start.id) || !vertexMap.containsKey(goal.id)) {
+      return null;
     }
-    fScore[start] = _heuristicCostEstimate(start, goal);
 
-    comparator(o1, o2) {
-      if (fScore[o1]! < fScore[o2]!) {
-        return -1;
-      }
-      if (fScore[o2]! < fScore[o1]!) {
-        return 1;
-      }
-      return 0;
-    }
+    final h = heuristic ?? (a, b) => 0.0;
+    final PriorityQueue<_NodeRank> openSet = PriorityQueue();
+    final Map<String, double> gScore = {};
+    final Map<String, Edge> cameFromEdge = {};
+
+    gScore[start.id] = 0.0;
+    double startF = h(start, goal);
+    openSet.add(_NodeRank(start.id, startF));
 
     while (openSet.isNotEmpty) {
-      final Vertex current = openSet[0];
-      if (current == goal) {
-        return _reconstructPath(cameFrom, goal);
+      final _NodeRank currentRank = openSet.removeFirst();
+      final String currentId = currentRank.vertexId;
+      if (currentId == goal.id) {
+        return _reconstructPath(cameFromEdge, currentId);
       }
-      openSet.removeAt(0);
-      closedSet.add(current);
-      for (Edge edge in edges2(current)) {
-        final Vertex neighbor = getVertex(edge.to);
-        if (closedSet.contains(neighbor)) {
-          continue;
+      final Vertex? currentVertex = vertexMap[currentId];
+      if (currentVertex == null) continue;
+      for (final edge in outEdges(currentVertex).values) {
+        final String neighborId = (edge.from == currentId) ? edge.to : edge.from;
+        final Vertex? neighbor = vertexMap[neighborId];
+        if (neighbor == null) continue;
+        final double tentativeG = (gScore[currentId] ?? double.infinity) + edge.weight;
+        if (tentativeG < (gScore[neighborId] ?? double.infinity)) {
+          cameFromEdge[neighborId] = edge;
+          gScore[neighborId] = tentativeG;
+          final double f = tentativeG + h(neighbor, goal);
+          openSet.add(_NodeRank(neighborId, f));
         }
-
-        final tenativeGScore = gScore[current]! + _distanceBetween(current, neighbor);
-        if (!openSet.contains(neighbor)) {
-          openSet.add(neighbor);
-        } else if (tenativeGScore >= gScore[neighbor]!) {
-          continue;
-        }
-
-        cameFrom[neighbor] = current;
-
-        gScore[neighbor] = tenativeGScore;
-
-        fScore[neighbor] = gScore[neighbor]! + _heuristicCostEstimate(neighbor, goal);
-
-        openSet.sort(comparator);
       }
     }
-
     return null;
   }
 
-  double _distanceBetween(Vertex start, Vertex next) {
-    for (var e in edges2(start)) {
-      if (e.to == next.id) return e.value;
+  List<Edge> _reconstructPath(Map<String, Edge> cameFromEdge, String currentId) {
+    final List<Edge> path = [];
+    String curr = currentId;
+
+    while (cameFromEdge.containsKey(curr)) {
+      final Edge edge = cameFromEdge[curr]!;
+      path.add(edge);
+      curr = (edge.to == curr) ? edge.from : edge.to;
     }
-    return Double.maxValue;
+    return path.reversed.toList();
   }
+}
 
-  double _heuristicCostEstimate(Vertex start, Vertex goal) {
-    return 1;
-  }
+class _NodeRank implements Comparable<_NodeRank> {
+  final String vertexId;
+  final double fScore;
 
-  List<Edge> _reconstructPath(Map<Vertex, Vertex> cameFrom, Vertex? current) {
-    final List<Edge> totalPath = [];
+  _NodeRank(this.vertexId, this.fScore);
 
-    while (current != null) {
-      final Vertex previous = current;
-      current = cameFrom[current];
-      if (current != null) {
-        final Edge edge = getEdge2(current.id, previous.id)!;
-        totalPath.add(edge);
-      }
-    }
-    return totalPath.reversed.toList();
-  }
+  @override
+  int compareTo(_NodeRank other) => fScore.compareTo(other.fScore);
 }

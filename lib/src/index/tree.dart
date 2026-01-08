@@ -1,67 +1,181 @@
+import 'dart:collection';
 import 'dart:math';
-
-import 'package:d_util/d_util.dart';
-import 'package:quiver/collection.dart';
 
 class Tree<T> {
   TreeNode<T>? _root;
 
-  ///双向映射
-  final BiMap<T, TreeNode<T>> _nodeMap = BiMap();
+  final Map<T, TreeNode<T>> _nodeMap = {};
 
-  ///存储所有的叶子结点
-  final BiMap<T, TreeNode<T>> _leafMap = BiMap();
+  final Map<T, TreeNode<T>> _leafMap = {};
 
   TreeNode<T>? get root => _root;
 
-  TreeNode<T> add(T? parent, T value) {
+  Iterable<T> get allData => _nodeMap.keys;
+
+  Iterable<TreeNode<T>> get leaves => _leafMap.values;
+
+  Tree();
+
+  TreeNode<T>? getNode(T data) => _nodeMap[data];
+
+  TreeNode<T>? getParent(T value) => getNode(value)?.parent;
+
+  /// [parentValue] 父节点数据。如果为 null，且树为空，则设为根节点。
+  /// [data] 新节点数据。
+  /// return: 新创建的节点
+  TreeNode<T> add(T? parentValue, T data) {
+    if (_nodeMap.containsKey(data)) {
+      throw ArgumentError('Tree already contains data: $data');
+    }
+
     TreeNode<T>? parentNode;
-    if (parent != null) {
-      parentNode = _nodeMap.putIfAbsent(parent, () => TreeNode(null, parent));
+    int depth = 0;
+
+    if (parentValue != null) {
+      parentNode = _nodeMap[parentValue];
+      if (parentNode == null) {
+        throw StateError('Parent node not found: $parentValue');
+      }
+      depth = parentNode.depth + 1;
+    } else {
+      if (_root != null) {
+        throw StateError('Root already exists.');
+      }
     }
 
-    final node = TreeNode(parentNode, value);
-    _nodeMap[value] = node;
-    _leafMap[value] = node;
-    parentNode?.add(node);
-    final root = _root;
-    if (root == null) {
-      _root = parentNode ?? node;
-    }
+    final newNode = TreeNode._(data, depth);
+    newNode._tree = this;
+    newNode._parent = parentNode;
+    newNode._descendantCount = 0;
+    newNode._height = 0;
     if (parentNode != null) {
-      _leafMap.remove(parentNode.data);
+      parentNode._addChild(newNode);
+      if (_leafMap.containsKey(parentNode.data)) {
+        _leafMap.remove(parentNode.data);
+      }
+      _increaseDescendantCount(parentNode, 1);
+      _invalidateHeightOnly(parentNode);
+    } else {
+      _root = newNode;
     }
-    return node;
+
+    _nodeMap[data] = newNode;
+    _leafMap[data] = newNode;
+
+    return newNode;
   }
 
-  void addAll(T? parent, Iterable<T> values) {
-    for (var item in values) {
-      add(parent, item);
+  void addAll(T parentValue, Iterable<T> values) {
+    for (var value in values) {
+      add(parentValue, value);
     }
   }
 
-  ///当删除该节点时会导致节点的子节点也会被删除
-  TreeNode<T>? remove(T value) {
-    final node = _nodeMap.remove(value);
-    if (node == null) {
-      return null;
+  /// 将节点 [data] 移动到新的父节点 [newParentData] 下
+  void moveNode(T data, T newParentData) {
+    final node = getNode(data);
+    final newParent = getNode(newParentData);
+    final oldParent = node?.parent;
+
+    if (node == null || newParent == null || oldParent == null) {
+      throw StateError('Node or target parent not found');
     }
-    if (node.isLeaf) {
-      _leafMap.remove(node.data);
+
+    if (node == newParent) return;
+    if (oldParent == newParent) return;
+
+    TreeNode<T>? tmp = newParent;
+    while (tmp != null) {
+      if (tmp == node) throw StateError('Cannot move node into its own descendant');
+      tmp = tmp.parent;
     }
+
+    _leafMap.remove(newParent.data);
+
+    oldParent._removeChild(node);
+    newParent._addChild(node);
+    node._parent = newParent;
+
+    if (oldParent.isLeaf) {
+      _leafMap[oldParent.data] = oldParent;
+    }
+
+    _invalidateAncestors(oldParent);
+    _invalidateAncestors(newParent);
+    node._updateDepth(newParent.depth + 1);
+  }
+
+  /// 移除节点及其所有后代
+  void remove(T data) {
+    final node = _nodeMap[data];
+    if (node == null) return;
+    final int removedCount = 1 + node.descendantCount;
     final parent = node.parent;
+
     if (parent != null) {
-      parent.remove(node);
+      parent._removeChild(node);
       if (parent.isLeaf) {
         _leafMap[parent.data] = parent;
       }
+      _increaseDescendantCount(parent, -removedCount);
+      _invalidateHeightOnly(parent);
+    } else if (node == _root) {
+      _root = null;
     }
-    return node;
+
+    recursiveCleanup(TreeNode<T> node) {
+      _nodeMap.remove(node.data);
+      if (node.isLeaf) {
+        _leafMap.remove(node.data);
+      }
+      node._tree = null;
+      if (!node.isLeaf) {
+        for (final child in node._children) {
+          recursiveCleanup(child);
+        }
+      }
+    }
+
+    recursiveCleanup(node);
   }
 
-  void removeAll(Iterable<T> values) {
-    for (var item in values) {
-      remove(item);
+  /// 根据条件移除子树 [where] 返回 true 则移除该节点及其子树
+  void removeSubtreesWhere(bool Function(TreeNode<T>) where) {
+    // 使用 BFS/层序遍历，从上往下找，找到满足条件的根就移除，不再深入该分支
+    // 避免在遍历过程中修改结构导致的异常，使用待删除队列
+    List<T> toRemove = [];
+
+    // 使用 BFS
+    final queue = Queue<TreeNode<T>>();
+    if (_root != null) queue.add(_root!);
+
+    while (queue.isNotEmpty) {
+      final node = queue.removeFirst();
+      if (where(node)) {
+        toRemove.add(node.data);
+        // 不再将子节点入队，因为它们会被级联删除
+      } else {
+        queue.addAll(node.children);
+      }
+    }
+
+    for (var data in toRemove) {
+      remove(data);
+    }
+  }
+
+  /// 仅移除满足条件的叶子节点 (修剪边缘) 循环执行直到没有节点被移除（因为移除叶子可能产生新的叶子）
+  void pruneLeavesWhere(bool Function(TreeNode<T>) where) {
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      final currentLeaves = _leafMap.values.toList();
+      for (var leaf in currentLeaves) {
+        if (where(leaf)) {
+          remove(leaf.data);
+          changed = true;
+        }
+      }
     }
   }
 
@@ -71,767 +185,478 @@ class Tree<T> {
     _leafMap.clear();
   }
 
-  TreeNode<T>? get(T value) {
-    return _nodeMap[value];
-  }
-
-  TreeNode<T>? getParent(T value) {
-    return _nodeMap[value]?.parent;
-  }
-
-  void sort(Fun3<TreeNode<T>, TreeNode<T>, int> sortFun) {
-    _root?.sort(sortFun, true);
-  }
-
-  ///返回从当前节点到指定节点的最短路径
-  List<TreeNode<T>> findPath(T source, T target) {
-    TreeNode<T>? start = get(source);
-    TreeNode<T>? end = get(target);
-    if (start == null || end == null) {
-      return [];
+  int get maxDepth {
+    if (_root == null) return 0;
+    int maxD = 0;
+    for (var leaf in _leafMap.values) {
+      maxD = max(maxD, leaf.depth);
     }
-    return start.findPath(end);
+    return maxD;
   }
 
-  ///返回 节点 a,b的最小公共祖先
-  TreeNode<T>? minCommonAncestor(T aValue, T bValue) {
-    if (aValue == bValue) return get(aValue);
-    var a = get(aValue);
-    var b = get(bValue);
-    if (a == null || b == null) {
-      return null;
+  bool contains(T data) => _nodeMap.containsKey(data);
+
+  List<TreeNode<T>> getNodesAtDepth(int depth, {bool needOrder = false}) {
+    if (!needOrder) {
+      return _nodeMap.values.where((n) => n.depth == depth).toList();
     }
-    var aNodes = a.ancestors();
-    var bNodes = b.ancestors();
-    TreeNode<T>? c;
-    a = aNodes.removeLast();
-    b = bNodes.removeLast();
-    while (a == b) {
-      c = a;
-      a = aNodes.removeLast();
-      b = bNodes.removeLast();
-    }
-    return c;
-  }
 
-  int get maxHeight {
-    return maxDeep;
-  }
+    List<TreeNode<T>> result = [];
+    if (_root == null) return result;
+    final queue = Queue<_NodeDepthPair<T>>();
+    queue.add(_NodeDepthPair(_root!, 0));
 
-  int get maxDeep {
-    int c = -1;
-    for (var item in _leafMap.keys) {
-      var t = getDeep(item);
-      if (t > c) {
-        t = c;
-      }
-    }
-    return c;
-  }
-
-  TreeNode<T>? get maxDeepNode {
-    int c = -1;
-    TreeNode<T>? result;
-    for (var item in _leafMap.entries) {
-      var t = getDeep(item.key);
-      if (t > c) {
-        t = c;
-        result = item.value;
+    while (queue.isNotEmpty) {
+      final pair = queue.removeFirst();
+      if (pair.depth == depth) {
+        result.add(pair.node);
+      } else if (pair.depth < depth) {
+        for (var child in pair.node.children) {
+          queue.add(_NodeDepthPair(child, pair.depth + 1));
+        }
       }
     }
     return result;
   }
 
-  ///节点的深度(从0开始)
-  int getDeep(T value) {
-    TreeNode<T>? node = _nodeMap[value];
-    if (node == null) {
-      return -1;
-    }
-    int c = -1;
-    while (node != null) {
-      c++;
-      node = node.parent;
-    }
-    return c;
-  }
+  Tree<T> copySubtree(T rootData) {
+    final startNode = getNode(rootData);
+    if (startNode == null) throw StateError('Node not found');
 
-  ///节点的高度(从0开始)
-  int getHeight(T value) {
-    TreeNode<T>? node = _nodeMap[value];
-    if (node == null) {
-      return -1;
-    }
-    if (node.isLeaf) {
-      return 0;
-    }
+    Tree<T> newTree = Tree<T>();
 
-    int c = -1;
-    List<TreeNode<T>> childList = List.from(node.children);
-    while (childList.isNotEmpty) {
-      List<TreeNode<T>> nextList = [];
-      for (var item in childList) {
-        nextList.addAll(item.children);
+    // BFS 复制
+    final queue = Queue<TreeNode<T>>();
+    queue.add(startNode);
+
+    // 根节点特殊处理
+    newTree.add(null, startNode.data); // 添加根
+
+    while (queue.isNotEmpty) {
+      final curr = queue.removeFirst();
+      final currInNewTree = newTree.getNode(curr.data)!; // 必然存在
+
+      for (var child in curr.children) {
+        newTree.add(currInNewTree.data, child.data);
+        queue.add(child);
       }
-      childList = nextList;
-      c++;
     }
-    return c;
+    return newTree;
   }
 
-  bool contains(T? value) {
-    if (value == null) {
-      return false;
+  TreeNode<T>? minCommonAncestor(T dataA, T dataB) {
+    final nodeA = getNode(dataA);
+    final nodeB = getNode(dataB);
+    if (nodeA == null || nodeB == null) return null;
+
+    TreeNode<T>? p1 = nodeA;
+    TreeNode<T>? p2 = nodeB;
+    int d1 = p1.depth;
+    int d2 = p2.depth;
+
+    while (d1 > d2) {
+      p1 = p1!.parent;
+      d1--;
     }
-    return _nodeMap.containsKey(value);
+    while (d2 > d1) {
+      p2 = p2!.parent;
+      d2--;
+    }
+    while (p1 != p2 && p1 != null && p2 != null) {
+      p1 = p1.parent;
+      p2 = p2.parent;
+    }
+    return p1;
   }
 
-  /// 返回其所有的叶子结点
-  Iterable<TreeNode<T>> get leaves {
-    return _leafMap.values;
+  List<TreeNode<T>> findPath(T sourceData, T targetData) {
+    final startNode = getNode(sourceData);
+    final endNode = getNode(targetData);
+
+    if (startNode == null || endNode == null) return [];
+
+    if (startNode == endNode) return [startNode];
+
+    final lca = minCommonAncestor(sourceData, targetData);
+
+    if (lca == null) return [];
+
+    final List<TreeNode<T>> pathUp = [];
+    TreeNode<T>? curr = startNode;
+    while (curr != lca) {
+      pathUp.add(curr!);
+      curr = curr.parent;
+    }
+    pathUp.add(lca);
+
+    final List<TreeNode<T>> pathDown = [];
+    curr = endNode;
+    while (curr != lca) {
+      pathDown.add(curr!);
+      curr = curr.parent;
+    }
+    return [...pathUp, ...pathDown.reversed];
   }
 
-  void bfsEach(Fun3<TreeNode<T>, int, bool> call) {
-    var r = _root;
-    if (r == null) {
-      return;
-    }
-    int i = 0;
-    List<TreeNode<T>> list = [r];
-    while (list.isNotEmpty) {
-      var f = list.removeAt(0);
-      if (call(f, i)) {
-        break;
-      }
-      i++;
-    }
-  }
-
-  void each(TreeEachFun<T> callback) {
+  void each(bool Function(TreeNode<T>) callback) {
     _root?.each(callback);
   }
 
-  void eachBefore(TreeEachFun<T> callback) {
+  void eachBefore(bool Function(TreeNode<T>) callback) {
     _root?.eachBefore(callback);
   }
 
-  void eachAfter(TreeEachFun<T> callback) {
+  void eachAfter(bool Function(TreeNode<T>) callback) {
     _root?.eachAfter(callback);
   }
 
-  TreeNode<T>? find(TreeEachFun<T> where) {
-    var list=findWhere(where);
-    if(list.isEmpty){
-      return null;
-    }
-    return list.first;
+  List<TreeNode<T>> search(bool Function(TreeNode<T>) where) {
+    return _nodeMap.values.where(where).toList();
   }
 
-  List<TreeNode<T>> findWhere(TreeEachFun<T> where) {
-    List<TreeNode<T>> list = [];
-    for (var item in _nodeMap.entries) {
-      if (where.call(item.value)) {
-        list.add(item.value);
-      }
+  TreeNode<T>? find(bool Function(TreeNode<T>) where) {
+    // 相比全量搜索，直接遍历 _nodeMap 可能更快，这取决于 where 的复杂度
+    // 但为了保持顺序一致性，通常委托给 root 遍历
+    return _root?.find(where);
+  }
+
+  TreeNode<T>? findFirst(bool Function(TreeNode<T>) where) {
+    for (var node in _nodeMap.values) {
+      if (where(node)) return node;
     }
-    return list;
+    return null;
+  }
+
+  List<TreeNode<T>> findWhere(bool Function(TreeNode<T>) where, {bool iterator = true, int limit = -1}) {
+    if (_root == null) return [];
+    return _root!.findWhere(where, iterator: iterator, limit: limit);
+  }
+
+  void _increaseDescendantCount(TreeNode<T>? node, int delta) {
+    while (node != null) {
+      if (node._descendantCount >= 0) {
+        node._descendantCount += delta;
+      }
+      node = node.parent;
+    }
+  }
+
+  void _invalidateHeightOnly(TreeNode<T>? node) {
+    while (node != null) {
+      if (node._height == -1) break;
+      node._height = -1;
+      node = node.parent;
+    }
+  }
+
+  void _invalidateAncestors(TreeNode<T>? node) {
+    while (node != null) {
+      node._height = -1;
+      node._descendantCount = -1;
+      node = node.parent;
+    }
   }
 }
 
 class TreeNode<T> {
-  T data;
-  TreeNode<T>? parent;
-  List<TreeNode<T>> _childrenList = [];
-  bool _expand = true;
-  int _deep = -1;
+  final T data;
+  late final _children = _ChildList<T>();
+  Tree<T>? _tree;
+  TreeNode<T>? _parent;
+
+  int _index = -1;
+
   int _height = -1;
-
-  double value = 0;
-
-  TreeNode(this.parent, this.data, [Iterable<TreeNode<T>>? children]) {
-    if (children != null) {
-      _childrenList.addAll(children);
-    }
-  }
-
-  List<TreeNode<T>> get children {
-    return _childrenList;
-  }
-
-  List<TreeNode<T>> get childrenReverse => List.from(_childrenList.reversed);
-
-  bool get hasChild {
-    return _childrenList.isNotEmpty;
-  }
-
-  bool get notChild {
-    return _childrenList.isEmpty;
-  }
-
-  int get childCount => _childrenList.length;
-
-  bool get isLeaf => notChild;
-
-  int get treeHeight => _height;
-
-  int get deep => _deep;
-
-  /// 自身在父节点中的索引 如果为-1表示没有父节点
-  int get inParentIndex {
-    var p = parent;
-    if (p == null) {
-      return -1;
-    }
-    return p._childrenList.indexOf(this);
-  }
-
-  ///计算后代节点数
-  ///后代节点数(包括子孙节点数)
   int _descendantCount = -1;
+  int _depth;
+
+  bool expand = true;
+
+  TreeNode._(this.data, this._depth);
+
+  TreeNode<T>? get parent => _parent;
+
+  List<TreeNode<T>> get children => UnmodifiableListView(_children);
+
+  Iterable<TreeNode<T>> get childrenReverse => _children.reversed;
+
+  bool get isLeaf => _children.isEmpty;
+
+  bool get isRoot => _parent == null;
+
+  int get childCount => _children.length;
+
+  bool get hasChildren => _children.isNotEmpty;
+
+  bool get isNotChildren => _children.isEmpty;
+
+  TreeNode<T> childAt(int index) => _children[index];
+
+
+  int get depth => _depth;
+
+  int get height {
+    if (_height < 0) {
+      _computeHeight();
+    }
+    return _height;
+  }
 
   int get descendantCount {
     if (_descendantCount < 0) {
-      computeDescendantCount();
+      _computeDescendantCount();
     }
     return _descendantCount;
   }
 
-  TreeNode<T> get root {
-    TreeNode<T>? tmpRoot = this;
-    while (tmpRoot != null) {
-      if (tmpRoot.parent == null) {
-        return tmpRoot;
+  int get indexInParent => _index;
+
+  void _addChild(TreeNode<T> node) => _children.add(node);
+
+  void _removeChild(TreeNode<T> node) => _children.remove(node);
+
+  int _computeHeight() {
+    if (isLeaf) {
+      _height = 0;
+    } else {
+      int maxH = -1;
+      for (var child in _children) {
+        int h = child.height; // 递归调用 getter
+        if (h > maxH) maxH = h;
       }
-      tmpRoot = tmpRoot.parent;
+      _height = maxH + 1;
     }
-
-    throw "tree status error";
+    return _height;
   }
 
-  TreeNode<T> childAt(int index) {
-    return _childrenList[index];
-  }
-
-  TreeNode<T> get firstChild {
-    return childAt(0);
-  }
-
-  TreeNode<T> get lastChild {
-    return childAt(_childrenList.length - 1);
-  }
-
-  void add(TreeNode<T> node) {
-    if (node.parent != null && node.parent != this) {
-      throw '当前要添加的节点其父节点不为空';
+  int _computeDescendantCount() {
+    int sum = 0;
+    for (var child in _children) {
+      sum += 1 + child.descendantCount;
     }
-    node.parent = this;
-    if (_childrenList.contains(node)) {
-      return;
-    }
-    _childrenList.add(node);
-    _descendantCount = -1;
+    _descendantCount = sum;
+    return _descendantCount;
   }
 
-  void addAll(Iterable<TreeNode<T>> nodes) {
-    for (var node in nodes) {
-      add(node);
-    }
-  }
+  void _updateDepth(int startDepth) {
+    final stack = <({TreeNode<T> node, int depth})>[];
+    stack.add((node: this, depth: startDepth));
 
-  void remove(TreeNode<T> node, [bool resetParent = true]) {
-    if (_childrenList.remove(node)) {
-      _descendantCount = -1;
-      if (resetParent) {
-        node.parent = null;
+    while (stack.isNotEmpty) {
+      final current = stack.removeLast();
+      final currNode = current.node;
+      final currDepth = current.depth;
+      currNode._depth = currDepth;
+      final children = currNode._children;
+      for (var i = children.length - 1; i >= 0; i--) {
+        stack.add((node: children[i], depth: currDepth + 1));
       }
     }
   }
 
-  TreeNode<T> removeFirst([bool resetParent = true]) {
-    return removeAt(0, resetParent: resetParent);
-  }
-
-  TreeNode<T> removeLast([bool resetParent = true]) {
-    return removeAt(_childrenList.length - 1, resetParent: resetParent);
-  }
-
-  TreeNode<T> removeAt(int i, {bool resetParent = true}) {
-    var node = _childrenList.removeAt(i);
-    if (resetParent) {
-      node.parent = null;
-    }
-    _descendantCount = -1;
-    return node;
-  }
-
-  void removeChild(bool Function(TreeNode<T>) where, [bool resetParent = true]) {
-    Set<TreeNode> removeSet = <TreeNode>{};
-    _childrenList.removeWhere((e) {
-      if (where.call(e)) {
-        removeSet.add(e);
-        return true;
-      }
-      return false;
-    });
-    if (resetParent) {
-      for (var item in removeSet) {
-        item.parent = null;
-      }
-    }
-  }
-
-  void removeWhere(bool Function(TreeNode<T>) where, {bool iterator = false, bool resetParent = true}) {
-    List<TreeNode<T>> nodeList = [this];
-    while (nodeList.isNotEmpty) {
-      TreeNode<T> first = nodeList.removeAt(0);
-      first.removeChild(where, resetParent);
-      if (iterator) {
-        nodeList.addAll(first.children);
-      }
-    }
-  }
-
-  void clear() {
-    var cs = _childrenList;
-    _childrenList = [];
-    for (var c in cs) {
-      c.parent = null;
-    }
-  }
-
-  /// 返回其所有的叶子结点
-  List<TreeNode<T>> leaves() {
-    List<TreeNode<T>> resultList = [];
-    eachBefore((TreeNode<T> a) {
-      if (a.notChild) {
-        resultList.add(a);
-      }
-      return false;
-    });
-    return resultList;
-  }
-
-  /// 返回其所有后代节点
-  List<TreeNode<T>> descendants() {
-    return iterator();
-  }
-
-  ///返回其后代所有节点(按照拓扑结构)
-  List<TreeNode<T>> iterator() {
-    List<TreeNode<T>> resultList = [];
-    TreeNode<T>? node = this;
-    List<TreeNode<T>> current = [];
-    List<TreeNode<T>> next = [node];
-    List<TreeNode<T>> children = [];
-    do {
-      current = List.from(next.reversed);
-      next = [];
-      while (current.isNotEmpty) {
-        node = current.removeLast();
-        resultList.add(node);
-        children = node.children;
-        if (children.isNotEmpty) {
-          for (int i = 0, n = children.length; i < n; ++i) {
-            next.add(children[i]);
-          }
-        }
-      }
-    } while (next.isNotEmpty);
-
-    return resultList;
-  }
-
-  /// 返回从当前节点开始的祖先节点
-  List<TreeNode<T>> ancestors() {
-    List<TreeNode<T>> resultList = [this];
-    TreeNode<T>? node = this;
-    while ((node = node?.parent) != null) {
-      resultList.add(node!);
-    }
-    return resultList;
-  }
-
-  ///层序遍历
-  List<List<TreeNode<T>>> levelEach([int maxLevel = -1]) {
-    List<List<TreeNode<T>>> resultList = [];
-    List<TreeNode<T>> list = [this];
-    List<TreeNode<T>> next = [];
-    if (maxLevel <= 0) {
-      maxLevel = 2 ^ 16;
-    }
-    while (list.isNotEmpty && maxLevel > 0) {
-      resultList.add(list);
-      for (var c in list) {
-        next.addAll(c.children);
-      }
-      list = next;
-      next = [];
-      maxLevel--;
-    }
-    return resultList;
-  }
-
-  void bfsEach(void Function(TreeNode<T>, int) f, [int maxLevel = -1]) {
-    if (maxLevel <= 0) {
-      maxLevel = 2 ^ 53;
-    }
-    List<Pair<TreeNode<T>, int>> queue = [Pair(this, 0)];
-    while (queue.isNotEmpty) {
-      var tmp = queue.removeAt(0);
-      var node = tmp.first;
-      int depth = tmp.second;
-      f.call(node, depth);
-      if (depth < maxLevel) {
-        for (var child in node.children) {
-          queue.add(Pair(child, depth + 1));
-        }
-      }
-    }
-  }
-
-  TreeNode<T> each(TreeEachFun<T> callback) {
-    for (var node in iterator()) {
-      if (callback.call(node)) {
-        break;
-      }
-    }
-    return this;
-  }
-
-  ///先序遍历
-  TreeNode<T> eachBefore(TreeEachFun<T> callback) {
-    List<TreeNode<T>> nodes = [this];
-    List<TreeNode<T>> children;
-    while (nodes.isNotEmpty) {
-      TreeNode<T> node = nodes.removeLast();
-      if (callback.call(node)) {
-        break;
-      }
-      children = node._childrenList;
-      nodes.addAll(children.reversed);
-    }
-    return this;
-  }
-
-  ///后序遍历
-  TreeNode<T> eachAfter(TreeEachFun<T> callback) {
-    List<TreeNode<T>> nodes = [this];
-    List<TreeNode<T>> next = [];
-    List<TreeNode<T>> children;
-    while (nodes.isNotEmpty) {
-      TreeNode<T> node = nodes.removeAt(nodes.length - 1);
-      next.add(node);
-      children = node._childrenList;
-      nodes.addAll(children);
-    }
-    while (next.isNotEmpty) {
-      TreeNode<T> node = next.removeAt(next.length - 1);
-      if (callback.call(node)) {
-        break;
-      }
-    }
-    return this;
-  }
-
-  ///在子节点中查找对应节点
-  TreeNode<T>? findInChildren(TreeEachFun<T> where) {
-    return findWhere(where, iterator: false, limit: 1).firstOrNull;
-  }
-
-  TreeNode<T>? find(TreeEachFun<T> where) {
-    return findWhere(where, iterator: true).firstOrNull;
-  }
-
-  List<TreeNode<T>> findWhere(TreeEachFun<T> where, {bool iterator = true, int limit = -1}) {
-    if (limit <= 0) {
-      limit = 2 << 53;
-    }
-
+  /// 获取所有祖先节点 [父, 爷, ..., 根]
+  List<TreeNode<T>> get ancestors {
     List<TreeNode<T>> list = [];
-    if (!iterator) {
-      for (var item in _childrenList) {
-        if (where.call(item)) {
-          list.add(item);
-        }
-        if (list.length >= limit) {
-          break;
-        }
-      }
-      return list;
+    var p = _parent;
+    while (p != null) {
+      list.add(p);
+      p = p.parent;
     }
-
-    each((node) {
-      if (where.call(node)) {
-        list.add(node);
-      }
-      if (list.length >= limit) {
-        return true;
-      }
-      return false;
-    });
     return list;
   }
 
-  /// 从当前节点开始查找深度等于给定深度的节点
-  /// 广度优先遍历 [only]==true 只返回对应层次的,否则返回<=
-  List<TreeNode<T>> depthNode(int depth, [bool only = true]) {
-    if (_deep > depth) {
+  /// 获取所有后代 (DFS 前序)
+  /// 返回的是新列表，不影响树结构
+  List<TreeNode<T>> get descendants {
+    final result = <TreeNode<T>>[];
+    final stack = List<TreeNode<T>>.from(_children);
+    while (stack.isNotEmpty) {
+      final n = stack.removeLast();
+      result.add(n);
+      stack.addAll(n._children);
+    }
+    return result;
+  }
+
+  /// 查找子树中最短路径
+  List<TreeNode<T>> findPathTo(TreeNode<T> target) {
+    if (_tree == null || target._tree != _tree) {
       return [];
     }
-    List<TreeNode<T>> resultList = [];
-    List<TreeNode<T>> tmp = [this];
-    List<TreeNode<T>> next = [];
-    while (tmp.isNotEmpty) {
-      for (var node in tmp) {
-        if (only) {
-          if (node._deep == depth) {
-            resultList.add(node);
-          } else {
-            next.addAll(node._childrenList);
-          }
-        } else {
-          resultList.add(node);
-          next.addAll(node._childrenList);
-        }
-      }
-      tmp = next;
-      next = [];
-    }
-    return resultList;
+    return _tree!.findPath(data, target.data);
   }
-
-  ///返回当前节点的后续的所有Link
-  List<Link<TreeNode<T>>> links() {
-    List<Link<TreeNode<T>>> links = [];
-    each((node) {
-      if (node != this && node.parent != null) {
-        links.add(Link(node.parent!, node));
-      }
-      return false;
-    });
-    return links;
-  }
-
-  ///返回从当前节点到指定节点的最短路径
-  List<TreeNode<T>> findPath(TreeNode<T> target) {
-    TreeNode<T>? start = this;
-    TreeNode<T>? end = target;
-    TreeNode<T>? ancestor = minCommonAncestor(start, end);
-    List<TreeNode<T>> nodes = [start];
-    while (ancestor != start) {
-      start = start?.parent;
-      if (start != null) {
-        nodes.add(start);
-      }
-    }
-    var k = nodes.length;
-    while (end != ancestor) {
-      nodes.insert(k, end!);
-      end = end.parent;
-    }
-    return nodes;
-  }
-
-  TreeNode<T> sort(Fun3<TreeNode<T>, TreeNode<T>, int> sortFun, [bool iterator = true]) {
-    if (iterator) {
-      eachBefore((node) {
-        if (node.childCount > 1) {
-          node._childrenList.sort(sortFun);
-        }
-        return false;
-      });
-      return this;
-    }
-    _childrenList.sort(sortFun);
-    return this;
-  }
-
-  ///统计并计算一些信息
-  ///计算节点value、深度、高度
-  void compute({
-    Fun3<TreeNode<T>, TreeNode<T>, int>? sortFun,
-    bool sortIterator = true,
-    bool computeDepth = true,
-    int currentDepth = 0,
-    int initHeight = 0,
-  }) {
-    if (sortFun != null) {
-      sort(sortFun, sortIterator);
-    }
-    if (computeDepth) {
-      setDeep(currentDepth, true);
-      computeHeight(initHeight);
-    }
-  }
-
-  ///计算当前节点的后代数
-  int computeDescendantCount() {
-    eachAfter((TreeNode<T> node) {
-      int sum = 0;
-      List<TreeNode> children = node._childrenList;
-      int i = children.length;
-      if (i == 0) {
-        sum = 1;
-      } else {
-        while (--i >= 0) {
-          sum += children[i]._descendantCount;
-        }
-      }
-      node._descendantCount = sum;
-      return false;
-    });
-    return _descendantCount;
-  }
-
-  /// 计算树的高度
-  void computeHeight([int initHeight = 0]) {
-    List<List<TreeNode<T>>> levelList = [];
-    List<TreeNode<T>> tmp = [this];
-    List<TreeNode<T>> next = [];
-    while (tmp.isNotEmpty) {
-      levelList.add(tmp);
-      next = [];
-      for (var c in tmp) {
-        next.addAll(c.children);
-      }
-      tmp = next;
-    }
-    int c = levelList.length;
-    for (int i = 0; i < c; i++) {
-      for (var node in levelList[i]) {
-        node._height = c - i - 1;
-      }
-    }
-  }
-
-  ///计算当前节点值
-  ///如果给定了回调,那么将使用给定的回调进行值统计
-  ///否则直接使用 _value 统计
-  TreeNode<T> sum(num Function(TreeNode<T>) valueCallback, [bool throwError = true]) {
-    return eachAfter((TreeNode<T> node) {
-      num sum = valueCallback(node);
-      if (sum.isNaN || sum.isInfinite) {
-        if (throwError) {
-          throw "Sum is NaN or Infinite";
-        }
-        sum = 0;
-      }
-      List<TreeNode> children = node._childrenList;
-      int i = children.length;
-      while (--i >= 0) {
-        sum += children[i].data;
-      }
-      node.value = sum.toDouble();
-      return false;
-    });
-  }
-
-  ///设置深度
-  void setDeep(int deep, [bool iterator = true]) {
-    this._deep = deep;
-    if (iterator) {
-      for (var node in _childrenList) {
-        node.setDeep(deep + 1, true);
-      }
-    }
-  }
-
-  void setTreeHeight(int height, [bool iterator = true]) {
-    _height = height;
-    if (iterator) {
-      for (var node in _childrenList) {
-        node.setTreeHeight(height - 1, true);
-      }
-    }
-  }
-
-  ///返回当前节点下最左边的叶子节点
-  TreeNode<T> leafLeft() {
-    List<TreeNode<T>> children = [];
-    TreeNode<T> node = this;
-    while ((children = node.children).isNotEmpty) {
-      node = children[0];
-    }
-    return node;
-  }
-
-  TreeNode<T> leafRight() {
-    List<TreeNode<T>> children = [];
-    TreeNode<T> node = this;
-    while ((children = node.children).isNotEmpty) {
-      node = children[children.length - 1];
-    }
-    return node;
-  }
-
-  int findMaxDeep() {
-    int i = 0;
-    leaves().forEach((element) {
-      i = max(i, element._deep);
-    });
-    return i;
-  }
-
-  ///从复制当前节点及其后代
-  ///复制后的节点没有parent
-  TreeNode<T> copy(TreeNode<T> Function(TreeNode<T>?, TreeNode<T>) build, [int deep = 0]) {
-    return _innerCopy(build, null, deep);
-  }
-
-  TreeNode<T> _innerCopy(TreeNode<T> Function(TreeNode<T>?, TreeNode<T>) build, TreeNode<T>? parent, int deep) {
-    TreeNode<T> node = build.call(parent, this);
-    node.parent = parent;
-    node._deep = deep;
-    node.data = data;
-    node._height = _height;
-    node._descendantCount = _descendantCount;
-    node._expand = _expand;
-    for (var ele in _childrenList) {
-      node.add(ele._innerCopy(build, node, deep + 1));
-    }
-    return node;
-  }
-
-  set expand(bool b) {
-    _expand = b;
-    for (var element in _childrenList) {
-      element.expand = b;
-    }
-  }
-
-  void setExpand(bool e, [bool iterator = true]) {
-    _expand = e;
-    if (iterator) {
-      for (var element in _childrenList) {
-        element.setExpand(e, iterator);
-      }
-    }
-  }
-
-  bool get expand => _expand;
 
   @override
   String toString() {
-    return "$runtimeType:\ndeep:$_deep height:$_height\nchildCount:$childCount\n";
+    return 'TreeNode(data: $data, depth: $depth, children: $childCount)';
   }
 
-  ///返回 节点 a,b的最小公共祖先
-  static TreeNode<T>? minCommonAncestor<T>(TreeNode<T> a, TreeNode<T> b) {
-    if (a == b) return a;
-    var aNodes = a.ancestors();
-    var bNodes = b.ancestors();
-    TreeNode<T>? c;
-    a = aNodes.removeLast();
-    b = bNodes.removeLast();
-    while (a == b) {
-      c = a;
-      a = aNodes.removeLast();
-      b = bNodes.removeLast();
+  Tree<T>? get tree => _tree;
+
+  void each(bool Function(TreeNode<T>) callback) {
+    // 使用 Queue 避免 removeAt(0) 的 O(n) 开销
+    final queue = Queue<TreeNode<T>>();
+    queue.add(this);
+
+    while (queue.isNotEmpty) {
+      final node = queue.removeFirst();
+      if (callback(node)) return; // 停止
+      queue.addAll(node._children);
     }
-    return c;
+  }
+
+  void eachBefore(bool Function(TreeNode<T>) callback) {
+    final stack = [this];
+
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      if (callback(node)) return;
+
+      // 倒序入栈，保证出栈时是正序 (0, 1, 2...)
+      final children = node._children;
+      for (var i = children.length - 1; i >= 0; i--) {
+        stack.add(children[i]);
+      }
+    }
+  }
+
+  void eachAfter(bool Function(TreeNode<T>) callback) {
+    final stack = [this];
+    final outputStack = <TreeNode<T>>[]; // 暂存反向顺序
+
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      outputStack.add(node);
+      // 正序入栈，出栈为反序，放入 outputStack 后再次反序，最终处理顺序正确
+      stack.addAll(node._children);
+    }
+
+    // 反向遍历输出栈
+    for (var i = outputStack.length - 1; i >= 0; i--) {
+      if (callback(outputStack[i])) return;
+    }
+  }
+
+  List<TreeNode<T>> findWhere(bool Function(TreeNode<T>) where, {bool iterator = true, int limit = -1}) {
+    final result = <TreeNode<T>>[];
+    final maxCount = limit <= 0 ? 2147483647 : limit;
+
+    if (!iterator) {
+      if (where(this)) {
+        result.add(this);
+        if (result.length >= maxCount) return result;
+      }
+      for (final child in _children) {
+        if (where(child)) {
+          result.add(child);
+          if (result.length >= maxCount) return result;
+        }
+      }
+      return result;
+    }
+    eachBefore((node) {
+      if (where(node)) {
+        result.add(node);
+      }
+      return result.length >= maxCount; // 如果满了，返回 true 停止遍历
+    });
+    return result;
+  }
+
+  TreeNode<T>? find(bool Function(TreeNode<T>) where) {
+    TreeNode<T>? found;
+    // 使用前序遍历查找
+    eachBefore((node) {
+      if (where(node)) {
+        found = node;
+        return true; // 停止
+      }
+      return false;
+    });
+    return found;
   }
 }
 
-typedef TreeEachFun<T> = bool Function(TreeNode<T> node);
+class _NodeDepthPair<T> {
+  final TreeNode<T> node;
+  final int depth;
 
-typedef Link<T> = Pair<T, T>;
+  _NodeDepthPair(this.node, this.depth);
+}
+
+class _ChildList<T> extends ListBase<TreeNode<T>> {
+  final List<TreeNode<T>> _inner = [];
+
+  _ChildList();
+
+  @override
+  int get length => _inner.length;
+
+  @override
+  set length(int newLength) {
+    if (newLength < _inner.length) {
+      for (int i = newLength; i < _inner.length; i++) {
+        _inner[i]._index = -1;
+      }
+    }
+    _inner.length = newLength;
+  }
+
+  @override
+  TreeNode<T> operator [](int index) => _inner[index];
+
+  @override
+  void operator []=(int index, TreeNode<T> value) {
+    TreeNode<T> old = _inner[index];
+    old._index = -1;
+
+    _inner[index] = value;
+    value._index = index;
+  }
+
+  @override
+  void add(TreeNode<T> element) {
+    element._index = _inner.length;
+    _inner.add(element);
+  }
+
+  @override
+  void addAll(Iterable<TreeNode<T>> iterable) {
+    int i = _inner.length;
+    for (var element in iterable) {
+      element._index = i++;
+      _inner.add(element);
+    }
+  }
+
+  @override
+  bool remove(Object? element) {
+    if (element is! TreeNode<T>) return false;
+    final int idx = element._index;
+
+    if (idx < 0 || idx >= _inner.length || _inner[idx] != element) {
+      return false;
+    }
+
+    removeAt(idx);
+    return true;
+  }
+
+  @override
+  TreeNode<T> removeAt(int index) {
+    final removedNode = _inner.removeAt(index);
+    removedNode._index = -1;
+    for (int i = index; i < _inner.length; i++) {
+      _inner[i]._index = i;
+    }
+    return removedNode;
+  }
+
+  @override
+  void clear() {
+    for (var node in _inner) {
+      node._index = -1;
+    }
+    _inner.clear();
+  }
+}
