@@ -45,3 +45,4 @@ export 'src/util/basic.dart';
 export 'src/util/boundary_util.dart';
 export 'src/util/contains_util.dart';
 export 'src/util/intersect_util.dart';
+export 'src/util/extra_mixin.dart';

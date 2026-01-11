@@ -55,18 +55,18 @@ class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
     if (root == null) return null;
     AVLNode<T>? current = root;
     while (current != null) {
-      int cmp = value.compareTo(current.value);
+      int cmp = value.compareTo(current.data);
       if (cmp == 0) break;
       current = cmp < 0 ? current.leftNode : current.rightNode;
     }
     if (current == null) return null;
-    T removedValue = current.value;
+    T removedValue = current.data;
     super.root = _delete(root!, value);
     return removedValue;
   }
 
   AVLNode<T> _insert(AVLNode<T> node, T value) {
-    int cmp = value.compareTo(node.value);
+    int cmp = value.compareTo(node.data);
 
     if (cmp < 0) {
       if (node.leftNode == null) {
@@ -83,7 +83,7 @@ class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
         node.rightNode!.parentNode = node;
       }
     } else {
-      node.value = value;
+      node.data = value;
       return node;
     }
 
@@ -91,7 +91,7 @@ class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
   }
 
   AVLNode<T>? _delete(AVLNode<T> node, T value) {
-    int cmp = value.compareTo(node.value);
+    int cmp = value.compareTo(node.data);
 
     if (cmp < 0) {
       if (node.leftNode != null) {
@@ -106,8 +106,8 @@ class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
     } else {
       if (node.leftNode != null && node.rightNode != null) {
         AVLNode<T> successor = _getMin(node.rightNode!);
-        node.value = successor.value;
-        node.rightNode = _delete(node.rightNode!, successor.value);
+        node.data = successor.data;
+        node.rightNode = _delete(node.rightNode!, successor.data);
         if (node.rightNode != null) node.rightNode!.parentNode = node;
       } else {
         AVLNode<T>? child = node.leftNode ?? node.rightNode;

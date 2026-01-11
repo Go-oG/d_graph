@@ -2,7 +2,7 @@ import 'dart:core';
 import 'dart:math';
 import 'dart:ui';
 
-typedef Fun2<T, R> = R Function(T t);
+import 'package:d_util/d_util.dart';
 
 final class BoundaryUtil {
   BoundaryUtil._();

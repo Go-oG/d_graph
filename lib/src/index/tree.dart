@@ -1,6 +1,8 @@
 import 'dart:collection';
 import 'dart:math';
 
+import 'package:dart_graph/dart_graph.dart';
+
 class Tree<T> {
   TreeNode<T>? _root;
 
@@ -358,7 +360,7 @@ class Tree<T> {
   }
 }
 
-class TreeNode<T> {
+class TreeNode<T> with ValueExtraMixin{
   final T data;
   late final _children = _ChildList<T>();
   Tree<T>? _tree;
@@ -391,7 +393,6 @@ class TreeNode<T> {
   bool get isNotChildren => _children.isEmpty;
 
   TreeNode<T> childAt(int index) => _children[index];
-
 
   int get depth => _depth;
 

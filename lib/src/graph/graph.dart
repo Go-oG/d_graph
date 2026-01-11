@@ -1,8 +1,11 @@
-final class Vertex<T> {
+import 'package:dart_graph/dart_graph.dart';
+
+final class Vertex<T> with ValueExtraMixin {
   final String id;
   final T? data;
   final String? label;
   final Map<String, dynamic> meta = {};
+  double weight = 0;
 
   Vertex({
     required this.id,
@@ -31,7 +34,7 @@ final class Vertex<T> {
   int get hashCode => id.hashCode;
 }
 
-final class Edge {
+final class Edge with ValueExtraMixin {
   final String id;
   final String from;
   final String to;
@@ -75,13 +78,12 @@ final class Edge {
 }
 
 final class Graph<T> {
-  final String id;
   final bool directed;
   final bool allowMultiEdge;
   final bool allowSelfLoop;
   final Map<String, dynamic> meta = {};
 
-  final Map<String, Vertex> _vertexMap = {};
+  final Map<String, Vertex<T>> _vertexMap = {};
   final Map<String, Edge> _edgeMap = {};
 
   final Map<String, Map<String, Edge>> _vertexOutEdges = {};
@@ -90,11 +92,10 @@ final class Graph<T> {
   late final GraphDegree _degree;
 
   Graph({
-    required this.id,
     this.directed = false,
     this.allowMultiEdge = true,
     this.allowSelfLoop = false,
-    Iterable<Vertex>? vertices,
+    Iterable<Vertex<T>>? vertices,
     Iterable<Edge>? edges,
     Map<String, dynamic>? meta,
   }) {
@@ -110,9 +111,8 @@ final class Graph<T> {
     }
   }
 
-  static Graph of(Graph g, {String? id}) {
+  static Graph<D> of<D>(Graph<D> g, {String? id}) {
     return Graph(
-      id: id ?? g.id,
       directed: g.directed,
       allowMultiEdge: g.allowMultiEdge,
       allowSelfLoop: g.allowSelfLoop,
@@ -124,7 +124,6 @@ final class Graph<T> {
 
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
       'directed': directed,
       'allowMultiEdge': allowMultiEdge,
       'allowSelfLoop': allowSelfLoop,
@@ -136,7 +135,6 @@ final class Graph<T> {
 
   static Graph fromMap(Map<String, dynamic> graph) {
     return Graph(
-      id: graph['id'],
       directed: graph['directed'],
       allowMultiEdge: graph['allowMultiEdge'] ?? false,
       allowSelfLoop: graph['allowSelfLoop'] ?? false,
@@ -145,7 +143,8 @@ final class Graph<T> {
       edges: (graph['edges'] as List).map((e) => Edge.fromMap(Map<String, dynamic>.from(e))).toList(),
     );
   }
-  void addVertex(Vertex vertex) {
+
+  void addVertex(Vertex<T> vertex) {
     if (_vertexMap.containsKey(vertex.id)) {
       return;
     }
@@ -153,15 +152,15 @@ final class Graph<T> {
     _degree._onVertexAdded(vertex);
   }
 
-  void addVertices(Iterable<Vertex> vertexs) {
+  void addVertices(Iterable<Vertex<T>> vertexs) {
     for (var v in vertexs) {
       addVertex(v);
     }
   }
 
-  Vertex getVertex(String id) => getVertexOrNull(id)!;
+  Vertex<T> getVertex(String id) => getVertexOrNull(id)!;
 
-  Vertex? getVertexOrNull(String id) => _vertexMap[id];
+  Vertex<T>? getVertexOrNull(String id) => _vertexMap[id];
 
   Edge getEdge(String id) => getEdgeOrNull(id)!;
 
@@ -176,7 +175,7 @@ final class Graph<T> {
     return null;
   }
 
-  void removeVertex(Vertex vertex) {
+  void removeVertex(Vertex<T> vertex) {
     final id = vertex.id;
     if (!_vertexMap.containsKey(id)) return;
     _degree._onVertexRemoved(vertex);
@@ -194,7 +193,7 @@ final class Graph<T> {
     _vertexMap.remove(id);
   }
 
-  void removeVertices(Iterable<Vertex> vertexs) {
+  void removeVertices(Iterable<Vertex<T>> vertexs) {
     for (var v in vertexs) {
       removeVertex(v);
     }
@@ -271,25 +270,25 @@ final class Graph<T> {
 
   bool hasEdge(Edge edge) => _edgeMap.containsKey(edge.id);
 
-  bool hasVertex(Vertex vertex) => _vertexMap.containsKey(vertex.id);
+  bool hasVertex(Vertex<T> vertex) => _vertexMap.containsKey(vertex.id);
 
   Degree degreeOf(String vertexId) => _degree.degreeOf(vertexId);
 
   WeightDegree weightDegreeOf(String vertexId) => _degree.weightDegreeOf(vertexId);
 
-  Map<String, Edge> inEdges(Vertex vertex) => _vertexInEdges[vertex.id] ?? const {};
+  Map<String, Edge> inEdges(Vertex<T> vertex) => _vertexInEdges[vertex.id] ?? const {};
 
-  Map<String, Edge> outEdges(Vertex vertex) => _vertexOutEdges[vertex.id] ?? const {};
+  Map<String, Edge> outEdges(Vertex<T> vertex) => _vertexOutEdges[vertex.id] ?? const {};
 
   List<Edge> edges(String vertexId) {
-    Vertex? vertex = _vertexMap[vertexId];
+    final vertex = _vertexMap[vertexId];
     if (vertex == null) {
       return [];
     }
     return edges2(vertex);
   }
 
-  List<Edge> edges2(Vertex vertex) {
+  List<Edge> edges2(Vertex<T> vertex) {
     Set<Edge> edges = <Edge>{};
     edges.addAll(inEdges(vertex).values);
     edges.addAll(outEdges(vertex).values);
@@ -298,15 +297,27 @@ final class Graph<T> {
 
   Iterable<Edge> get edgeIterator => _edgeMap.values;
 
-  Iterable<Vertex> get vertexIterator => _vertexMap.values;
+  Iterable<Vertex<T>> get vertexIterator => _vertexMap.values;
 
-  Map<String, Vertex> get vertexMap => _vertexMap;
+  Map<String, Vertex<T>> get vertexMap => _vertexMap;
 
   Map<String, Edge> get edgeMap => _edgeMap;
 
   Map<String, Map<String, Edge>> get vertexsOutEdges => _vertexOutEdges;
 
   Map<String, Map<String, Edge>> get vertexsInEdges => _vertexInEdges;
+
+  int get vertexCount => _vertexMap.length;
+
+  int get edgeCount => _edgeMap.length;
+
+  bool get hasEdges => _edgeMap.isNotEmpty;
+
+  bool get hasVertices => _vertexMap.isNotEmpty;
+
+  bool get isNotEdge => _edgeMap.isEmpty;
+
+  bool get isNotVertex => _vertexMap.isEmpty;
 }
 
 final class GraphDegree {

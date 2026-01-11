@@ -2,6 +2,9 @@ import 'dart:collection';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:d_util/d_util.dart';
+import 'package:dart_graph/src/util/extra_mixin.dart';
+
 enum VisitResult { continueTree, skipChildren, stopAll }
 
 typedef NodeVisitor<T> = VisitResult Function(RNode<T> node);
@@ -63,8 +66,8 @@ final class RTree<E> {
       for (var child in node.children) {
         if (child.left <= rRight && child.right >= rLeft && child.top <= rBottom && child.bottom >= rTop) {
           if (node.leaf) {
-            if (child.value != null) {
-              result.add(child.value as E);
+            if (child.data != null) {
+              result.add(child.data as E);
             }
           } else {
             stack.add(child);
@@ -81,7 +84,7 @@ final class RTree<E> {
       final n = stack.removeLast();
       if (n.leaf) {
         for (var child in n.children) {
-          if (child.value != null) result.add(child.value as E);
+          if (child.data != null) result.add(child.data as E);
         }
       } else {
         stack.addAll(n.children);
@@ -112,7 +115,7 @@ final class RTree<E> {
       for (var child in node.children) {
         if (child.left <= rRight && child.right >= rLeft && child.top <= rBottom && child.bottom >= rTop) {
           if (node.leaf) {
-            final d = child.value;
+            final d = child.data;
             if (d != null && testFun(d)) {
               return d;
             }
@@ -131,7 +134,7 @@ final class RTree<E> {
       final n = stack.removeLast();
       if (n.leaf) {
         for (var c in n.children) {
-          final d = c.value;
+          final d = c.data;
           if (d != null && testFun(d)) return d;
         }
       } else {
@@ -232,7 +235,7 @@ final class RTree<E> {
   RTree<E> add(E value) {
     final rect = boundsFun(value);
     _rectCacheMap[value] = rect;
-    final node = RNode(value: value, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom);
+    final node = RNode(data: value, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom);
 
     if (strategy == RTreeStrategy.highQuality) {
       _reinsertedLevels.clear();
@@ -260,7 +263,7 @@ final class RTree<E> {
     for (var value in data) {
       final rect = boundsFun(value);
       _rectCacheMap[value] = rect;
-      buildList.add(RNode(value: value, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom));
+      buildList.add(RNode(data: value, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom));
     }
 
     var node = _build(buildList, 0, buildList.length - 1, 0);
@@ -690,7 +693,7 @@ final class RTree<E> {
 
   int _findItem(E item, List<RNode<E>> items) {
     for (int i = items.length - 1; i >= 0; i--) {
-      if (items[i].value == item) return i;
+      if (items[i].data == item) return i;
     }
     return -1;
   }
@@ -764,7 +767,8 @@ final class RTree<E> {
   }
 }
 
-final class RNode<E> {
+final class RNode<E> with ValueExtraMixin {
+  E? data;
   List<RNode<E>> children;
   int height;
   bool leaf;
@@ -772,8 +776,6 @@ final class RNode<E> {
   double top;
   double right;
   double bottom;
-
-  E? value;
 
   RNode({
     this.height = 1,
@@ -783,7 +785,7 @@ final class RNode<E> {
     this.right = double.negativeInfinity,
     this.bottom = double.negativeInfinity,
     List<RNode<E>>? children,
-    this.value,
+    this.data,
   }) : children = children ?? [];
 
   @override
@@ -795,72 +797,3 @@ final class RNode<E> {
   }
 }
 
-class FastSelect {
-  static void fastSelect<T>(List<T> arr, int k, [int left = 0, int? right, int Function(T a, T b)? compare]) {
-    if (left < 0) left = 0;
-    right ??= arr.length - 1;
-    if (right >= arr.length) right = arr.length - 1;
-    if (k < left || k > right) return;
-    compare ??= _defaultCompare;
-    _fastSelectStep(arr, k, left, right, compare);
-  }
-
-  static void _fastSelectStep<T>(List<T> arr, int k, int left, int right, int Function(T a, T b) compare) {
-    while (right > left) {
-      if (right - left > 600) {
-        int n = right - left + 1;
-        int m = k - left + 1;
-        double z = math.log(n);
-        double s = 0.5 * math.exp(2 * z / 3);
-        double sd = 0.5 * math.sqrt(z * s * (n - s) / n) * (m - n / 2 < 0 ? -1 : 1);
-        int newLeft = math.max(left, (k - m * s / n + sd).floor());
-        int newRight = math.min(right, (k + (n - m) * s / n + sd).floor());
-        _fastSelectStep(arr, k, newLeft, newRight, compare);
-      }
-
-      var t = arr[k];
-      var i = left;
-      var j = right;
-
-      _swap(arr, left, k);
-      if (compare(arr[right], t) > 0) _swap(arr, left, right);
-
-      while (i < j) {
-        _swap(arr, i, j);
-        i++;
-        j--;
-        while (i < right && compare(arr[i], t) < 0) {
-          i++;
-        }
-        while (j > left && compare(arr[j], t) > 0) {
-          j--;
-        }
-      }
-
-      if (compare(arr[left], t) == 0) {
-        _swap(arr, left, j);
-      } else {
-        j++;
-        _swap(arr, j, right);
-      }
-      if (j <= k) left = j + 1;
-      if (k <= j) right = j - 1;
-    }
-  }
-
-  static void _swap<T>(List<T> arr, int i, int j) {
-    var tmp = arr[i];
-    arr[i] = arr[j];
-    arr[j] = tmp;
-  }
-
-  static int _defaultCompare<T>(T a, T b) {
-    if (a is Comparable) {
-      return a.compareTo(b);
-    }
-    if (a is num) {
-      return a.compareTo(b as num);
-    }
-    return a.hashCode.compareTo(b.hashCode);
-  }
-}

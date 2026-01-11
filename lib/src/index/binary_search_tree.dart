@@ -1,7 +1,10 @@
 import 'dart:collection';
 import 'dart:math';
-import 'package:flutter/foundation.dart';
+
 import 'package:d_util/d_util.dart';
+import 'package:dart_graph/src/util/extra_mixin.dart';
+import 'package:flutter/foundation.dart';
+
 import 'i_tree.dart';
 
 class BinarySearchTree<T> extends ITree<T> {
@@ -45,7 +48,7 @@ class BinarySearchTree<T> extends ITree<T> {
 
     BSNode<T>? node = root;
     while (node != null) {
-      if (compareFun.call(newNode.value, node.value) <= 0) {
+      if (compareFun.call(newNode.data, node.data) <= 0) {
         if (node.left == null) {
           node.left = newNode;
           newNode.parent = node;
@@ -76,8 +79,8 @@ class BinarySearchTree<T> extends ITree<T> {
 
   BSNode<T>? getNode(T value) {
     BSNode<T>? node = root;
-    while (node != null && node.value != null) {
-      final cc = compareFun.call(value, node.value);
+    while (node != null && node.data != null) {
+      final cc = compareFun.call(value, node.data);
       if (cc < 0) {
         node = node.left;
       } else if (cc > 0) {
@@ -150,9 +153,9 @@ class BinarySearchTree<T> extends ITree<T> {
     }
 
     BSNode<T>? greater = startingNode.right;
-    while (greater != null && greater.value != null) {
+    while (greater != null && greater.data != null) {
       BSNode<T>? node = greater.right;
-      if (node != null && node.value != null) {
+      if (node != null && node.data != null) {
         greater = node;
       } else {
         break;
@@ -167,9 +170,9 @@ class BinarySearchTree<T> extends ITree<T> {
     }
 
     BSNode<T>? lesser = startingNode.left;
-    while (lesser != null && lesser.value != null) {
+    while (lesser != null && lesser.data != null) {
       BSNode<T>? node = lesser.left;
-      if (node != null && node.value != null) {
+      if (node != null && node.data != null) {
         lesser = node;
       } else {
         break;
@@ -181,7 +184,7 @@ class BinarySearchTree<T> extends ITree<T> {
   @override
   T? remove(T value) {
     BSNode<T>? nodeToRemove = removeValue(value);
-    return ((nodeToRemove != null) ? nodeToRemove.value : null);
+    return ((nodeToRemove != null) ? nodeToRemove.data : null);
   }
 
   BSNode<T>? removeValue(T value) {
@@ -262,12 +265,12 @@ class BinarySearchTree<T> extends ITree<T> {
       if (root != null) {
         root!.parent = null;
       }
-    } else if (parent.left != null && (compareFun.call(parent.left!.value, nodeToRemoved.value) == 0)) {
+    } else if (parent.left != null && (compareFun.call(parent.left!.data, nodeToRemoved.data) == 0)) {
       parent.left = replacementNode;
       if (replacementNode != null) {
         replacementNode.parent = parent;
       }
-    } else if (parent.right != null && (compareFun.call(parent.right!.value, nodeToRemoved.value) == 0)) {
+    } else if (parent.right != null && (compareFun.call(parent.right!.data, nodeToRemoved.data) == 0)) {
       parent.right = replacementNode;
       if (replacementNode != null) {
         replacementNode.parent = parent;
@@ -296,8 +299,8 @@ class BinarySearchTree<T> extends ITree<T> {
     BSNode<T>? lesser = node.left;
     BSNode<T>? greater = node.right;
     bool lesserCheck = true;
-    if (lesser != null && lesser.value != null) {
-      lesserCheck = (compareFun.call(lesser.value, node.value) <= 0);
+    if (lesser != null && lesser.data != null) {
+      lesserCheck = (compareFun.call(lesser.data, node.data) <= 0);
       if (lesserCheck) {
         lesserCheck = validateNode(lesser);
       }
@@ -307,8 +310,8 @@ class BinarySearchTree<T> extends ITree<T> {
     }
 
     bool greaterCheck = true;
-    if (greater != null && greater.value != null) {
-      greaterCheck = (compareFun.call(greater.value, node.value) > 0);
+    if (greater != null && greater.data != null) {
+      greaterCheck = (compareFun.call(greater.data, node.data) > 0);
       if (greaterCheck) {
         greaterCheck = validateNode(greater);
       }
@@ -327,7 +330,7 @@ class BinarySearchTree<T> extends ITree<T> {
     int count = 0;
     BSNode<T>? node = start;
     while (node != null) {
-      values[count++] = node.value;
+      values[count++] = node.data;
       if (node.left != null) {
         queue.add(node.left!);
       }
@@ -367,7 +370,7 @@ class BinarySearchTree<T> extends ITree<T> {
 
       if (parent == null && lesser == null && greater == null) {
         if (!added.contains(node)) {
-          nodes[index++] = node.value;
+          nodes[index++] = node.data;
         }
         break;
       }
@@ -377,7 +380,7 @@ class BinarySearchTree<T> extends ITree<T> {
           node = lesser;
         } else {
           if (!added.contains(node)) {
-            nodes[index++] = node.value;
+            nodes[index++] = node.data;
             added.add(node);
           }
           if (greater != null) {
@@ -390,7 +393,7 @@ class BinarySearchTree<T> extends ITree<T> {
         }
       } else if (order == DepthFirstSearchOrder.preOrder) {
         if (!added.contains(node)) {
-          nodes[index++] = node.value;
+          nodes[index++] = node.data;
           added.add(node);
         }
         if (lesser != null) {
@@ -409,7 +412,7 @@ class BinarySearchTree<T> extends ITree<T> {
           if (greater != null) {
             node = greater;
           } else {
-            nodes[index++] = node.value;
+            nodes[index++] = node.data;
             added.add(node);
             node = parent;
           }
@@ -450,7 +453,7 @@ class BinarySearchTreeIterator<T> implements Iterator<T> {
   }
 
   @override
-  T get current => _current!.value;
+  T get current => _current!.data;
 
   @override
   bool moveNext() {
@@ -499,8 +502,8 @@ class _JavaCompatibleBinarySearchTree<T> extends Iterable<T> {
 
 typedef INodeCreator<T> = BSNode<T> Function(BSNode<T>? parent, T id);
 
-class BSNode<T> {
-  late T value;
+class BSNode<T> with ValueExtraMixin {
+  late T data;
 
   BSNode<T>? parent;
 
@@ -508,5 +511,5 @@ class BSNode<T> {
 
   BSNode<T>? right;
 
-  BSNode(this.parent, this.value);
+  BSNode(this.parent, this.data);
 }
