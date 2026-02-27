@@ -8,21 +8,20 @@ import 'graph.dart';
 extension JohnsonExt on Graph {
   Map<Vertex, Map<Vertex, List<Edge>>> shortestPathsByJohnson() {
     final String connectorId = "\$_johnson_\$";
-    final Vertex connector = Vertex(id: connectorId, label: "Connector");
-    final List<Edge> tempEdges = [];
+
+    final List<String> tempEdges = [];
     final Map<Edge, double> originalWeights = {};
 
     try {
-      addVertex(connector);
+      addVertex(connectorId);
       final existingVertices = vertexIterator.toList();
       for (final v in existingVertices) {
         if (v.id == connectorId) continue;
-
-        final edge = Edge(id: "\$${connectorId}_${v.id}\$", from: connectorId, to: v.id, weight: 0, directed: true);
-        addEdge(edge);
-        tempEdges.add(edge);
+        String eid="\$${connectorId}_${v.id}\$";
+        addEdge(id: eid, fromVid: connectorId, toVid: v.id, weight: 0, direct: true);
+        tempEdges.add(eid);
       }
-      final Map<String, double> h = _runBellmanFordSafe(connector);
+      final Map<String, double> h = _runBellmanFordSafe(connectorId);
 
       for (final edge in edgeIterator) {
         originalWeights[edge] = edge.weight;
@@ -58,11 +57,11 @@ extension JohnsonExt on Graph {
       for (final edge in tempEdges) {
         removeEdge(edge);
       }
-      removeVertex(connector);
+      removeVertex(connectorId);
     }
   }
 
-  Map<String, double> _runBellmanFordSafe(Vertex start) {
+  Map<String, double> _runBellmanFordSafe(String start) {
     final result = shortestPathsByBellmanFord(start);
     final Map<String, double> costs = {};
     for (final entry in result.entries) {

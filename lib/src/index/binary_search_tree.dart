@@ -1,7 +1,6 @@
 import 'dart:collection';
 import 'dart:math';
 
-import 'package:d_util/d_util.dart';
 import 'package:dart_graph/src/util/extra_mixin.dart';
 import 'package:flutter/foundation.dart';
 
@@ -11,13 +10,13 @@ class BinarySearchTree<T> extends ITree<T> {
   @protected
   static final Random random = Random();
 
-  late final CompareFun<T> compareFun;
+  late final int Function(T a, T b) compareFun;
 
   @protected
   late INodeCreator<T> creator;
 
   BinarySearchTree(this.compareFun) {
-    this.creator = (parent, id) {
+    creator = (parent, id) {
       return BSNode(parent, id);
     };
   }
@@ -34,7 +33,7 @@ class BinarySearchTree<T> extends ITree<T> {
 
   @override
   bool add(T value) {
-    return this.addValue(value) != null;
+    return addValue(value) != null;
   }
 
   @protected
@@ -188,7 +187,7 @@ class BinarySearchTree<T> extends ITree<T> {
   }
 
   BSNode<T>? removeValue(T value) {
-    BSNode<T>? nodeToRemoved = this.getNode(value);
+    BSNode<T>? nodeToRemoved = getNode(value);
     if (nodeToRemoved != null) {
       nodeToRemoved = removeNode(nodeToRemoved);
     }
@@ -207,10 +206,10 @@ class BinarySearchTree<T> extends ITree<T> {
     BSNode<T>? replacement;
     if (nodeToRemoved.right != null && nodeToRemoved.left != null) {
       if (modifications % 2 != 0) {
-        replacement = this.getGreatest(nodeToRemoved.left);
+        replacement = getGreatest(nodeToRemoved.left);
         replacement ??= nodeToRemoved.left;
       } else {
-        replacement = this.getLeast(nodeToRemoved.right);
+        replacement = getLeast(nodeToRemoved.right);
         replacement ??= nodeToRemoved.right;
       }
       modifications++;
@@ -320,10 +319,10 @@ class BinarySearchTree<T> extends ITree<T> {
   }
 
   List<T> getBFS() {
-    return getBFSStatic(root, this.size, compareFun);
+    return getBFSStatic(root, size, compareFun);
   }
 
-  static List<T> getBFSStatic<T>(BSNode<T>? start, int size, CompareFun<T> compareFun) {
+  static List<T> getBFSStatic<T>(BSNode<T>? start, int size, int Function(T a, T b) compareFun) {
     final Queue<BSNode<T>> queue = Queue();
     final Map<int, T> values = {};
 
@@ -354,10 +353,11 @@ class BinarySearchTree<T> extends ITree<T> {
   }
 
   List<T> getDFS(DepthFirstSearchOrder order) {
-    return getDFSStatic(order, root, this.size, compareFun);
+    return getDFSStatic(order, root, size, compareFun);
   }
 
-  static List<T> getDFSStatic<T>(DepthFirstSearchOrder order, BSNode<T>? start, int size, CompareFun<T> compareFun) {
+  static List<T> getDFSStatic<T>(
+      DepthFirstSearchOrder order, BSNode<T>? start, int size, int Function(T a, T b) compareFun) {
     final Set<BSNode<T>> added = <BSNode<T>>{};
     final Map<int, T> nodes = {};
 

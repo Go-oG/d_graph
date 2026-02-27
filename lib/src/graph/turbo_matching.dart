@@ -50,7 +50,7 @@ extension TurboMatching on Graph {
   /// 辅助方法：获取邻居 (兼容有向/无向图逻辑)
   /// 在匹配算法中，通常将图视为无向来处理连接性
   static Iterable<Vertex> _getNeighbors(Graph g, Vertex v) sync* {
-    final out = g.outEdges(v);
+    final out = g.outEdges(v.id);
     for (final edge in out.values) {
       final neighborId = (edge.from == v.id) ? edge.to : edge.from;
       if (neighborId == v.id) continue;

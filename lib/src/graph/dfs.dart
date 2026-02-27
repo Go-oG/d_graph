@@ -28,7 +28,7 @@ extension DFSExtension on Graph {
   }
 
   Iterable<Vertex> _getNeighbors(Vertex v) sync* {
-    final out = outEdges(v);
+    final out = outEdges(v.id);
     if (out.isNotEmpty) {
       for (final edge in out.values) {
         final targetId = edge.to;

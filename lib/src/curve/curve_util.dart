@@ -2,7 +2,6 @@ import 'dart:core';
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:d_util/d_util.dart';
 import 'package:dart_graph/dart_graph.dart';
 
 abstract class CurveUtil {
@@ -227,7 +226,7 @@ abstract class CurveUtil {
     for (var i = 0; i < points.length - 1; i++) {
       final start = points[i];
       final end = points[i + 1];
-      final c1 = controlPoints[i].second;
+      final c1 = controlPoints[i][1];
       final c2 = controlPoints[i + 1].first;
       resultList.add(Curve(start: start, end: end, c1: c1, c2: c2));
     }
@@ -235,8 +234,8 @@ abstract class CurveUtil {
     return resultList;
   }
 
-  static List<Pair<Offset, Offset>> _computeControlPoints(List<Offset> points, double smoothFactor) {
-    final controlPoints = <Pair<Offset, Offset>>[];
+  static List<List<Offset>> _computeControlPoints(List<Offset> points, double smoothFactor) {
+    final controlPoints = <List<Offset>>[];
     final n = points.length;
     for (var i = 0; i < n; i++) {
       Offset tangent;
@@ -249,7 +248,7 @@ abstract class CurveUtil {
       }
       final control1 = Offset(points[i].dx - tangent.dx / 3, points[i].dy);
       final control2 = Offset(points[i].dx + tangent.dx / 3, points[i].dy);
-      controlPoints.add(Pair(control1, control2));
+      controlPoints.add([control1, control2]);
     }
     return controlPoints;
   }

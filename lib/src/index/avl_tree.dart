@@ -144,7 +144,6 @@ class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
     return node;
   }
 
-
   AVLNode<T> _rotateLeft(AVLNode<T> node) {
     AVLNode<T> newRoot = node.rightNode!;
     node.rightNode = newRoot.leftNode;

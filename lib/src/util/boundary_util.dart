@@ -2,8 +2,6 @@ import 'dart:core';
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:d_util/d_util.dart';
-
 final class BoundaryUtil {
   BoundaryUtil._();
 
@@ -57,8 +55,8 @@ final class BoundaryUtil {
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
-  static Rect? boundaryWith<T>(Iterable<T> nodes, Fun2<T, double> leftFun, Fun2<T, double> topFun,
-      Fun2<T, double> rightFun, Fun2<T, double> bottomFun) {
+  static Rect? boundaryWith<T>(Iterable<T> nodes, double Function(T node) leftFun, double Function(T node) topFun,
+      double Function(T node) rightFun, double Function(T node) bottomFun) {
     double left = double.infinity;
     double top = double.infinity;
     double right = double.negativeInfinity;

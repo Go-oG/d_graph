@@ -2,8 +2,6 @@ import 'dart:collection';
 import 'dart:core';
 import 'dart:math';
 
-import 'package:d_util/d_util.dart';
-
 interface class BinaryHeap<T> {
   List<T> getHeap() {
     return [];
@@ -47,10 +45,10 @@ enum HeapType { min, max }
 class BinaryHeapArray<T> implements BinaryHeap<T> {
   static const int minSize = 1024;
   late final HeapType type;
-  final CompareFun<T> compareFun;
+  final int Function(T a, T b) compareFun;
 
   int _size = 0;
-  Array<T> _array = Array(minSize);
+  List<T?> _array = List.filled(minSize, null);
 
   BinaryHeapArray(this.compareFun, [this.type = HeapType.min]);
 
@@ -87,9 +85,8 @@ class BinaryHeapArray<T> implements BinaryHeap<T> {
 
   T? _removeAt(int index) {
     if (index < 0 || index >= _size) return null;
-    T removed = _array[index];
-
-    T last = _array[--_size];
+    T? removed = _array[index];
+    T? last = _array[--_size];
     _array[_size] = null;
 
     if (index != _size) {
@@ -106,13 +103,12 @@ class BinaryHeapArray<T> implements BinaryHeap<T> {
 
   void _heapUp(int index) {
     int curr = index;
-    T value = _array[curr];
-
+    T? value = _array[curr];
     while (curr > 0) {
       int parentIdx = _getParentIndex(curr);
-      T parent = _array[parentIdx];
+      T? parent = _array[parentIdx];
 
-      if (_compare(value, parent) < 0) {
+      if (_compare(value as T, parent as T) < 0) {
         _array[curr] = parent;
         curr = parentIdx;
       } else {
@@ -124,16 +120,16 @@ class BinaryHeapArray<T> implements BinaryHeap<T> {
 
   void _heapDown(int index) {
     int curr = index;
-    T value = _array[curr];
+    T value = _array[curr] as T;
     int half = _size ~/ 2;
 
     while (curr < half) {
       int leftIdx = _getLeftIndex(curr);
       int rightIdx = _getRightIndex(curr);
       int bestChildIdx = leftIdx;
-      T bestChild = _array[leftIdx];
+      T bestChild = _array[leftIdx] as T;
       if (rightIdx < _size) {
-        T rightChild = _array[rightIdx];
+        T rightChild = _array[rightIdx] as T;
         if (_compare(rightChild, bestChild) < 0) {
           bestChildIdx = rightIdx;
           bestChild = rightChild;
@@ -155,14 +151,14 @@ class BinaryHeapArray<T> implements BinaryHeap<T> {
 
   void _grow() {
     int newSize = _array.length + (_array.length >> 1);
-    Array<T> newArr = Array(newSize);
+    List<T?> newArr = List.filled(newSize, null);
     newArr.setAll(0, _array);
     _array = newArr;
   }
 
   void _shrink() {
     int newSize = _array.length >> 1;
-    Array<T> newArr = Array(max(newSize, minSize));
+    List<T?> newArr = List.filled(max(newSize, minSize), null);
     for (int i = 0; i < _size; i++) {
       newArr[i] = _array[i];
     }
@@ -199,8 +195,7 @@ class BinaryHeapArray<T> implements BinaryHeap<T> {
   List<T> getHeap() {
     List<T> list = [];
     for (int i = 0; i < size; i++) {
-      T node = _array[i];
-      list.add(node);
+      list.add(_array[i] as T);
     }
     return list;
   }
@@ -208,7 +203,7 @@ class BinaryHeapArray<T> implements BinaryHeap<T> {
 
 class BinaryHeapTree<T> implements BinaryHeap<T> {
   final HeapType type;
-  final CompareFun<T> compareFun;
+  final int Function(T a, T b) compareFun;
   int _size = 0;
   _Node<T>? _root;
 
@@ -365,14 +360,20 @@ class BinaryHeapTree<T> implements BinaryHeap<T> {
 
   @override
   List<T> getHeap() {
-    Array<T> nodes = Array(size);
+    List<T?> nodes = List.filled(size, null);
     if (_root != null) {
       _getNodeValue(_root!, 0, nodes);
     }
-    return nodes.toList();
+    List<T> rl = [];
+    for (var n in nodes) {
+      if (n != null) {
+        rl.add(n);
+      }
+    }
+    return rl;
   }
 
-  void _getNodeValue(_Node<T> node, int idx, Array<T> array) {
+  void _getNodeValue(_Node<T> node, int idx, List<T?> array) {
     int index = idx;
     array[index] = node.value;
     index = (index * 2) + 1;
@@ -394,13 +395,13 @@ class _Node<T> {
   _Node<T>? left;
   _Node<T>? right;
 
-  _Node(this.parent, T this.value);
+  _Node(this.parent, this.value);
 }
 
 class _JavaCompatibleBinaryHeapArray<T> extends Iterable<T> {
   late BinaryHeapArray<T> heap;
 
-  _JavaCompatibleBinaryHeapArray(CompareFun<T> compareFun, [BinaryHeapArray<T>? heap]) {
+  _JavaCompatibleBinaryHeapArray(int Function(T a, T b) compareFun, [BinaryHeapArray<T>? heap]) {
     this.heap = heap ?? BinaryHeapArray(compareFun);
   }
 
@@ -460,7 +461,7 @@ class _BinaryHeapArrayIterator<T> implements Iterator<T> {
 }
 
 class _JavaCompatibleBinaryHeapTree<T> extends Iterable<T> {
-  final CompareFun<T> compareFun;
+  final int Function(T a, T b) compareFun;
   late BinaryHeapTree<T> heap;
 
   _JavaCompatibleBinaryHeapTree(this.compareFun, [BinaryHeapTree<T>? heap]) {

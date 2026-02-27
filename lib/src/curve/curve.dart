@@ -1,7 +1,7 @@
 import 'dart:ui';
+
 import 'package:bezier/bezier.dart';
 import 'package:dart_graph/dart_graph.dart';
-import 'package:dart_graph/src/curve/even_spacer.dart';
 import 'package:vector_math/vector_math.dart';
 
 class Curve {

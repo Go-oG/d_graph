@@ -1,10 +1,10 @@
 name: dart_graph
 description: "A geometry util library"
-version: 1.1.9
+version: 1.1.11
 homepage: https://github.com/Go-oG/d_graph
 
 environment:
-  sdk: ^3.0.0
+  sdk: ">=3.3.0 <4.0.0"
   flutter: ">=1.17.0"
 
 dependencies:
@@ -12,16 +12,14 @@ dependencies:
     sdk: flutter
   quiver: ^3.2.2
   collection: ^1.19.1
-  d_util: ^1.1.6
-  dts: ^0.1.1
   bezier: ^1.2.0
   vector_math: ^2.2.0
+  dts: ^0.1.1
+
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-dependency_overrides:
-  vector_math: ^2.2.0
 
 flutter:

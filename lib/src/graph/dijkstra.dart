@@ -121,9 +121,7 @@ extension DijkstraExtension on Graph {
     return PathResult(totalCost, path.reversed.toList());
   }
 
-  Iterable<Edge> _getOutEdges(Vertex v) {
-    return outEdges(v).values;
-  }
+  Iterable<Edge> _getOutEdges(Vertex v) => outEdges(v.id).values;
 
   void _checkNegativeEdges() {
     for (final edge in edgeIterator) {

@@ -4,7 +4,7 @@ import 'graph.dart';
 /// 适用于负加权和正加权边。还可以检测负权重循环。返回最短路径和路径。
 extension BellmanFordExtension on Graph {
   /// Map<VertexId, CostPath>
-  Map<String, CostPath> shortestPathsByBellmanFord(Vertex start) {
+  Map<String, CostPath> shortestPathsByBellmanFord(String start) {
     if (!hasVertex(start)) return {};
 
     final Map<String, double> dist = {};
@@ -13,7 +13,7 @@ extension BellmanFordExtension on Graph {
     for (final v in vertexIterator) {
       dist[v.id] = double.infinity;
     }
-    dist[start.id] = 0.0;
+    dist[start] = 0.0;
 
     final int vertexCount = vertexMap.length;
 
@@ -23,7 +23,7 @@ extension BellmanFordExtension on Graph {
         if (_relax(edge, edge.from, edge.to, dist, cameFrom)) {
           changed = true;
         }
-        if (!edge.isDirected(directed)) {
+        if (!edge.directed) {
           if (_relax(edge, edge.to, edge.from, dist, cameFrom)) {
             changed = true;
           }
@@ -35,7 +35,7 @@ extension BellmanFordExtension on Graph {
     for (final edge in edgeIterator) {
       bool hasCycle = false;
       if (_canRelax(edge, edge.from, edge.to, dist)) hasCycle = true;
-      if (!edge.isDirected(directed) && _canRelax(edge, edge.to, edge.from, dist)) hasCycle = true;
+      if (!edge.directed && _canRelax(edge, edge.to, edge.from, dist)) hasCycle = true;
 
       if (hasCycle) {
         throw StateError("Graph contains a negative weight cycle.");
@@ -46,7 +46,7 @@ extension BellmanFordExtension on Graph {
       if (dist[v.id] != double.infinity) {
         result[v.id] = CostPath(
           dist[v.id]!,
-          _reconstructPath(cameFrom, start.id, v.id),
+          _reconstructPath(cameFrom, start, v.id),
         );
       }
     }
@@ -55,7 +55,7 @@ extension BellmanFordExtension on Graph {
 
   /// 计算从 [start] 到 [end] 的最短路径
   CostPath? shortestPathByBellmanFord(Vertex start, Vertex end) {
-    final allPaths = shortestPathsByBellmanFord(start);
+    final allPaths = shortestPathsByBellmanFord(start.id);
     return allPaths[end.id];
   }
 
@@ -81,7 +81,7 @@ extension BellmanFordExtension on Graph {
     if (distU == double.infinity) return false;
     return distV > distU + edge.weight;
   }
-  
+
   List<Edge> _reconstructPath(Map<String, Edge> cameFrom, String startId, String endId) {
     if (startId == endId) return [];
 

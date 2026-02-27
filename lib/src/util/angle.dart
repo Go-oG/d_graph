@@ -11,7 +11,7 @@ const pi2 = math.pi * 2;
 const halfPi = math.pi * 0.5;
 const piPow = math.pi * math.pi;
 
-class Angle implements Comparable<Angle> {
+extension type Angle(double radians) implements double {
   static const _degToRad = math.pi / 180.0;
   static const _radToDeg = 180.0 / math.pi;
 
@@ -20,11 +20,9 @@ class Angle implements Comparable<Angle> {
   static const half = Angle.radians(math.pi);
   static const quarter = Angle.radians(halfPi);
 
-  final double radians;
-
   const Angle.radians(this.radians);
 
-  factory Angle.degrees(double degrees) => Angle.radians(degrees * _degToRad);
+  const Angle.degrees(double degrees) : radians = degrees * _degToRad;
 
   double get degrees => radians * _radToDeg;
 
@@ -89,15 +87,7 @@ class Angle implements Comparable<Angle> {
 
   bool operator <(Angle other) => radians < other.radians;
 
-  bool isLessRadians(double theta) => radians < theta;
-
-  bool isLessDegrees(double theta) => degrees < theta;
-
   bool operator >(Angle other) => radians > other.radians;
-
-  bool isMoreRadians(double theta) => radians > theta;
-
-  bool isMoreDegrees(double theta) => degrees > theta;
 
   double get sin => math.sin(radians);
 
@@ -110,21 +100,4 @@ class Angle implements Comparable<Angle> {
   bool get isFull => (radians - pi2).abs() <= 1e-9;
 
   bool equals(Angle other, [double epsilon = 1e-10]) => (radians - other.radians).abs() < epsilon;
-
-  @override
-  String toString() => 'Angle(${degrees.toStringAsFixed(2)}°)';
-
-  @override
-  int get hashCode => radians.hashCode;
-
-  @override
-  bool operator ==(Object other) {
-    if (other is! Angle) {
-      return false;
-    }
-    return equals(other);
-  }
-
-  @override
-  int compareTo(Angle other) => radians.compareTo(other.radians);
 }

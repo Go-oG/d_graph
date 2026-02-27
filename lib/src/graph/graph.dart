@@ -1,29 +1,22 @@
-import 'package:dart_graph/dart_graph.dart';
+import 'dart:math';
 
-final class Vertex<T> with ValueExtraMixin {
+final class Vertex<T> {
   final String id;
   final T? data;
-  final String? label;
-  final Map<String, dynamic> meta = {};
-  double weight = 0;
+  double weight;
 
   Vertex({
     required this.id,
-    Map<String, dynamic>? meta,
-    this.label,
     this.data,
-  }) {
-    if (meta != null) {
-      this.meta.addAll(meta);
-    }
-  }
+    this.weight = 0,
+  });
 
   Map<String, dynamic> toMap() {
-    return {'id': id, 'label': label, 'data': data, 'meta': meta};
+    return {'id': id, 'data': data, "weight": weight};
   }
 
   static Vertex fromMap(Map<String, dynamic> map) {
-    return Vertex(id: map['id'], label: map['label'], data: map['data'], meta: map['meta']);
+    return Vertex(id: map['id'], data: map['data'], weight: map['weight']);
   }
 
   @override
@@ -34,13 +27,12 @@ final class Vertex<T> with ValueExtraMixin {
   int get hashCode => id.hashCode;
 }
 
-final class Edge with ValueExtraMixin {
+final class Edge<T> {
   final String id;
   final String from;
   final String to;
-  final bool? directed;
-  final Map<String, dynamic> meta = {};
-  final Object? data;
+  final bool directed;
+  final T? data;
 
   double weight;
 
@@ -48,18 +40,13 @@ final class Edge with ValueExtraMixin {
     required this.id,
     required this.from,
     required this.to,
-    Map<String, dynamic>? meta,
-    this.directed,
+    required this.directed,
     this.weight = 0,
     this.data,
-  }) {
-    if (meta != null) {
-      this.meta.addAll(meta);
-    }
-  }
+  });
 
   Map<String, dynamic> toMap() {
-    return {'id': id, 'from': from, 'to': to, 'directed': directed, 'weight': weight, 'data': data, 'meta': meta};
+    return {'id': id, 'from': from, 'to': to, 'directed': directed, 'weight': weight, 'data': data};
   }
 
   static Edge fromMap<T>(Map<String, dynamic> map) {
@@ -68,26 +55,23 @@ final class Edge with ValueExtraMixin {
       from: map['from'],
       to: map['to'],
       directed: map['directed'],
-      meta: map['meta'],
       data: map['data'],
       weight: map['weight'],
     );
   }
-
-  bool isDirected(bool graphDirected) => directed ?? graphDirected;
 }
 
-final class Graph<T> {
+final class Graph<V, E> {
   final bool directed;
   final bool allowMultiEdge;
   final bool allowSelfLoop;
   final Map<String, dynamic> meta = {};
 
-  final Map<String, Vertex<T>> _vertexMap = {};
-  final Map<String, Edge> _edgeMap = {};
+  final Map<String, Vertex<V>> _vertexMap = {};
+  final Map<String, Edge<E>> _edgeMap = {};
 
-  final Map<String, Map<String, Edge>> _vertexOutEdges = {};
-  final Map<String, Map<String, Edge>> _vertexInEdges = {};
+  final Map<String, Map<String, Edge<E>>> _vertexOutEdges = {};
+  final Map<String, Map<String, Edge<E>>> _vertexInEdges = {};
 
   late final GraphDegree _degree;
 
@@ -95,24 +79,28 @@ final class Graph<T> {
     this.directed = false,
     this.allowMultiEdge = true,
     this.allowSelfLoop = false,
-    Iterable<Vertex<T>>? vertices,
-    Iterable<Edge>? edges,
+    Iterable<Vertex<V>>? vertices,
+    Iterable<Edge<E>>? edges,
     Map<String, dynamic>? meta,
   }) {
     _degree = GraphDegree(this);
     if (vertices != null) {
-      addVertices(vertices);
+      for (var v in vertices) {
+        _addVertex(v);
+      }
     }
     if (edges != null) {
-      addEdges(edges);
+      for (var e in edges) {
+        _addEdge(e);
+      }
     }
     if (meta != null) {
       this.meta.addAll(meta);
     }
   }
 
-  static Graph<D> of<D>(Graph<D> g, {String? id}) {
-    return Graph(
+  static Graph<V, E> of<V, E>(Graph<V, E> g) {
+    return Graph<V, E>(
       directed: g.directed,
       allowMultiEdge: g.allowMultiEdge,
       allowSelfLoop: g.allowSelfLoop,
@@ -144,85 +132,53 @@ final class Graph<T> {
     );
   }
 
-  void addVertex(Vertex<T> vertex) {
+  bool addVertex(String id, {V? value, double weight = 0}) {
+    if (_vertexMap.containsKey(id)) {
+      return false;
+    }
+    final vertex = Vertex(id: id, data: value, weight: weight);
+    return _addVertex(vertex);
+  }
+
+  bool _addVertex(Vertex<V> vertex) {
     if (_vertexMap.containsKey(vertex.id)) {
-      return;
+      return false;
     }
     _vertexMap[vertex.id] = vertex;
     _degree._onVertexAdded(vertex);
+    return true;
   }
 
-  void addVertices(Iterable<Vertex<T>> vertexs) {
-    for (var v in vertexs) {
-      addVertex(v);
-    }
+  bool addEdge({
+    required String id,
+    required String fromVid,
+    required String toVid,
+    double weight = 0,
+    bool? direct,
+    E? value,
+  }) {
+    final edge = Edge(id: id, from: fromVid, to: toVid, data: value, directed: direct ?? directed, weight: weight);
+    return _addEdge(edge);
   }
 
-  Vertex<T> getVertex(String id) => getVertexOrNull(id)!;
-
-  Vertex<T>? getVertexOrNull(String id) => _vertexMap[id];
-
-  Edge getEdge(String id) => getEdgeOrNull(id)!;
-
-  Edge? getEdgeOrNull(String id) => _edgeMap[id];
-
-  Edge? getEdge2(String from, String to) {
-    for (var e in edges(from)) {
-      if (e.to == to) {
-        return e;
-      }
-    }
-    return null;
-  }
-
-  void removeVertex(Vertex<T> vertex) {
-    final id = vertex.id;
-    if (!_vertexMap.containsKey(id)) return;
-    _degree._onVertexRemoved(vertex);
-
-    final edgesToRemove = <Edge>{};
-    _vertexOutEdges[id]?.values.forEach(edgesToRemove.add);
-    _vertexInEdges[id]?.values.forEach(edgesToRemove.add);
-
-    for (final e in edgesToRemove) {
-      removeEdge(e);
-    }
-
-    _vertexOutEdges.remove(id);
-    _vertexInEdges.remove(id);
-    _vertexMap.remove(id);
-  }
-
-  void removeVertices(Iterable<Vertex<T>> vertexs) {
-    for (var v in vertexs) {
-      removeVertex(v);
-    }
-  }
-
-  void addEdges(Iterable<Edge> edges) {
-    for (var e in edges) {
-      addEdge(e);
-    }
-  }
-
-  void addEdge(Edge edge) {
-    if (!_vertexMap.containsKey(edge.from) || !_vertexMap.containsKey(edge.to)) {
+  bool _addEdge(Edge<E> edge) {
+    final fromId = edge.from;
+    final toVid = edge.from;
+    if (!_vertexMap.containsKey(fromId) || !_vertexMap.containsKey(toVid)) {
       throw StateError('Edge endpoint does not exist');
     }
-
-    if (_edgeMap.containsKey(edge.id)) {
-      return;
-    }
-    if (!allowSelfLoop && edge.from == edge.to) {
+    if (!allowSelfLoop && fromId == toVid) {
       throw StateError('Self-loop is not allowed');
     }
-
+    if (_edgeMap.containsKey(edge.id)) {
+      return false;
+    }
     if (!allowMultiEdge) {
-      final outEdges = _vertexOutEdges[edge.from];
+      final outEdges = _vertexOutEdges[fromId];
       if (outEdges != null) {
         for (final existing in outEdges.values) {
-          if (existing.to == edge.to) {
-            throw StateError('Multi-edge is not allowed between ${edge.from} and ${edge.to}');
+          if (existing.to == toVid) {
+            throw StateError('Multi-edge is not allowed between $fromId and $toVid');
           }
         }
       }
@@ -232,16 +188,51 @@ final class Graph<T> {
     _vertexOutEdges.putIfAbsent(edge.from, () => {})[edge.id] = edge;
     _vertexInEdges.putIfAbsent(edge.to, () => {})[edge.id] = edge;
 
-    if (!edge.isDirected(directed)) {
+    if (!edge.directed) {
       _vertexOutEdges.putIfAbsent(edge.to, () => {})[edge.id] = edge;
       _vertexInEdges.putIfAbsent(edge.from, () => {})[edge.id] = edge;
     }
 
     _degree._onEdgeAdded(edge);
+    return true;
   }
 
-  void removeEdge(Edge edge) {
-    if (!_edgeMap.containsKey(edge.id)) return;
+  Vertex<V>? removeVertex(String id) {
+    final vertex = _vertexMap[id];
+    if (vertex == null) {
+      return null;
+    }
+
+    _degree._onVertexRemoved(vertex);
+    final edgesToRemove = <Edge>{};
+    _vertexOutEdges[id]?.values.forEach(edgesToRemove.add);
+    _vertexInEdges[id]?.values.forEach(edgesToRemove.add);
+    for (final e in edgesToRemove) {
+      removeEdge(e.id);
+    }
+    _vertexOutEdges.remove(id);
+    _vertexInEdges.remove(id);
+    _vertexMap.remove(id);
+    return vertex;
+  }
+
+  void removeVertices(Iterable<String> vertexs) {
+    for (var v in vertexs) {
+      removeVertex(v);
+    }
+  }
+
+  void removeVertices2(Iterable<Vertex> vertexs) {
+    for (var v in vertexs) {
+      removeVertex(v.id);
+    }
+  }
+
+  Edge<E>? removeEdge(String eid) {
+    final edge = _edgeMap[eid];
+    if (edge == null) {
+      return null;
+    }
 
     _degree._onEdgeRemoved(edge);
 
@@ -249,17 +240,45 @@ final class Graph<T> {
     _vertexOutEdges[edge.from]?.remove(edge.id);
     _vertexInEdges[edge.to]?.remove(edge.id);
 
-    if (!edge.isDirected(directed)) {
+    if (!edge.directed) {
       _vertexOutEdges[edge.to]?.remove(edge.id);
       _vertexInEdges[edge.from]?.remove(edge.id);
     }
+
+    return edge;
   }
 
-  void removeEdges(Iterable<Edge> edges) {
+  void removeEdges(Iterable<String> edges) {
     for (var v in edges) {
       removeEdge(v);
     }
   }
+
+  void removeEdges2(Iterable<Edge> edges) {
+    for (var v in edges) {
+      removeEdge(v.id);
+    }
+  }
+
+  Vertex<V> vertexOf(String vid) => vertexOfNull(vid)!;
+
+  Vertex<V>? vertexOfNull(String vid) => _vertexMap[vid];
+
+  List<Vertex<V>> neighbours(String vid) {
+    Set<Vertex<V>> nodeSet = <Vertex<V>>{};
+    for (var e in edges(vid)) {
+      nodeSet.add(vertexOf(e.from));
+      nodeSet.add(vertexOf(e.to));
+    }
+    nodeSet.remove(vertexOf(vid));
+    return nodeSet.toList();
+  }
+
+  Edge<E> edgeOf(String id) => edgeOfNull(id)!;
+
+  Edge<E>? edgeOfNull(String id) => _edgeMap[id];
+
+  Edge<E>? edgeFrom(String from, String to) => _vertexOutEdges[from]?[to];
 
   void clear() {
     _vertexMap.clear();
@@ -268,44 +287,40 @@ final class Graph<T> {
     _vertexOutEdges.clear();
   }
 
-  bool hasEdge(Edge edge) => _edgeMap.containsKey(edge.id);
+  bool hasEdge(String eid) => _edgeMap.containsKey(eid);
 
-  bool hasVertex(Vertex<T> vertex) => _vertexMap.containsKey(vertex.id);
+  bool hasVertex(String vid) => _vertexMap.containsKey(vid);
 
-  Degree degreeOf(String vertexId) => _degree.degreeOf(vertexId);
+  Degree degreeOf(String vid) => _degree.degreeOf(vid);
 
-  WeightDegree weightDegreeOf(String vertexId) => _degree.weightDegreeOf(vertexId);
+  WeightDegree weightDegreeOf(String vid) => _degree.weightDegreeOf(vid);
 
-  Map<String, Edge> inEdges(Vertex<T> vertex) => _vertexInEdges[vertex.id] ?? const {};
+  Map<String, Edge<E>> inEdges(String vid) => _vertexInEdges.putIfAbsent(vid, () => {});
 
-  Map<String, Edge> outEdges(Vertex<T> vertex) => _vertexOutEdges[vertex.id] ?? const {};
+  Map<String, Edge<E>> outEdges(String vid) => _vertexOutEdges.putIfAbsent(vid, () => {});
 
-  List<Edge> edges(String vertexId) {
-    final vertex = _vertexMap[vertexId];
+  List<Edge<E>> edges(String vid) {
+    final vertex = _vertexMap[vid];
     if (vertex == null) {
       return [];
     }
-    return edges2(vertex);
-  }
-
-  List<Edge> edges2(Vertex<T> vertex) {
-    Set<Edge> edges = <Edge>{};
-    edges.addAll(inEdges(vertex).values);
-    edges.addAll(outEdges(vertex).values);
+    Set<Edge<E>> edges = <Edge<E>>{};
+    edges.addAll(inEdges(vid).values);
+    edges.addAll(outEdges(vid).values);
     return edges.toList();
   }
 
-  Iterable<Edge> get edgeIterator => _edgeMap.values;
+  Iterable<Edge<E>> get edgeIterator => _edgeMap.values;
 
-  Iterable<Vertex<T>> get vertexIterator => _vertexMap.values;
+  Iterable<Vertex<V>> get vertexIterator => _vertexMap.values;
 
-  Map<String, Vertex<T>> get vertexMap => _vertexMap;
+  Map<String, Vertex<V>> get vertexMap => _vertexMap;
 
-  Map<String, Edge> get edgeMap => _edgeMap;
+  Map<String, Edge<E>> get edgeMap => _edgeMap;
 
-  Map<String, Map<String, Edge>> get vertexsOutEdges => _vertexOutEdges;
+  Map<String, Map<String, Edge<E>>> get vertexsOutEdges => _vertexOutEdges;
 
-  Map<String, Map<String, Edge>> get vertexsInEdges => _vertexInEdges;
+  Map<String, Map<String, Edge<E>>> get vertexsInEdges => _vertexInEdges;
 
   int get vertexCount => _vertexMap.length;
 
@@ -389,8 +404,7 @@ final class GraphDegree {
     }
 
     final w = (e.weight) * delta;
-    final isDirected = e.isDirected(graph.directed);
-
+    final isDirected = e.directed;
     final fromDegree = _degreeMap[e.from];
     final toDegree = _degreeMap[e.to];
     final fromWeighted = _weightedDegreeMap[e.from];

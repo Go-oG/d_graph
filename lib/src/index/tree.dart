@@ -1,20 +1,31 @@
 import 'dart:collection';
 import 'dart:math';
 
-import 'package:dart_graph/dart_graph.dart';
+import 'package:dart_graph/src/index/common.dart';
+
+typedef TreeVisitor<T> = VisitResult Function(TreeNode<T> node);
 
 class Tree<T> {
   TreeNode<T>? _root;
 
+  ///存放全部的节点
   final Map<T, TreeNode<T>> _nodeMap = {};
 
+  ///存放叶子节点
   final Map<T, TreeNode<T>> _leafMap = {};
+
+  ///按深度存放节点
+  final Map<int, Set<TreeNode<T>>> _depthNodeMap = {};
 
   TreeNode<T>? get root => _root;
 
   Iterable<T> get allData => _nodeMap.keys;
 
   Iterable<TreeNode<T>> get leaves => _leafMap.values;
+
+  bool get isEmpty => _nodeMap.isEmpty;
+
+  bool get isNotEmpty => _nodeMap.isNotEmpty;
 
   Tree();
 
@@ -60,9 +71,9 @@ class Tree<T> {
     } else {
       _root = newNode;
     }
-
     _nodeMap[data] = newNode;
     _leafMap[data] = newNode;
+    _depthNodeMap.putIfAbsent(depth, () => <TreeNode<T>>{}).add(newNode);
 
     return newNode;
   }
@@ -105,6 +116,20 @@ class Tree<T> {
     _invalidateAncestors(oldParent);
     _invalidateAncestors(newParent);
     node._updateDepth(newParent.depth + 1);
+    _reindexDepth(node, newParent.depth + 1);
+  }
+
+  void _reindexDepth(TreeNode<T> node, int newDepth) {
+    _depthNodeMap[node.depth]?.remove(node);
+    if (_depthNodeMap[node.depth]?.isEmpty ?? false) {
+      _depthNodeMap.remove(node.depth);
+    }
+
+    node._depth = newDepth;
+    _depthNodeMap.putIfAbsent(newDepth, () => <TreeNode<T>>{}).add(node);
+    for (final child in node.children) {
+      _reindexDepth(child, newDepth + 1);
+    }
   }
 
   /// 移除节点及其所有后代
@@ -127,6 +152,11 @@ class Tree<T> {
 
     recursiveCleanup(TreeNode<T> node) {
       _nodeMap.remove(node.data);
+      _depthNodeMap[node.depth]?.remove(node);
+      if (_depthNodeMap[node.depth]?.isEmpty ?? false) {
+        _depthNodeMap.remove(node.depth);
+      }
+
       if (node.isLeaf) {
         _leafMap.remove(node.data);
       }
@@ -143,19 +173,13 @@ class Tree<T> {
 
   /// 根据条件移除子树 [where] 返回 true 则移除该节点及其子树
   void removeSubtreesWhere(bool Function(TreeNode<T>) where) {
-    // 使用 BFS/层序遍历，从上往下找，找到满足条件的根就移除，不再深入该分支
-    // 避免在遍历过程中修改结构导致的异常，使用待删除队列
     List<T> toRemove = [];
-
-    // 使用 BFS
     final queue = Queue<TreeNode<T>>();
     if (_root != null) queue.add(_root!);
-
     while (queue.isNotEmpty) {
       final node = queue.removeFirst();
       if (where(node)) {
         toRemove.add(node.data);
-        // 不再将子节点入队，因为它们会被级联删除
       } else {
         queue.addAll(node.children);
       }
@@ -196,6 +220,8 @@ class Tree<T> {
     return maxD;
   }
 
+  int get childrenCount => _nodeMap.length;
+
   bool contains(T data) => _nodeMap.containsKey(data);
 
   List<TreeNode<T>> getNodesAtDepth(int depth, {bool needOrder = false}) {
@@ -221,22 +247,22 @@ class Tree<T> {
     return result;
   }
 
+  Iterable<TreeNode<T>> getNodesAtDepthFast(int depth) => _depthNodeMap[depth] ?? <TreeNode<T>>{};
+
   Tree<T> copySubtree(T rootData) {
     final startNode = getNode(rootData);
     if (startNode == null) throw StateError('Node not found');
 
     Tree<T> newTree = Tree<T>();
 
-    // BFS 复制
     final queue = Queue<TreeNode<T>>();
     queue.add(startNode);
 
-    // 根节点特殊处理
-    newTree.add(null, startNode.data); // 添加根
+    newTree.add(null, startNode.data);
 
     while (queue.isNotEmpty) {
       final curr = queue.removeFirst();
-      final currInNewTree = newTree.getNode(curr.data)!; // 必然存在
+      final currInNewTree = newTree.getNode(curr.data)!;
 
       for (var child in curr.children) {
         newTree.add(currInNewTree.data, child.data);
@@ -300,27 +326,25 @@ class Tree<T> {
     return [...pathUp, ...pathDown.reversed];
   }
 
-  void each(bool Function(TreeNode<T>) callback) {
-    _root?.each(callback);
+  void visit(TreeVisitor<T> visitor) => visitBFS(visitor);
+
+  void visitBFS(TreeVisitor<T> visitor) {
+    _root?.visitBFS(visitor);
   }
 
-  void eachBefore(bool Function(TreeNode<T>) callback) {
-    _root?.eachBefore(callback);
+  void visitBefore(TreeVisitor<T> visitor) {
+    _root?.visitBefore(visitor);
   }
 
-  void eachAfter(bool Function(TreeNode<T>) callback) {
-    _root?.eachAfter(callback);
+  void visitAfter(TreeVisitor<T> visitor) {
+    _root?.visitAfter(visitor);
   }
 
   List<TreeNode<T>> search(bool Function(TreeNode<T>) where) {
     return _nodeMap.values.where(where).toList();
   }
 
-  TreeNode<T>? find(bool Function(TreeNode<T>) where) {
-    // 相比全量搜索，直接遍历 _nodeMap 可能更快，这取决于 where 的复杂度
-    // 但为了保持顺序一致性，通常委托给 root 遍历
-    return _root?.find(where);
-  }
+  TreeNode<T>? find(bool Function(TreeNode<T>) where) => _root?.find(where);
 
   TreeNode<T>? findFirst(bool Function(TreeNode<T>) where) {
     for (var node in _nodeMap.values) {
@@ -358,16 +382,66 @@ class Tree<T> {
       node = node.parent;
     }
   }
+
+  void sort(int Function(TreeNode<T> a, TreeNode<T> b) compare) {
+    final root = _root;
+    if (root == null) {
+      return;
+    }
+    sortSubtree(root.data, compare);
+  }
+
+  void sortChildren(
+    T parentData,
+    Comparator<TreeNode<T>> compare, {
+    bool recursive = false,
+  }) {
+    final parent = getNode(parentData);
+    if (parent == null) {
+      throw StateError('Node not found: $parentData');
+    }
+
+    void sortNode(TreeNode<T> node) {
+      node._children.sortWithIndex(compare);
+
+      if (recursive) {
+        for (final child in node._children) {
+          sortNode(child);
+        }
+      }
+    }
+
+    sortNode(parent);
+  }
+
+  void sortSubtree(
+    T parentData,
+    int Function(TreeNode<T> a, TreeNode<T> b) compare,
+  ) {
+    final parent = getNode(parentData);
+    if (parent == null) {
+      throw StateError('Node not found: $parentData');
+    }
+    void dfs(TreeNode<T> node) {
+      if (node._children.length > 1) {
+        node._children.sortWithIndex(compare); // 修复点
+      }
+      for (final child in node._children) {
+        dfs(child);
+      }
+    }
+
+    dfs(parent);
+  }
 }
 
-class TreeNode<T> with ValueExtraMixin{
+class TreeNode<T> {
   final T data;
   late final _children = _ChildList<T>();
   Tree<T>? _tree;
   TreeNode<T>? _parent;
 
   int _index = -1;
-
   int _height = -1;
   int _descendantCount = -1;
   int _depth;
@@ -378,7 +452,7 @@ class TreeNode<T> with ValueExtraMixin{
 
   TreeNode<T>? get parent => _parent;
 
-  List<TreeNode<T>> get children => UnmodifiableListView(_children);
+  List<TreeNode<T>> get children => _children;
 
   Iterable<TreeNode<T>> get childrenReverse => _children.reversed;
 
@@ -393,6 +467,10 @@ class TreeNode<T> with ValueExtraMixin{
   bool get isNotChildren => _children.isEmpty;
 
   TreeNode<T> childAt(int index) => _children[index];
+
+  TreeNode<T> get firstChild => _children[0];
+
+  TreeNode<T> get lastChild => _children[_children.length - 1];
 
   int get depth => _depth;
 
@@ -494,25 +572,35 @@ class TreeNode<T> with ValueExtraMixin{
 
   Tree<T>? get tree => _tree;
 
-  void each(bool Function(TreeNode<T>) callback) {
-    // 使用 Queue 避免 removeAt(0) 的 O(n) 开销
+  void visit(TreeVisitor<T> visitor) => visitBFS(visitor);
+
+  void visitBFS(TreeVisitor<T> visitor) {
     final queue = Queue<TreeNode<T>>();
     queue.add(this);
-
     while (queue.isNotEmpty) {
       final node = queue.removeFirst();
-      if (callback(node)) return; // 停止
+      final res = visitor(node);
+      if (res == VisitResult.stop) {
+        return;
+      }
+      if (res == VisitResult.skipChildren) {
+        continue;
+      }
       queue.addAll(node._children);
     }
   }
 
-  void eachBefore(bool Function(TreeNode<T>) callback) {
+  void visitBefore(TreeVisitor<T> visitor) {
     final stack = [this];
-
     while (stack.isNotEmpty) {
       final node = stack.removeLast();
-      if (callback(node)) return;
-
+      final res = visitor(node);
+      if (res == VisitResult.stop) {
+        return;
+      }
+      if (res == VisitResult.skipChildren) {
+        continue;
+      }
       // 倒序入栈，保证出栈时是正序 (0, 1, 2...)
       final children = node._children;
       for (var i = children.length - 1; i >= 0; i--) {
@@ -521,20 +609,28 @@ class TreeNode<T> with ValueExtraMixin{
     }
   }
 
-  void eachAfter(bool Function(TreeNode<T>) callback) {
-    final stack = [this];
-    final outputStack = <TreeNode<T>>[]; // 暂存反向顺序
-
-    while (stack.isNotEmpty) {
-      final node = stack.removeLast();
-      outputStack.add(node);
-      // 正序入栈，出栈为反序，放入 outputStack 后再次反序，最终处理顺序正确
-      stack.addAll(node._children);
+  ///后序遍历中只支持stop ，不支持skipChildren和Continue
+  void visitAfter(VisitResult Function(TreeNode<T> node) visitor) {
+    if (_children.isEmpty) {
+      visitor(this);
+      return;
     }
+    final stack = <_StackFrame<T>>[_StackFrame(this)];
+    while (stack.isNotEmpty) {
+      final frame = stack.last;
+      final node = frame.node;
 
-    // 反向遍历输出栈
-    for (var i = outputStack.length - 1; i >= 0; i--) {
-      if (callback(outputStack[i])) return;
+      if (frame.childIndex < node._children.length) {
+        final child = node._children[frame.childIndex];
+        frame.childIndex++;
+        stack.add(_StackFrame(child));
+      } else {
+        stack.removeLast();
+        final res = visitor(node);
+        if (res == VisitResult.stop) {
+          return;
+        }
+      }
     }
   }
 
@@ -555,27 +651,101 @@ class TreeNode<T> with ValueExtraMixin{
       }
       return result;
     }
-    eachBefore((node) {
+    visitBefore((node) {
       if (where(node)) {
         result.add(node);
       }
-      return result.length >= maxCount; // 如果满了，返回 true 停止遍历
+      if (result.length >= maxCount) {
+        return VisitResult.stop;
+      }
+      return VisitResult.continueVisit;
     });
     return result;
   }
 
   TreeNode<T>? find(bool Function(TreeNode<T>) where) {
     TreeNode<T>? found;
-    // 使用前序遍历查找
-    eachBefore((node) {
+    visitBefore((node) {
       if (where(node)) {
         found = node;
-        return true; // 停止
+        return VisitResult.stop;
       }
-      return false;
+      return VisitResult.continueVisit;
     });
     return found;
   }
+
+  void sum(
+    double Function(TreeNode<T> data) valueFun,
+    void Function(TreeNode<T> node, double value) setFun, {
+    ValueConflictStrategy strategy = ValueConflictStrategy.sum,
+    double selfWeight = 0.5,
+  }) {
+    final valueCache = <TreeNode<T>, double>{};
+    visitAfter((e) {
+      final own = valueFun(e);
+      if (e.isLeaf) {
+        valueCache[e] = own;
+        setFun(e, own);
+        return VisitResult.continueVisit;
+      }
+
+      double childrenSum = 0;
+      for (final c in e.children) {
+        childrenSum += valueCache[c]!;
+      }
+
+      double result;
+      switch (strategy) {
+        case ValueConflictStrategy.sum:
+          result = childrenSum;
+          break;
+        case ValueConflictStrategy.preferSelf:
+          result = own;
+          break;
+        case ValueConflictStrategy.max:
+          result = own > childrenSum ? own : childrenSum;
+          break;
+        case ValueConflictStrategy.min:
+          result = own < childrenSum ? own : childrenSum;
+          break;
+        case ValueConflictStrategy.average:
+          result = (own + childrenSum) / 2.0;
+          break;
+        case ValueConflictStrategy.weighted:
+          result = own * selfWeight + childrenSum * (1 - selfWeight);
+          break;
+      }
+      valueCache[e] = result;
+      setFun(e, result);
+      return VisitResult.continueVisit;
+    });
+  }
+
+  TreeNode<T> leafLeft() {
+    List<TreeNode<T>> children = [];
+    TreeNode<T> node = this;
+    while ((children = node.children).isNotEmpty) {
+      node = children[0];
+    }
+    return node;
+  }
+
+  TreeNode<T> leafRight() {
+    List<TreeNode<T>> children = [];
+    TreeNode<T> node = this;
+    while ((children = node.children).isNotEmpty) {
+      node = children[children.length - 1];
+    }
+    return node;
+  }
+}
+
+class _StackFrame<T> {
+  final TreeNode<T> node;
+  int childIndex = 0;
+
+  _StackFrame(this.node);
 }
 
 class _NodeDepthPair<T> {
@@ -659,5 +829,81 @@ class _ChildList<T> extends ListBase<TreeNode<T>> {
       node._index = -1;
     }
     _inner.clear();
+  }
+
+  @override
+  void sort([int Function(TreeNode<T> a, TreeNode<T> b)? compare]) {
+    sortWithIndex(compare ?? (a, b) => (a.data as Comparable).compareTo(b.data));
+  }
+
+  void sortWithIndex(Comparator<TreeNode<T>> compare) {
+    if (_inner.length <= 1) return;
+    _inner.sort(compare);
+    for (int i = 0; i < _inner.length; i++) {
+      _inner[i]._index = i;
+    }
+  }
+}
+
+enum ValueConflictStrategy {
+  sum, // 使用子节点和
+  preferSelf, // 使用自身值
+  max, // max(self, sum(children))
+  min, // min(self, sum(children))
+  average, // (self + sum(children)) / 2
+  weighted, // 权重混合
+}
+
+extension TreeExt<T> on Tree<T> {
+  void sum(
+    double Function(TreeNode<T> data) valueFun,
+    void Function(TreeNode<T> node, double value) setFun, {
+    ValueConflictStrategy strategy = ValueConflictStrategy.sum,
+    double selfWeight = 0.5,
+  }) {
+    _root?.sum(valueFun, setFun, strategy: strategy, selfWeight: selfWeight);
+  }
+
+  /// 将当前树从根节点处分裂为两棵新树。
+  /// [leftCount] 指定归入左侧树的根节点子节点数量。
+  /// 返回一个包含两棵新树的 List [leftTree, rightTree]。
+  List<Tree<T>> split(int leftCount) {
+    if (_root == null) return [Tree<T>(), Tree<T>()];
+
+    final children = _root!.children.toList();
+    if (leftCount < 0 || leftCount > children.length) {
+      throw RangeError('leftCount out of range: 0 to ${children.length}');
+    }
+
+    Tree<T> leftTree = Tree<T>();
+    Tree<T> rightTree = Tree<T>();
+    leftTree.add(null, _root!.data);
+    rightTree.add(null, _root!.data);
+
+    for (int i = 0; i < children.length; i++) {
+      final targetTree = (i < leftCount) ? leftTree : rightTree;
+      _copyBranchTo(children[i], targetTree, _root!.data);
+    }
+
+    return [leftTree, rightTree];
+  }
+
+  void _copyBranchTo(TreeNode<T> sourceNode, Tree<T> targetTree, T targetParentData) {
+    targetTree.add(targetParentData, sourceNode.data);
+    for (var child in sourceNode.children) {
+      _copyBranchTo(child, targetTree, sourceNode.data);
+    }
+  }
+
+  List<Tree<T>> splitBy(bool Function(TreeNode<T>) belongsToLeft) {
+    if (_root == null) return [Tree<T>(), Tree<T>()];
+    Tree<T> leftTree = Tree<T>()..add(null, _root!.data);
+    Tree<T> rightTree = Tree<T>()..add(null, _root!.data);
+
+    for (var child in _root!.children) {
+      final targetTree = belongsToLeft(child) ? leftTree : rightTree;
+      _copyBranchTo(child, targetTree, _root!.data);
+    }
+    return [leftTree, rightTree];
   }
 }

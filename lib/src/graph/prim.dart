@@ -41,7 +41,7 @@ extension PrimExtension on Graph {
   ///标记节点为已访问，并将其连接到未访问节点的边加入队列
   void _visit(Vertex v, Set<String> visited, PriorityQueue<Edge> pq) {
     visited.add(v.id);
-    for (final edge in outEdges(v).values) {
+    for (final edge in outEdges(v.id).values) {
       if (!visited.contains(edge.to)) {
         pq.add(edge);
       }

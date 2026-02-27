@@ -30,7 +30,7 @@ extension FloydWarshallExtension on Graph {
           dist[u][v] = edge.weight;
         }
 
-        if (!edge.isDirected(directed)) {
+        if (!edge.directed) {
           if (edge.weight < dist[v][u]) {
             dist[v][u] = edge.weight;
           }

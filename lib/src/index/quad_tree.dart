@@ -2,10 +2,11 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import '../util/extra_mixin.dart';
+import 'common.dart';
 
 typedef Accessor<T> = double Function(T data);
 
-typedef VisitCallback<T> = bool Function(QuadNode<T> node, double x0, double y0, double x1, double y1);
+typedef QuadTreeVisitor<T> = VisitResult Function(QuadNode<T> node, double x0, double y0, double x1, double y1);
 
 class QuadTree<T> {
   final Accessor<T> xFun;
@@ -308,13 +309,20 @@ class QuadTree<T> {
     }
   }
 
-  void visit(VisitCallback<T> callback) {
+  void visit(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
     final List<_StackFrame<T>> stack = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
     while (stack.isNotEmpty) {
       final frame = stack.removeLast();
       final node = frame.node;
-      if (callback(node, frame.x0, frame.y0, frame.x1, frame.y1)) continue;
+      final res = visitor(node, frame.x0, frame.y0, frame.x1, frame.y1);
+      if (res == VisitResult.stop) {
+        return;
+      }
+      if (res == VisitResult.skipChildren) {
+        continue;
+      }
+
       if (node.isInternal) {
         double xm = (frame.x0 + frame.x1) / 2;
         double ym = (frame.y0 + frame.y1) / 2;
@@ -326,7 +334,7 @@ class QuadTree<T> {
     }
   }
 
-  void visitInOrder(VisitCallback<T> callback) {
+  void visitInOrder(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
 
     final List<_StackFrame<T>> stack = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
@@ -349,7 +357,11 @@ class QuadTree<T> {
         }
       } else if (frame.stage == 1) {
         frame.stage = 2;
-        if (callback(node, frame.x0, frame.y0, frame.x1, frame.y1)) {
+        final res = visitor(node, frame.x0, frame.y0, frame.x1, frame.y1);
+        if (res == VisitResult.stop) {
+          return;
+        }
+        if (res == VisitResult.skipChildren) {
           continue;
         }
         stack.add(frame);
@@ -369,41 +381,54 @@ class QuadTree<T> {
     }
   }
 
-  void visitAfter(VisitCallback<T> callback) {
+  void visitAfter(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
 
     final List<_StackFrame<T>> stack = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
-    final List<_StackFrame<T>> next = [];
 
     while (stack.isNotEmpty) {
       final frame = stack.removeLast();
       final node = frame.node;
+
+      if (frame.visited) {
+        final result = visitor(node, frame.x0, frame.y0, frame.x1, frame.y1);
+        if (result == VisitResult.stop) return;
+        continue;
+      }
+
+      stack.add(_StackFrame.of(node, frame.x0, frame.y0, frame.x1, frame.y1, true));
+
       if (node.isInternal) {
+        final result = visitor(node, frame.x0, frame.y0, frame.x1, frame.y1);
+
+        if (result == VisitResult.stop) return;
+        if (result == VisitResult.skipChildren) continue;
+
         double xm = (frame.x0 + frame.x1) / 2;
         double ym = (frame.y0 + frame.y1) / 2;
-        if (node.children[0] != null) stack.add(_StackFrame(node.children[0]!, frame.x0, frame.y0, xm, ym));
-        if (node.children[1] != null) stack.add(_StackFrame(node.children[1]!, xm, frame.y0, frame.x1, ym));
-        if (node.children[2] != null) stack.add(_StackFrame(node.children[2]!, frame.x0, ym, xm, frame.y1));
-        if (node.children[3] != null) stack.add(_StackFrame(node.children[3]!, xm, ym, frame.x1, frame.y1));
+        final children = node.children;
+        if (children[3] != null) stack.add(_StackFrame(children[3]!, xm, ym, frame.x1, frame.y1));
+        if (children[2] != null) stack.add(_StackFrame(children[2]!, frame.x0, ym, xm, frame.y1));
+        if (children[1] != null) stack.add(_StackFrame(children[1]!, xm, frame.y0, frame.x1, ym));
+        if (children[0] != null) stack.add(_StackFrame(children[0]!, frame.x0, frame.y0, xm, ym));
       }
-      next.add(frame);
-    }
-
-    for (int i = next.length - 1; i >= 0; i--) {
-      var frame = next[i];
-      callback(frame.node, frame.x0, frame.y0, frame.x1, frame.y1);
     }
   }
 
-  void visitBFS(VisitCallback<T> callback) {
+  void visitBFS(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
-
     final List<_StackFrame<T>> queue = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
     int head = 0;
     while (head < queue.length) {
       final frame = queue[head++];
       final node = frame.node;
-      if (callback(node, frame.x0, frame.y0, frame.x1, frame.y1)) continue;
+      final res = visitor(node, frame.x0, frame.y0, frame.x1, frame.y1);
+      if (res == VisitResult.stop) {
+        return;
+      }
+      if (res == VisitResult.skipChildren) {
+        continue;
+      }
       if (node.isInternal) {
         double xm = (frame.x0 + frame.x1) / 2;
         double ym = (frame.y0 + frame.y1) / 2;
@@ -488,18 +513,18 @@ class QuadTree<T> {
     double rL = rect.left, rT = rect.top, rR = rect.right, rB = rect.bottom;
 
     visit((node, x0, y0, x1, y1) {
-      if (x0 >= rR || x1 < rL || y0 >= rB || y1 < rT) return true;
+      if (x0 >= rR || x1 < rL || y0 >= rB || y1 < rT) return VisitResult.skipChildren;
 
       if (!node.isInternal) {
         QuadNode<T>? leaf = node;
         while (leaf != null) {
           if (leaf.x >= rL && leaf.x < rR && leaf.y >= rT && leaf.y < rB) {
-            results.add(leaf.data!);
+            results.add(leaf.data as T);
           }
           leaf = leaf.next;
         }
       }
-      return false;
+      return VisitResult.continueVisit;
     });
     return results;
   }
@@ -569,7 +594,7 @@ class QuadTree<T> {
           leaf = leaf.next;
         }
       }
-      return false;
+      return VisitResult.continueVisit;
     });
     clear();
     _x0 = x0;
@@ -589,7 +614,7 @@ class QuadTree<T> {
           leaf = leaf.next;
         }
       }
-      return false;
+      return VisitResult.continueVisit;
     });
     return count;
   }
@@ -605,7 +630,6 @@ class QuadNode<T> with ValueExtraMixin {
 
   double x = 0;
   double y = 0;
-
   double value = 0;
 
   QuadNode.internal()
@@ -624,14 +648,10 @@ class QuadNode<T> with ValueExtraMixin {
 final class _StackFrame<T> {
   final QuadNode<T> node;
   final double x0, y0, x1, y1;
-
-  /// 状态机：
-  /// 0: 准备访问 NW (Child 0)
-  /// 1: 准备访问 SW (Child 2)
-  /// 2: 准备访问 自己 (Self) 然后访问 NE (Child 1)
-  /// 3: 准备访问 SE (Child 3)
-  /// 4: 完成
   int stage = 0;
+  bool visited = false;
 
   _StackFrame(this.node, this.x0, this.y0, this.x1, this.y1);
+
+  _StackFrame.of(this.node, this.x0, this.y0, this.x1, this.y1, [this.visited = false]);
 }

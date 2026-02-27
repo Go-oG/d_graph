@@ -20,31 +20,31 @@ class MultiLine {
   }
 
   static int _computeOutCode(Offset p, Rect rect) {
-    const int INSIDE = 0; // 0000
-    const int LEFT = 1; // 0001
-    const int RIGHT = 2; // 0010
-    const int BOTTOM = 4; // 0100
-    const int TOP = 8; // 1000
+    const int inside = 0; // 0000
+    const int left = 1; // 0001
+    const int right = 2; // 0010
+    const int bottom = 4; // 0100
+    const int top = 8; // 1000
 
-    int code = INSIDE;
+    int code = inside;
 
     if (p.dx < rect.left) {
-      code |= LEFT;
+      code |= left;
     } else if (p.dx > rect.right) {
-      code |= RIGHT;
+      code |= right;
     }
 
     if (p.dy < rect.top) {
-      code |= TOP;
+      code |= top;
     } else if (p.dy > rect.bottom) {
-      code |= BOTTOM;
+      code |= bottom;
     }
 
     return code;
   }
 
   static List<Offset>? _cohenSutherlandClip(Offset p0, Offset p1, Rect rect) {
-    const int LEFT = 1, RIGHT = 2, BOTTOM = 4, TOP = 8;
+    const int left = 1, right = 2, bottom = 4, top = 8;
 
     double x0 = p0.dx, y0 = p0.dy;
     double x1 = p1.dx, y1 = p1.dy;
@@ -56,26 +56,23 @@ class MultiLine {
 
     while (true) {
       if ((outCode0 | outCode1) == 0) {
-        // 两点都在矩形内
         accept = true;
         break;
       } else if ((outCode0 & outCode1) != 0) {
-        // 两点在矩形外同一侧
         break;
       } else {
         double x = 0.0, y = 0.0;
         int outCodeOut = outCode0 != 0 ? outCode0 : outCode1;
-
-        if ((outCodeOut & TOP) != 0) {
+        if ((outCodeOut & top) != 0) {
           x = x0 + (x1 - x0) * (rect.top - y0) / (y1 - y0);
           y = rect.top;
-        } else if ((outCodeOut & BOTTOM) != 0) {
+        } else if ((outCodeOut & bottom) != 0) {
           x = x0 + (x1 - x0) * (rect.bottom - y0) / (y1 - y0);
           y = rect.bottom;
-        } else if ((outCodeOut & RIGHT) != 0) {
+        } else if ((outCodeOut & right) != 0) {
           y = y0 + (y1 - y0) * (rect.right - x0) / (x1 - x0);
           x = rect.right;
-        } else if ((outCodeOut & LEFT) != 0) {
+        } else if ((outCodeOut & left) != 0) {
           y = y0 + (y1 - y0) * (rect.left - x0) / (x1 - x0);
           x = rect.left;
         }

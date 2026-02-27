@@ -31,7 +31,7 @@ extension ConnectedComponentsExtension on Graph {
   }
 
   Iterable<Vertex> _getNeighbors(Graph g, Vertex v) sync* {
-    final outEdges = g.outEdges(v);
+    final outEdges = g.outEdges(v.id);
     for (final edge in outEdges.values) {
       final neighborId = edge.to;
       if (neighborId == v.id) continue;
@@ -39,7 +39,7 @@ extension ConnectedComponentsExtension on Graph {
       if (neighbor != null) yield neighbor;
     }
 
-    final inEdges = g.inEdges(v);
+    final inEdges = g.inEdges(v.id);
     for (final edge in inEdges.values) {
       final neighborId = edge.from;
       if (neighborId == v.id) continue;

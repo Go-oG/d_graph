@@ -13,63 +13,6 @@ interface class LineStyle {
   }
 }
 
-class NormalLineStyle implements LineStyle {
-  const NormalLineStyle();
-
-  @override
-  List<Curve> apply(List<Offset> points) {
-    if (points.length < 2) {
-      return const [];
-    }
-    List<Curve> list = [];
-    for (int i = 0; i < points.length - 1; i++) {
-      list.add(CurveUtil.ofLine(points[i], points[i + 1]));
-    }
-    return list;
-  }
-}
-
-class StepLineStyle implements LineStyle {
-  static const _kAfter = 1;
-  static const _kBefore = 2;
-  static const _kCenter = 2;
-
-  final int _type;
-
-  const StepLineStyle.after() : _type = _kAfter;
-
-  const StepLineStyle.before() : _type = _kBefore;
-
-  const StepLineStyle.center() : _type = _kCenter;
-
-  @override
-  List<Curve> apply(List<Offset> points) {
-    if (points.length < 2) {
-      return const [];
-    }
-    List<List<Offset>> list = [];
-    for (int i = 0; i < points.length - 1; i++) {
-      Offset s = points[i];
-      Offset e = points[i + 1];
-      Offset cen;
-      if (_type == _kBefore) {
-        cen = Offset(s.dx, e.dy);
-      } else if (_type == _kCenter) {
-        cen = Offset((s.dx + e.dx) / 2, (s.dy + e.dy) / 2);
-      } else {
-        cen = Offset(e.dx, s.dy);
-      }
-      list.add([s, cen, e]);
-    }
-    List<Curve> curveList = [];
-    for (var pl in list) {
-      curveList.add(CurveUtil.ofLine(pl[0], pl[1]));
-      curveList.add(CurveUtil.ofLine(pl[1], pl[2]));
-    }
-    return curveList;
-  }
-}
-
 abstract class CurveStyle implements LineStyle {
   final double smooth;
 
@@ -127,7 +70,174 @@ abstract class CurveStyle implements LineStyle {
   }
 }
 
-final class BasisCurve extends CurveStyle {
+class NormalLineStyle implements LineStyle {
+  final bool close;
+
+  const NormalLineStyle({this.close = false});
+
+  @override
+  List<Curve> apply(List<Offset> points) {
+    if (points.length < 2) {
+      return const [];
+    }
+    List<Curve> list = [];
+    for (int i = 0; i < points.length - 1; i++) {
+      list.add(CurveUtil.ofLine(points[i], points[i + 1]));
+    }
+    if (points.length > 2 && close) {
+      list.add(CurveUtil.ofLine(points.last, points.first));
+    }
+
+    return list;
+  }
+}
+
+class StepLineStyle implements LineStyle {
+  static const _kAfter = 1;
+  static const _kBefore = 2;
+  static const _kCenter = 3;
+
+  final int type;
+
+  const StepLineStyle.after() : type = _kAfter;
+
+  const StepLineStyle.before() : type = _kBefore;
+
+  const StepLineStyle.center() : type = _kCenter;
+
+  @override
+  List<Curve> apply(List<Offset> points) {
+    if (points.length < 2) {
+      return const [];
+    }
+    List<List<Offset>> list = [];
+    for (int i = 0; i < points.length - 1; i++) {
+      Offset s = points[i];
+      Offset e = points[i + 1];
+      Offset cen;
+      if (type == _kBefore) {
+        cen = Offset(s.dx, e.dy);
+      } else if (type == _kCenter) {
+        cen = Offset((s.dx + e.dx) / 2, (s.dy + e.dy) / 2);
+      } else {
+        cen = Offset(e.dx, s.dy);
+      }
+      list.add([s, cen, e]);
+    }
+    List<Curve> curveList = [];
+    for (var pl in list) {
+      curveList.add(CurveUtil.ofLine(pl[0], pl[1]));
+      curveList.add(CurveUtil.ofLine(pl[1], pl[2]));
+    }
+    return curveList;
+  }
+}
+
+class RoundStepLineStyle extends StepLineStyle {
+  final double radius;
+  static const double _kappa = 0.5522847498307936;
+
+  RoundStepLineStyle.after({this.radius = 10}) : super.after();
+
+  RoundStepLineStyle.before({this.radius = 10}) : super.before();
+
+  RoundStepLineStyle.center({this.radius = 10}) : super.center();
+
+  @override
+  List<Curve> apply(List<Offset> points) {
+    if (points.length < 2) return const [];
+    if (radius <= 0) {
+      return super.apply(points);
+    }
+
+    final poly = _buildStepPolyline(points);
+    if (poly.length < 2) return const [];
+
+    return _roundPolylineToCurves(poly, radius);
+  }
+
+  List<Offset> _buildStepPolyline(List<Offset> points) {
+    final res = <Offset>[];
+    res.add(points.first);
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final s = points[i];
+      final e = points[i + 1];
+      final cen = _cornerPoint(s, e);
+
+      // 避免重复点
+      if ((res.last - cen).distance > 1e-9) {
+        res.add(cen);
+      }
+      if ((res.last - e).distance > 1e-9) {
+        res.add(e);
+      }
+    }
+    return res;
+  }
+
+  Offset _cornerPoint(Offset s, Offset e) {
+    if (type == 2) return Offset(s.dx, e.dy);
+    if (type == 3) return Offset((s.dx + e.dx) / 2, (s.dy + e.dy) / 2);
+    return Offset(e.dx, s.dy);
+  }
+
+  List<Curve> _roundPolylineToCurves(List<Offset> poly, double r) {
+    const eps = 1e-9;
+    final curves = <Curve>[];
+    Offset current = poly.first;
+    for (int i = 1; i < poly.length - 1; i++) {
+      final p0 = poly[i - 1];
+      final p1 = poly[i];
+      final p2 = poly[i + 1];
+
+      final v01 = p1 - p0;
+      final v12 = p2 - p1;
+
+      final len01 = v01.distance;
+      final len12 = v12.distance;
+
+      if (len01 <= eps || len12 <= eps) {
+        if ((p1 - current).distance > eps) {
+          curves.add(CurveUtil.ofLine(current, p1));
+          current = p1;
+        }
+        continue;
+      }
+
+      final d01 = v01 / len01;
+      final d12 = v12 / len12;
+
+      final dot = d01.dx * d12.dx + d01.dy * d12.dy;
+      if ((dot - 1).abs() < 1e-4 || (dot + 1).abs() < 1e-4) {
+        if ((p1 - current).distance > eps) {
+          curves.add(CurveUtil.ofLine(current, p1));
+          current = p1;
+        }
+        continue;
+      }
+
+      final rr = min(r, min(len01, len12) / 2);
+
+      final a = p1 - d01 * rr;
+      final b = p1 + d12 * rr;
+      if ((a - current).distance > eps) {
+        curves.add(CurveUtil.ofLine(current, a));
+      }
+      final c1 = a + d01 * (rr * _kappa);
+      final c2 = b - d12 * (rr * _kappa);
+      curves.add(Curve(start: a, c1: c1, c2: c2, end: b));
+      current = b;
+    }
+    final end = poly.last;
+    if ((end - current).distance > eps) {
+      curves.add(CurveUtil.ofLine(current, end));
+    }
+    return curves;
+  }
+}
+
+class BasisCurve extends CurveStyle {
   const BasisCurve({required super.smooth});
 
   @override
@@ -162,7 +272,7 @@ final class BasisCurve extends CurveStyle {
   }
 }
 
-final class BasisClosedCurve extends CurveStyle {
+class BasisClosedCurve extends CurveStyle {
   const BasisClosedCurve({required super.smooth});
 
   @override
@@ -192,7 +302,7 @@ final class BasisClosedCurve extends CurveStyle {
   }
 }
 
-final class BasisOpenCurve extends CurveStyle {
+class BasisOpenCurve extends CurveStyle {
   const BasisOpenCurve({required super.smooth});
 
   @override
@@ -224,7 +334,7 @@ final class BasisOpenCurve extends CurveStyle {
   }
 }
 
-final class BsplineCurve extends CurveStyle {
+class BsplineCurve extends CurveStyle {
   const BsplineCurve({required super.smooth});
 
   @override
@@ -260,7 +370,7 @@ final class BsplineCurve extends CurveStyle {
   }
 }
 
-final class BumpXCurve extends CurveStyle {
+class BumpXCurve extends CurveStyle {
   const BumpXCurve({required super.smooth});
 
   @override
@@ -285,7 +395,7 @@ final class BumpXCurve extends CurveStyle {
   }
 }
 
-final class BumpYCurve extends CurveStyle {
+class BumpYCurve extends CurveStyle {
   const BumpYCurve({required super.smooth});
 
   @override
@@ -311,7 +421,7 @@ final class BumpYCurve extends CurveStyle {
   }
 }
 
-final class BundleCurve extends CurveStyle {
+class BundleCurve extends CurveStyle {
   const BundleCurve({required super.smooth});
 
   @override
@@ -339,7 +449,7 @@ final class BundleCurve extends CurveStyle {
   }
 }
 
-final class BundleAlphaCurve extends CurveStyle {
+class BundleAlphaCurve extends CurveStyle {
   final double beta;
 
   const BundleAlphaCurve({required super.smooth, this.beta = 1 / 6});
@@ -370,7 +480,7 @@ final class BundleAlphaCurve extends CurveStyle {
   }
 }
 
-final class CardinalCurve extends CurveStyle {
+class CardinalCurve extends CurveStyle {
   const CardinalCurve({required super.smooth});
 
   @override
@@ -392,7 +502,7 @@ final class CardinalCurve extends CurveStyle {
   }
 }
 
-final class CardinalClosedCurve extends CurveStyle {
+class CardinalClosedCurve extends CurveStyle {
   const CardinalClosedCurve({required super.smooth});
 
   @override
@@ -421,7 +531,7 @@ final class CardinalClosedCurve extends CurveStyle {
   }
 }
 
-final class CardinalOpenCurve extends CurveStyle {
+class CardinalOpenCurve extends CurveStyle {
   const CardinalOpenCurve({required super.smooth});
 
   @override
@@ -445,7 +555,7 @@ final class CardinalOpenCurve extends CurveStyle {
   }
 }
 
-final class CardinalTensionCurve extends CurveStyle {
+class CardinalTensionCurve extends CurveStyle {
   final bool closed;
 
   const CardinalTensionCurve(this.closed, {required super.smooth});
@@ -482,7 +592,7 @@ final class CardinalTensionCurve extends CurveStyle {
   }
 }
 
-final class CatmullRomCurve extends CurveStyle {
+class CatmullRomCurve extends CurveStyle {
   const CatmullRomCurve({required super.smooth});
 
   @override
@@ -511,11 +621,11 @@ final class CatmullRomCurve extends CurveStyle {
   }
 }
 
-final class CatmullRomCloseCurve extends CatmullRomAlphaCurve {
+class CatmullRomCloseCurve extends CatmullRomAlphaCurve {
   CatmullRomCloseCurve({required super.smooth}) : super(closed: true, alpha: 1);
 }
 
-final class CatmullRomOpenCurve extends CurveStyle {
+class CatmullRomOpenCurve extends CurveStyle {
   const CatmullRomOpenCurve({required super.smooth});
 
   @override
@@ -589,7 +699,7 @@ class CatmullRomAlphaCurve extends CurveStyle {
   }
 }
 
-final class MonotoneCurve extends CurveStyle {
+class MonotoneCurve extends CurveStyle {
   const MonotoneCurve({required super.smooth});
 
   @override
@@ -621,7 +731,7 @@ final class MonotoneCurve extends CurveStyle {
   }
 }
 
-final class MonotoneXCurve extends CurveStyle {
+class MonotoneXCurve extends CurveStyle {
   const MonotoneXCurve({required super.smooth});
 
   @override
@@ -674,7 +784,7 @@ final class MonotoneXCurve extends CurveStyle {
   }
 }
 
-final class MonotoneYCurve extends CurveStyle {
+class MonotoneYCurve extends CurveStyle {
   const MonotoneYCurve({required super.smooth});
 
   @override
@@ -721,7 +831,7 @@ final class MonotoneYCurve extends CurveStyle {
   }
 }
 
-final class NaturalCurve extends CurveStyle {
+class NaturalCurve extends CurveStyle {
   const NaturalCurve({required super.smooth});
 
   @override

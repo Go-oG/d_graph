@@ -29,7 +29,7 @@ extension AStarExtension on Graph {
       }
       final Vertex? currentVertex = vertexMap[currentId];
       if (currentVertex == null) continue;
-      for (final edge in outEdges(currentVertex).values) {
+      for (final edge in outEdges(currentVertex.id).values) {
         final String neighborId = (edge.from == currentId) ? edge.to : edge.from;
         final Vertex? neighbor = vertexMap[neighborId];
         if (neighbor == null) continue;

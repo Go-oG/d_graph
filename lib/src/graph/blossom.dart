@@ -148,7 +148,7 @@ extension BlossomAlgorithm on Graph {
   }
 
   Iterable<int> _getNeighborsIndices(Graph g, Vertex v, Map<String, int> idToIndex) sync* {
-    final out = g.outEdges(v);
+    final out = g.outEdges(v.id);
     for (final edge in out.values) {
       final neighborId = (edge.from == v.id) ? edge.to : edge.from;
       if (neighborId == v.id) continue;
@@ -156,7 +156,7 @@ extension BlossomAlgorithm on Graph {
       if (idx != null) yield idx;
     }
 
-    final ind = g.inEdges(v);
+    final ind = g.inEdges(v.id);
     for (final edge in ind.values) {
       final neighborId = (edge.from == v.id) ? edge.to : edge.from;
       if (neighborId == v.id) continue;

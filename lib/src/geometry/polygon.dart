@@ -4,7 +4,6 @@ import 'package:dart_graph/dart_graph.dart';
 import 'package:dts/dts.dart' as dt;
 import 'package:flutter/foundation.dart';
 
-
 class Polygon extends BasicGeometry {
   static final Polygon zero = Polygon([]);
   late final List<Offset> vertices;
@@ -22,11 +21,11 @@ class Polygon extends BasicGeometry {
   late final List<Offset> hull = _getHull();
 
   Polygon(Iterable<Offset> vertex) {
-    this.vertices = List.unmodifiable(vertex);
-    int n = this.vertices.length;
+    vertices = List.unmodifiable(vertex);
+    int n = vertices.length;
     List<SegmentLine> tmp = [];
     for (int i = 0; i < n; i++) {
-      tmp.add(SegmentLine(this.vertices[i], this.vertices[(i + 1) % n]));
+      tmp.add(SegmentLine(vertices[i], vertices[(i + 1) % n]));
     }
     lines = List.unmodifiable(tmp);
   }
@@ -100,6 +99,6 @@ class Polygon extends BasicGeometry {
 
   @override
   dt.Geometry buildGeometry() {
-      return geomFactory.createPolygon5(vertices,false);
+    return geomFactory.createPolygon5(vertices, false);
   }
 }

@@ -1,12 +1,8 @@
 import 'dart:math';
 import 'dart:ui';
+
 import 'package:dart_graph/dart_graph.dart';
 import 'package:dts/dts.dart' as dt;
-import 'basic.dart';
-import 'circle.dart';
-import 'polygon.dart';
-import 'triangle.dart';
-import '../extensions.dart';
 
 abstract class BasicLine extends BasicGeometry {
   final Offset start;

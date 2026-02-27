@@ -39,7 +39,7 @@ extension CycleDetection on Graph {
   }
 
   static Iterable<Vertex> _getNeighbors(Graph g, Vertex v) sync* {
-    final outEdges = g.outEdges(v);
+    final outEdges = g.outEdges(v.id);
     for (final edge in outEdges.values) {
       final neighborId = (edge.from == v.id) ? edge.to : edge.from;
       if (neighborId == v.id) continue;
