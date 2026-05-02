@@ -1,5 +1,7 @@
 library;
 
+export 'package:d_util/d_util.dart' show Angle, NumberExt;
+
 export 'src/curve/curve.dart';
 export 'src/curve/curve_util.dart';
 export 'src/curve/even_spacer.dart';
@@ -41,9 +43,10 @@ export 'src/index/kd_tree.dart';
 export 'src/index/quad_tree.dart';
 export 'src/index/r_tree.dart';
 export 'src/index/tree.dart';
-export 'src/util/angle.dart';
+export 'src/model/polar_offset.dart';
 export 'src/util/basic.dart';
 export 'src/util/boundary_util.dart';
 export 'src/util/contains_util.dart';
+export 'src/util/coord_util.dart';
 export 'src/util/extra_mixin.dart';
 export 'src/util/intersect_util.dart';

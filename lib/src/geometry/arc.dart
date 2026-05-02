@@ -2,7 +2,9 @@ import 'dart:math' as m;
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:d_util/d_util.dart';
 import 'package:dart_graph/dart_graph.dart';
+import 'package:dart_graph/src/util/coord_util.dart';
 import 'package:dts/dts.dart' show Geometry;
 
 class Arc extends BasicGeometry {
@@ -112,7 +114,7 @@ class Arc extends BasicGeometry {
   Offset centroid() {
     var r = (innerRadius + outRadius) / 2;
     var a = (startAngle + endAngle) / 2;
-    return circlePoint(r, a, center);
+    return CoordUtil.circlePoint(r, a, center: center);
   }
 
   Angle centerAngle() => startAngle + (sweepAngle / 2);
@@ -232,7 +234,7 @@ class Arc extends BasicGeometry {
   static Path _buildCircle(Offset center, Angle startAngle, double or, int direction) {
     final piOffset = pi * direction;
     Path path = Path();
-    Offset o1 = circlePoint(or, startAngle, center);
+    Offset o1 = CoordUtil.circlePoint(or, startAngle, center: center);
     Rect orRect = Rect.fromCircle(center: center, radius: or);
     path.moveTo(o1.dx, o1.dy);
     path.arcTo(orRect, startAngle.radians, piOffset, false);
@@ -256,7 +258,7 @@ class Arc extends BasicGeometry {
     path.moveTo(center.dx, center.dy);
     Rect orRect = Rect.fromCircle(center: center, radius: or);
     if (corner <= _cornerMin) {
-      Offset o1 = circlePoint(or, startAngle, center);
+      Offset o1 = CoordUtil.circlePoint(or, startAngle, center: center);
       path.lineTo(o1.dx, o1.dy);
       path.arcTo2(orRect, startAngle, sweepAngle, false);
       path.close();
@@ -327,11 +329,11 @@ class Arc extends BasicGeometry {
     final Path path = Path();
     if (corner <= _cornerMin) {
       ///outer
-      path.moveTo2(circlePoint(or, osa, center));
+      path.moveTo2(CoordUtil.circlePoint(or, osa, center: center));
       path.arcTo2(outRect, osa, outSweep, false);
 
       ///inner
-      path.lineTo2(circlePoint(ir, iea, center));
+      path.lineTo2(CoordUtil.circlePoint(ir, iea, center: center));
       path.arcTo2(inRect, iea, -inSweep, false);
       path.close();
       return path;
@@ -375,7 +377,7 @@ class Arc extends BasicGeometry {
       path.lineTo2(clockwise ? rt.p1 : lt.p2);
       path.arcToPoint(clockwise ? rt.p2 : lt.p1, radius: radius, largeArc: false, clockwise: clockwise);
     } else {
-      path.moveTo2(circlePoint(or, osa, center));
+      path.moveTo2(CoordUtil.circlePoint(or, osa, center: center));
       if (outSweep.radians > 1e-6) {
         path.arcTo2(outRect, osa, outSweep, false);
       }
@@ -401,7 +403,7 @@ class Arc extends BasicGeometry {
       path.lineTo2(clockwise ? lb.p1 : rb.p2);
       path.arcToPoint(clockwise ? lb.p2 : rb.p1, radius: radius, largeArc: false, clockwise: clockwise);
     } else {
-      path.lineTo2(circlePoint(ir, iea, center));
+      path.lineTo2(CoordUtil.circlePoint(ir, iea, center: center));
       if (inSweep.radians > 1e-6) {
         path.arcTo2(inRect, iea, -inSweep, false);
       }

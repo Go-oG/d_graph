@@ -2,10 +2,15 @@ import 'dart:core';
 import 'dart:math';
 import 'dart:ui';
 
-final class BoundaryUtil {
-  BoundaryUtil._();
+import 'package:d_util/d_util.dart';
 
-  static Rect? boundary(Iterable<Offset?> rects) {
+
+final class BoundsUtil {
+  BoundsUtil._();
+
+  static const _tau = pi * 2.0;
+
+  static Rect? pointsBounds(Iterable<Offset?> rects) {
     if (rects.isEmpty) {
       return null;
     }
@@ -30,7 +35,7 @@ final class BoundaryUtil {
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
-  static Rect? boundaryWithRect(Iterable<Rect?> rects) {
+  static Rect? rectsBounds(Iterable<Rect?> rects) {
     if (rects.isEmpty) {
       return null;
     }
@@ -55,7 +60,7 @@ final class BoundaryUtil {
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
-  static Rect? boundaryWith<T>(Iterable<T> nodes, double Function(T node) leftFun, double Function(T node) topFun,
+  static Rect? boundsOf<T>(Iterable<T> nodes, double Function(T node) leftFun, double Function(T node) topFun,
       double Function(T node) rightFun, double Function(T node) bottomFun) {
     double left = double.infinity;
     double top = double.infinity;
@@ -76,5 +81,70 @@ final class BoundaryUtil {
       return null;
     }
     return Rect.fromLTRB(left, top, right, bottom);
+  }
+
+  static Rect arcBounds({
+    required Offset center,
+    required double ir,
+    required double or,
+    required Angle startAngle,
+    required Angle sweepAngle,
+  }) {
+    final endAngle = startAngle + sweepAngle;
+    final cx = center.dx;
+    final cy = center.dy;
+    double minX = double.infinity;
+    double minY = double.infinity;
+    double maxX = -double.infinity;
+    double maxY = -double.infinity;
+
+    void add(double r, double a) {
+      final x = cx + cos(a) * r;
+      final y = cy + sin(a) * r;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+
+    add(ir, startAngle.radians);
+    add(ir, endAngle.radians);
+    add(or, startAngle.radians);
+    add(or, endAngle.radians);
+
+    const qs = <double>[0.0, pi / 2, pi, 3 * pi / 2];
+    for (final q in qs) {
+      if (_angleInSweep(startAngle, sweepAngle, q)) {
+        add(or, q);
+        if (ir > 0) add(ir, q);
+      }
+    }
+
+    if (minX == double.infinity) {
+      return Rect.fromLTWH(cx, cy, 0, 0);
+    }
+    return Rect.fromLTRB(minX, minY, maxX, maxY);
+  }
+
+  static bool _angleInSweep(Angle startAngle, Angle sweepAngle, double angleRad) {
+    final sa = _norm0ToTau(startAngle.radians);
+    final a = _norm0ToTau(angleRad);
+    final sweep = sweepAngle.normalized.radians;
+    final sAbs = sweep.abs();
+    if (sAbs <= 1e-12) return false;
+    final end = _norm0ToTau(sa + sweep);
+    if (sweep >= 0) {
+      if (sa <= end) return a >= sa && a <= end;
+      return a >= sa || a <= end;
+    } else {
+      if (end <= sa) return a >= end && a <= sa;
+      return a >= end || a <= sa;
+    }
+  }
+
+  static double _norm0ToTau(double a) {
+    var x = a % _tau;
+    if (x < 0) x += _tau;
+    return x;
   }
 }
