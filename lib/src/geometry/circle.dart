@@ -138,7 +138,7 @@ final class Circle extends BasicGeometry {
     if (geom is Arc) {
       return geom.crossPoint(this);
     }
-    throw UnimplementedError();
+    return super.crossPoint(geom);
   }
 
   @override

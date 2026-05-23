@@ -2,13 +2,13 @@ import 'graph.dart';
 
 /// 最短路径：贝尔曼-福特算法
 /// 适用于负加权和正加权边。还可以检测负权重循环。返回最短路径和路径。
-extension BellmanFordExtension on Graph {
+extension BellmanFordExtension<V, E> on Graph<V, E> {
   /// `Map<VertexId, CostPath>`
-  Map<String, CostPath> shortestPathsByBellmanFord(String start) {
+  Map<String, CostPath<E>> shortestPathsByBellmanFord(String start) {
     if (!hasVertex(start)) return {};
 
     final Map<String, double> dist = {};
-    final Map<String, Edge> cameFrom = {};
+    final Map<String, Edge<E>> cameFrom = {};
 
     for (final v in vertexIterator) {
       dist[v.id] = double.infinity;
@@ -43,7 +43,7 @@ extension BellmanFordExtension on Graph {
         throw StateError("Graph contains a negative weight cycle.");
       }
     }
-    final Map<String, CostPath> result = {};
+    final Map<String, CostPath<E>> result = {};
     for (final v in vertexIterator) {
       if (dist[v.id] != double.infinity) {
         result[v.id] = CostPath(
@@ -56,18 +56,18 @@ extension BellmanFordExtension on Graph {
   }
 
   /// 计算从 [start] 到 [end] 的最短路径
-  CostPath? shortestPathByBellmanFord(Vertex start, Vertex end) {
+  CostPath<E>? shortestPathByBellmanFord(Vertex<V> start, Vertex<V> end) {
     final allPaths = shortestPathsByBellmanFord(start.id);
     return allPaths[end.id];
   }
 
   /// 执行松弛操作 return true 表示距离被更新了
   bool _relax(
-    Edge edge,
+    Edge<E> edge,
     String sourceId,
     String targetId,
     Map<String, double> dist,
-    Map<String, Edge> cameFrom,
+    Map<String, Edge<E>> cameFrom,
   ) {
     final double distU = dist[sourceId] ?? double.infinity;
     final double distV = dist[targetId] ?? double.infinity;
@@ -83,21 +83,26 @@ extension BellmanFordExtension on Graph {
   }
 
   /// 检查是否还可以松弛（用于检测负环）
-  bool _canRelax(Edge edge, String uId, String vId, Map<String, double> dist) {
+  bool _canRelax(
+    Edge<E> edge,
+    String uId,
+    String vId,
+    Map<String, double> dist,
+  ) {
     final double distU = dist[uId] ?? double.infinity;
     final double distV = dist[vId] ?? double.infinity;
     if (distU == double.infinity) return false;
     return distV > distU + edge.weight;
   }
 
-  List<Edge> _reconstructPath(
-    Map<String, Edge> cameFrom,
+  List<Edge<E>> _reconstructPath(
+    Map<String, Edge<E>> cameFrom,
     String startId,
     String endId,
   ) {
     if (startId == endId) return [];
 
-    final List<Edge> path = [];
+    final List<Edge<E>> path = [];
     String currentId = endId;
 
     int safeGuard = 0;

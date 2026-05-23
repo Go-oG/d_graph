@@ -1,5 +1,3 @@
-import 'dart:math';
-
 final class Vertex<T> {
   final String id;
   final T? data;
@@ -287,26 +285,72 @@ final class Graph<V, E> {
   Vertex<V>? vertexOfNull(String vid) => _vertexMap[vid];
 
   List<Vertex<V>> neighbours(String vid) {
-    final vertex = _vertexMap[vid];
-    if (vertex == null) {
-      return [];
+    return neighborVertices(vid).toList();
+  }
+
+  Iterable<Edge<E>> connectedEdges(
+    String vid, {
+    bool includeIncoming = true,
+  }) sync* {
+    if (!_vertexMap.containsKey(vid)) {
+      return;
     }
-    Set<Vertex<V>> nodeSet = <Vertex<V>>{};
-    void addNeighbor(Edge<E> edge) {
-      final neighborId = edge.from == vid ? edge.to : edge.from;
-      final neighbor = _vertexMap[neighborId];
-      if (neighbor != null && neighbor != vertex) {
-        nodeSet.add(neighbor);
+    final seen = <String>{};
+    for (final edge
+        in _vertexOutEdges[vid]?.values ?? Iterable<Edge<E>>.empty()) {
+      if (seen.add(edge.id)) {
+        yield edge;
       }
     }
+    if (!includeIncoming) {
+      return;
+    }
+    for (final edge
+        in _vertexInEdges[vid]?.values ?? Iterable<Edge<E>>.empty()) {
+      if (seen.add(edge.id)) {
+        yield edge;
+      }
+    }
+  }
 
-    for (var e in _vertexOutEdges[vid]?.values ?? const Iterable.empty()) {
-      addNeighbor(e);
+  Iterable<Edge<E>> traversableEdges(String vid) sync* {
+    if (!_vertexMap.containsKey(vid)) {
+      return;
     }
-    for (var e in _vertexInEdges[vid]?.values ?? const Iterable.empty()) {
-      addNeighbor(e);
+    final seen = <String>{};
+    for (final edge
+        in _vertexOutEdges[vid]?.values ?? Iterable<Edge<E>>.empty()) {
+      if (seen.add(edge.id)) {
+        yield edge;
+      }
     }
-    return nodeSet.toList();
+    for (final edge
+        in _vertexInEdges[vid]?.values ?? Iterable<Edge<E>>.empty()) {
+      if (!edge.directed && seen.add(edge.id)) {
+        yield edge;
+      }
+    }
+  }
+
+  Iterable<Vertex<V>> neighborVertices(
+    String vid, {
+    bool includeIncoming = true,
+  }) sync* {
+    final vertex = _vertexMap[vid];
+    if (vertex == null) {
+      return;
+    }
+    final seen = <String>{};
+    for (final edge in connectedEdges(vid, includeIncoming: includeIncoming)) {
+      final neighborId = edge.from == vid ? edge.to : edge.from;
+      if (neighborId == vid || !seen.add(neighborId)) {
+        continue;
+      }
+      final neighbor = _vertexMap[neighborId];
+      if (neighbor != null && neighbor != vertex) {
+        yield neighbor;
+      }
+    }
   }
 
   Edge<E> edgeOf(String id) => edgeOfNull(id)!;
@@ -456,7 +500,12 @@ final class GraphDegree {
     final fromWeighted = _weightedDegreeMap[e.from];
     final toWeighted = _weightedDegreeMap[e.to];
 
-    if (fromDegree == null || toDegree == null) return;
+    if (fromDegree == null ||
+        toDegree == null ||
+        fromWeighted == null ||
+        toWeighted == null) {
+      return;
+    }
 
     fromDegree.outDegree += delta;
     toDegree.inDegree += delta;
@@ -465,8 +514,6 @@ final class GraphDegree {
       fromDegree.inDegree += delta;
       toDegree.outDegree += delta;
     }
-
-    if (fromWeighted == null || toWeighted == null) return;
 
     fromWeighted.outWeight += w;
     toWeighted.inWeight += w;
@@ -515,9 +562,9 @@ final class WeightDegree {
       'WeightedDegree(in: $inWeight, out: $outWeight, total: $total)';
 }
 
-class CostPath {
+class CostPath<E> {
   final double cost;
-  final List<Edge> path;
+  final List<Edge<E>> path;
 
   const CostPath(this.cost, this.path);
 
@@ -532,11 +579,11 @@ class CostPath {
       return true;
     }
 
-    if ((other is! CostPath)) {
+    if ((other is! CostPath<E>)) {
       return false;
     }
 
-    final CostPath pair = other;
+    final CostPath<E> pair = other;
     if (cost != pair.cost) {
       return false;
     }

@@ -9,9 +9,11 @@ class PolarOffset {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is PolarOffset && runtimeType == other.runtimeType && angle == other.angle && radius == other.radius;
+      other is PolarOffset &&
+          runtimeType == other.runtimeType &&
+          angle == other.angle &&
+          radius == other.radius;
 
   @override
   int get hashCode => Object.hash(angle, radius);
-
 }

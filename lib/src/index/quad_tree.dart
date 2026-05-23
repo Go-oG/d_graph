@@ -6,14 +6,7 @@ import 'common.dart';
 
 typedef Accessor<T> = double Function(T data);
 
-typedef QuadTreeVisitor<T> =
-    VisitResult Function(
-      QuadNode<T> node,
-      double x0,
-      double y0,
-      double x1,
-      double y1,
-    );
+typedef QuadTreeVisitor<T> = VisitResult Function(QuadNode<T> node, double x0, double y0, double x1, double y1);
 
 class QuadTree<T> {
   final Accessor<T> xFun;
@@ -26,14 +19,7 @@ class QuadTree<T> {
   double _x1 = double.nan;
   double _y1 = double.nan;
 
-  QuadTree(
-    this.xFun,
-    this.yFun, [
-    double? x0,
-    double? y0,
-    double? x1,
-    double? y1,
-  ]) {
+  QuadTree(this.xFun, this.yFun, [double? x0, double? y0, double? x1, double? y1]) {
     if (x0 != null && y0 != null && x1 != null && y1 != null) {
       _x0 = x0;
       _y0 = y0;
@@ -42,11 +28,7 @@ class QuadTree<T> {
     }
   }
 
-  static QuadTree<T> fromList<T>(
-    Accessor<T> xFun,
-    Accessor<T> yFun,
-    List<T> nodes,
-  ) {
+  static QuadTree<T> fromList<T>(Accessor<T> xFun, Accessor<T> yFun, List<T> nodes) {
     QuadTree<T> tree = QuadTree(xFun, yFun);
     tree.addAll(nodes);
     return tree;
@@ -102,9 +84,7 @@ class QuadTree<T> {
         }
         if (childCount == 0 && parent != null) {
           parent.children[parentIndex!] = null;
-        } else if (childCount == 1 &&
-            onlyChild != null &&
-            !onlyChild.isInternal) {
+        } else if (childCount == 1 && onlyChild != null && !onlyChild.isInternal) {
           if (parent != null) {
             parent.children[parentIndex!] = onlyChild;
           } else {
@@ -329,16 +309,7 @@ class QuadTree<T> {
     _root = node;
   }
 
-  void _pushCords(
-    List<double> stack,
-    int i,
-    double x0,
-    double y0,
-    double xm,
-    double ym,
-    double x1,
-    double y1,
-  ) {
+  void _pushCords(List<double> stack, int i, double x0, double y0, double xm, double ym, double x1, double y1) {
     if (i == 0) {
       stack.add(x0);
       stack.add(y0);
@@ -367,9 +338,7 @@ class QuadTree<T> {
 
   void visit(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
-    final List<_StackFrame<T>> stack = [
-      _StackFrame(_root!, _x0, _y0, _x1, _y1),
-    ];
+    final List<_StackFrame<T>> stack = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
     while (stack.isNotEmpty) {
       final frame = stack.removeLast();
       final node = frame.node;
@@ -403,9 +372,7 @@ class QuadTree<T> {
   void visitInOrder(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
 
-    final List<_StackFrame<T>> stack = [
-      _StackFrame(_root!, _x0, _y0, _x1, _y1),
-    ];
+    final List<_StackFrame<T>> stack = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
 
     while (stack.isNotEmpty) {
       final frame = stack.removeLast();
@@ -417,14 +384,10 @@ class QuadTree<T> {
           double xm = (frame.x0 + frame.x1) / 2;
           double ym = (frame.y0 + frame.y1) / 2;
           if (node.children[1] != null) {
-            stack.add(
-              _StackFrame(node.children[1]!, xm, frame.y0, frame.x1, ym),
-            );
+            stack.add(_StackFrame(node.children[1]!, xm, frame.y0, frame.x1, ym));
           }
           if (node.children[0] != null) {
-            stack.add(
-              _StackFrame(node.children[0]!, frame.x0, frame.y0, xm, ym),
-            );
+            stack.add(_StackFrame(node.children[0]!, frame.x0, frame.y0, xm, ym));
           }
         }
       } else if (frame.stage == 1) {
@@ -443,14 +406,10 @@ class QuadTree<T> {
           double ym = (frame.y0 + frame.y1) / 2;
 
           if (node.children[3] != null) {
-            stack.add(
-              _StackFrame(node.children[3]!, xm, ym, frame.x1, frame.y1),
-            );
+            stack.add(_StackFrame(node.children[3]!, xm, ym, frame.x1, frame.y1));
           }
           if (node.children[2] != null) {
-            stack.add(
-              _StackFrame(node.children[2]!, frame.x0, ym, xm, frame.y1),
-            );
+            stack.add(_StackFrame(node.children[2]!, frame.x0, ym, xm, frame.y1));
           }
         }
       }
@@ -460,9 +419,7 @@ class QuadTree<T> {
   void visitAfter(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
 
-    final List<_StackFrame<T>> stack = [
-      _StackFrame(_root!, _x0, _y0, _x1, _y1),
-    ];
+    final List<_StackFrame<T>> stack = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
 
     while (stack.isNotEmpty) {
       final frame = stack.removeLast();
@@ -474,9 +431,7 @@ class QuadTree<T> {
         continue;
       }
 
-      stack.add(
-        _StackFrame.of(node, frame.x0, frame.y0, frame.x1, frame.y1, true),
-      );
+      stack.add(_StackFrame.of(node, frame.x0, frame.y0, frame.x1, frame.y1, true));
 
       if (node.isInternal) {
         final result = visitor(node, frame.x0, frame.y0, frame.x1, frame.y1);
@@ -505,9 +460,7 @@ class QuadTree<T> {
 
   void visitBFS(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
-    final List<_StackFrame<T>> queue = [
-      _StackFrame(_root!, _x0, _y0, _x1, _y1),
-    ];
+    final List<_StackFrame<T>> queue = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
     int head = 0;
     while (head < queue.length) {
       final frame = queue[head++];
@@ -574,8 +527,7 @@ class QuadTree<T> {
       if (!node.isInternal) {
         QuadNode<T>? leaf = node;
         while (leaf != null) {
-          double dSq =
-              (leaf.x - x) * (leaf.x - x) + (leaf.y - y) * (leaf.y - y);
+          double dSq = (leaf.x - x) * (leaf.x - x) + (leaf.y - y) * (leaf.y - y);
           if (dSq < minDistanceSq) {
             minDistanceSq = dSq;
             data = leaf.data;
@@ -653,11 +605,7 @@ class QuadTree<T> {
       var currentOld = node.next;
       var currentNew = newNode;
       while (currentOld != null) {
-        currentNew.next = QuadNode<T>.leaf(
-          currentOld.data,
-          currentOld.x,
-          currentOld.y,
-        );
+        currentNew.next = QuadNode<T>.leaf(currentOld.data, currentOld.x, currentOld.y);
         currentNew = currentNew.next!;
         currentOld = currentOld.next;
       }
@@ -746,12 +694,5 @@ final class _StackFrame<T> {
 
   _StackFrame(this.node, this.x0, this.y0, this.x1, this.y1);
 
-  _StackFrame.of(
-    this.node,
-    this.x0,
-    this.y0,
-    this.x1,
-    this.y1, [
-    this.visited = false,
-  ]);
+  _StackFrame.of(this.node, this.x0, this.y0, this.x1, this.y1, [this.visited = false]);
 }

@@ -24,7 +24,9 @@ final class EdmondsKarp {
   /// [to]: 终点下标 (0 到 n-1)
   /// [cap]: 容量
   void addEdge(int from, int to, int cap) {
-    assert(cap >= 0);
+    if (cap < 0) {
+      throw ArgumentError('Capacity must be non-negative, got $cap');
+    }
     // 如果是多重边（两点间多条边），容量累加
     capacity[from][to] += cap;
     // 注意：如果是无向图，通常这里也需要 capacity[to][from] += cap;

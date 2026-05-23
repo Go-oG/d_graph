@@ -34,7 +34,13 @@ final class IntersectUtil {
     return p1.intersects(p2);
   }
 
-  static bool intersectWithLine(Offset p1, Offset p2, Offset q1, Offset q2, {double eps = _defaultEpsilon}) {
+  static bool intersectWithLine(
+    Offset p1,
+    Offset p2,
+    Offset q1,
+    Offset q2, {
+    double eps = _defaultEpsilon,
+  }) {
     if (math.max(p1.dx, p2.dx) < math.min(q1.dx, q2.dx) ||
         math.max(q1.dx, q2.dx) < math.min(p1.dx, p2.dx) ||
         math.max(p1.dy, p2.dy) < math.min(q1.dy, q2.dy) ||
@@ -100,12 +106,18 @@ final class IntersectUtil {
       return diff <= sweep + epsilon;
     }
 
-    final corners = [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
+    final corners = [
+      rect.topLeft,
+      rect.topRight,
+      rect.bottomRight,
+      rect.bottomLeft,
+    ];
 
     for (final p in corners) {
       final v = p - center;
       final d2 = v.distanceSquared;
-      if (d2 >= math.pow(innerRadius - epsilon, 2) && d2 <= math.pow(outerRadius + epsilon, 2)) {
+      if (d2 >= math.pow(innerRadius - epsilon, 2) &&
+          d2 <= math.pow(outerRadius + epsilon, 2)) {
         if (isAngleBetween(math.atan2(v.dy, v.dx))) return true;
       }
     }
@@ -122,7 +134,9 @@ final class IntersectUtil {
       if (r <= epsilon) return false;
       final hits = crossPointsLineWithCircle(p1, p2, center, r, eps: epsilon);
       for (final p in hits) {
-        if (isAngleBetween(math.atan2(p.dy - center.dy, p.dx - center.dx))) return true;
+        if (isAngleBetween(math.atan2(p.dy - center.dy, p.dx - center.dx))) {
+          return true;
+        }
       }
       return false;
     }
@@ -145,12 +159,27 @@ final class IntersectUtil {
     return false;
   }
 
-  static bool intersectLineWithCircle(Offset start, Offset end, Offset center, double radius,
-      {double eps = _defaultEpsilon}) {
-    return crossPointsLineWithCircle(start, end, center, radius, eps: eps).isNotEmpty;
+  static bool intersectLineWithCircle(
+    Offset start,
+    Offset end,
+    Offset center,
+    double radius, {
+    double eps = _defaultEpsilon,
+  }) {
+    return crossPointsLineWithCircle(
+      start,
+      end,
+      center,
+      radius,
+      eps: eps,
+    ).isNotEmpty;
   }
 
-  static bool intersectCircleWithRect(Offset circleCenter, double radius, Rect rect) {
+  static bool intersectCircleWithRect(
+    Offset circleCenter,
+    double radius,
+    Rect rect,
+  ) {
     double closestX = circleCenter.dx.clamp(rect.left, rect.right);
     double closestY = circleCenter.dy.clamp(rect.top, rect.bottom);
 
@@ -160,13 +189,24 @@ final class IntersectUtil {
     return (dx * dx + dy * dy) <= (radius * radius);
   }
 
-
-  static Offset? crossPointWithLines(Offset p1, Offset p2, Offset q1, Offset q2) {
-    final d = (p1.dx - p2.dx) * (q1.dy - q2.dy) - (p1.dy - p2.dy) * (q1.dx - q2.dx);
+  static Offset? crossPointWithLines(
+    Offset p1,
+    Offset p2,
+    Offset q1,
+    Offset q2,
+  ) {
+    final d =
+        (p1.dx - p2.dx) * (q1.dy - q2.dy) - (p1.dy - p2.dy) * (q1.dx - q2.dx);
     if (d.abs() < _defaultEpsilon) return null;
 
-    final t = ((p1.dx - q1.dx) * (q1.dy - q2.dy) - (p1.dy - q1.dy) * (q1.dx - q2.dx)) / d;
-    final u = -((p1.dx - p2.dx) * (p1.dy - q1.dy) - (p1.dy - p2.dy) * (p1.dx - q1.dx)) / d;
+    final t =
+        ((p1.dx - q1.dx) * (q1.dy - q2.dy) -
+            (p1.dy - q1.dy) * (q1.dx - q2.dx)) /
+        d;
+    final u =
+        -((p1.dx - p2.dx) * (p1.dy - q1.dy) -
+            (p1.dy - p2.dy) * (p1.dx - q1.dx)) /
+        d;
 
     if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
       return Offset(p1.dx + t * (p2.dx - p1.dx), p1.dy + t * (p2.dy - p1.dy));
@@ -174,7 +214,12 @@ final class IntersectUtil {
     return null;
   }
 
-  static List<Offset> crossPointsWithCircle(Offset c1, double r1, Offset c2, double r2) {
+  static List<Offset> crossPointsWithCircle(
+    Offset c1,
+    double r1,
+    Offset c2,
+    double r2,
+  ) {
     final dx = c2.dx - c1.dx;
     final dy = c2.dy - c1.dy;
     final d2 = dx * dx + dy * dy;
@@ -246,8 +291,13 @@ final class IntersectUtil {
     return results;
   }
 
-  static List<Offset> crossPointsLineWithCircle(Offset p1, Offset p2, Offset center, double r,
-      {double eps = _defaultEpsilon}) {
+  static List<Offset> crossPointsLineWithCircle(
+    Offset p1,
+    Offset p2,
+    Offset center,
+    double r, {
+    double eps = _defaultEpsilon,
+  }) {
     final d = p2 - p1;
     final f = p1 - center;
 
@@ -269,7 +319,8 @@ final class IntersectUtil {
     final t2 = (-b + discriminant) / (2 * a);
     if (t1 >= -eps && t1 <= 1 + eps) result.add(p1 + d * t1);
     if (t2 >= -eps && t2 <= 1 + eps) {
-      if (result.isEmpty || (result.last - (p1 + d * t2)).distanceSquared > eps) {
+      if (result.isEmpty ||
+          (result.last - (p1 + d * t2)).distanceSquared > eps) {
         result.add(p1 + d * t2);
       }
     }

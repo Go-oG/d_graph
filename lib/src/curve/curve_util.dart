@@ -252,9 +252,9 @@ abstract class CurveUtil {
       ];
     }
 
-    List<Offset> points = reversed
-        ? List.from(dataList.reversed)
-        : List.from(dataList);
+    final List<Offset> points = reversed
+        ? List<Offset>.from(dataList.reversed)
+        : dataList;
     final controlPoints = _computeControlPoints(points, smooth);
 
     final resultList = <Curve>[];

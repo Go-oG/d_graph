@@ -5,20 +5,26 @@ import 'graph.dart';
 /// Johnson 算法
 /// 用于在包含负权边（但无负权环）的稀疏图中，计算所有顶点对之间的最短路径。
 /// 返回: Map<起点, Map<终点, 路径列表>>
-extension JohnsonExt on Graph {
-  Map<Vertex, Map<Vertex, List<Edge>>> shortestPathsByJohnson() {
+extension JohnsonExt<V, E> on Graph<V, E> {
+  Map<Vertex<V>, Map<Vertex<V>, List<Edge<E>>>> shortestPathsByJohnson() {
     final String connectorId = "\$_johnson_\$";
 
     final List<String> tempEdges = [];
-    final Map<Edge, double> originalWeights = {};
+    final Map<Edge<E>, double> originalWeights = {};
 
     try {
       addVertex(connectorId);
       final existingVertices = vertexIterator.toList();
       for (final v in existingVertices) {
         if (v.id == connectorId) continue;
-        String eid="\$${connectorId}_${v.id}\$";
-        addEdge(id: eid, fromVid: connectorId, toVid: v.id, weight: 0, direct: true);
+        String eid = "\$${connectorId}_${v.id}\$";
+        addEdge(
+          id: eid,
+          fromVid: connectorId,
+          toVid: v.id,
+          weight: 0,
+          direct: true,
+        );
         tempEdges.add(eid);
       }
       final Map<String, double> h = _runBellmanFordSafe(connectorId);
@@ -35,11 +41,11 @@ extension JohnsonExt on Graph {
         }
       }
 
-      final Map<Vertex, Map<Vertex, List<Edge>>> allShortestPaths = {};
+      final Map<Vertex<V>, Map<Vertex<V>, List<Edge<E>>>> allShortestPaths = {};
 
       for (final u in existingVertices) {
         final dijkstraResults = shortestPaths(u);
-        final Map<Vertex, List<Edge>> pathsFromU = {};
+        final Map<Vertex<V>, List<Edge<E>>> pathsFromU = {};
         dijkstraResults.forEach((targetId, result) {
           final targetVertex = vertexMap[targetId];
           if (targetVertex != null) {

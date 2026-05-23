@@ -5,8 +5,8 @@ import 'utils.dart';
 
 /// 一般图最大匹配算法 (Edmonds' Blossom Algorithm)
 /// 时间复杂度: O(V^3)
-extension BlossomAlgorithm on Graph {
-  MatchingResult maxMatchingGeneral() {
+extension BlossomAlgorithm<V, E> on Graph<V, E> {
+  MatchingResult<V> maxMatchingGeneral() {
     final vertices = vertexIterator.toList();
     final int n = vertices.length;
 
@@ -60,7 +60,7 @@ extension BlossomAlgorithm on Graph {
     }
 
     void contract(int u, int v) {
-      for(int i=0; i<n; i++) {
+      for (int i = 0; i < n; i++) {
         used[i] = 0;
       }
 
@@ -84,7 +84,7 @@ extension BlossomAlgorithm on Graph {
     bool findAugmentingPath(int root) {
       stateList.fillRange(0, n, 0);
       p.fillRange(0, n, -1);
-      for(int i=0; i<n; i++) {
+      for (int i = 0; i < n; i++) {
         base[i] = i;
       }
 
@@ -94,7 +94,7 @@ extension BlossomAlgorithm on Graph {
 
       while (q.isNotEmpty) {
         final int u = q.removeFirst();
-        final Vertex uVertex = vertices[u];
+        final Vertex<V> uVertex = vertices[u];
         final neighbors = _getNeighborsIndices(this, uVertex, idToIndex);
 
         for (final int v in neighbors) {
@@ -105,8 +105,7 @@ extension BlossomAlgorithm on Graph {
 
           if (stateList[v] == 1) {
             contract(u, v);
-          }
-          else if (stateList[v] == 0) {
+          } else if (stateList[v] == 0) {
             p[v] = u;
             stateList[v] = 2;
 
@@ -137,7 +136,7 @@ extension BlossomAlgorithm on Graph {
       }
     }
 
-    final Map<Vertex, Vertex> mateResult = {};
+    final Map<Vertex<V>, Vertex<V>> mateResult = {};
     for (int i = 0; i < n; i++) {
       if (match[i] != -1) {
         mateResult[vertices[i]] = vertices[match[i]];
@@ -147,21 +146,17 @@ extension BlossomAlgorithm on Graph {
     return MatchingResult(mateResult);
   }
 
-  Iterable<int> _getNeighborsIndices(Graph g, Vertex v, Map<String, int> idToIndex) sync* {
-    final out = g.outEdges(v.id);
-    for (final edge in out.values) {
+  Iterable<int> _getNeighborsIndices(
+    Graph<V, E> g,
+    Vertex<V> v,
+    Map<String, int> idToIndex,
+  ) sync* {
+    final seen = <int>{};
+    for (final edge in g.connectedEdges(v.id)) {
       final neighborId = (edge.from == v.id) ? edge.to : edge.from;
       if (neighborId == v.id) continue;
       final idx = idToIndex[neighborId];
-      if (idx != null) yield idx;
-    }
-
-    final ind = g.inEdges(v.id);
-    for (final edge in ind.values) {
-      final neighborId = (edge.from == v.id) ? edge.to : edge.from;
-      if (neighborId == v.id) continue;
-      final idx = idToIndex[neighborId];
-      if (idx != null) yield idx;
+      if (idx != null && seen.add(idx)) yield idx;
     }
   }
 }

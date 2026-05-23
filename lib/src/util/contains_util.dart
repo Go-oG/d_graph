@@ -117,6 +117,24 @@ final class ContainsUtil {
   }
 
   static bool pointInPolygon(Offset p, List<Offset> polygon) {
+    if (polygon.isEmpty) {
+      return false;
+    }
+    double minX = polygon.first.dx;
+    double maxX = polygon.first.dx;
+    double minY = polygon.first.dy;
+    double maxY = polygon.first.dy;
+    for (var i = 1; i < polygon.length; i++) {
+      final point = polygon[i];
+      if (point.dx < minX) minX = point.dx;
+      if (point.dx > maxX) maxX = point.dx;
+      if (point.dy < minY) minY = point.dy;
+      if (point.dy > maxY) maxY = point.dy;
+    }
+    if (p.dx < minX || p.dx > maxX || p.dy < minY || p.dy > maxY) {
+      return false;
+    }
+
     bool inside = false;
     int j = polygon.length - 1;
     for (int i = 0; i < polygon.length; j = i++) {

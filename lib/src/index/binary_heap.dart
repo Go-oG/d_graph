@@ -2,42 +2,26 @@ import 'dart:collection';
 import 'dart:core';
 import 'dart:math';
 
-interface class BinaryHeap<T> {
-  List<T> getHeap() {
-    return [];
-  }
+abstract interface class BinaryHeap<T> {
+  List<T> getHeap();
 
-  bool add(T value) {
-    throw UnimplementedError();
-  }
+  bool add(T value);
 
-  void clear() {}
+  void clear();
 
-  bool contains(T value) {
-    throw UnimplementedError();
-  }
+  bool contains(T value);
 
-  T? getHeadValue() {
-    throw UnimplementedError();
-  }
+  T? getHeadValue();
 
-  T? remove(T value) {
-    throw UnimplementedError();
-  }
+  T? remove(T value);
 
-  T? removeHead() {
-    throw UnimplementedError();
-  }
+  T? removeHead();
 
-  int get size => throw UnimplementedError();
+  int get size;
 
-  Iterable<T> toCollection() {
-    throw UnimplementedError();
-  }
+  Iterable<T> toCollection();
 
-  bool validate() {
-    throw UnimplementedError();
-  }
+  bool validate();
 }
 
 enum HeapType { min, max }
@@ -207,6 +191,7 @@ class BinaryHeapTree<T> implements BinaryHeap<T> {
   final int Function(T a, T b) compareFun;
   int _size = 0;
   _Node<T>? _root;
+  final Map<T, Set<_Node<T>>> _nodeIndex = HashMap();
 
   BinaryHeapTree(this.compareFun, {this.type = HeapType.min});
 
@@ -217,6 +202,7 @@ class BinaryHeapTree<T> implements BinaryHeap<T> {
   bool add(T value) {
     if (_root == null) {
       _root = _Node(null, value);
+      _addNodeIndex(value, _root!);
       _size++;
       return true;
     }
@@ -230,6 +216,7 @@ class BinaryHeapTree<T> implements BinaryHeap<T> {
     } else {
       parent.right = newNode;
     }
+    _addNodeIndex(value, newNode);
     _heapUp(newNode);
     return true;
   }
@@ -237,8 +224,9 @@ class BinaryHeapTree<T> implements BinaryHeap<T> {
   @override
   T? remove(T value) {
     if (_root == null) return null;
-    _Node<T>? target = _findNodeByValue(_root, value);
-    if (target == null) return null;
+    final targetNodes = _nodeIndex[value];
+    if (targetNodes == null || targetNodes.isEmpty) return null;
+    _Node<T> target = targetNodes.first;
 
     T removedData = target.value;
     _Node<T> lastNode = _findNodeByIndex(_size)!;
@@ -246,9 +234,11 @@ class BinaryHeapTree<T> implements BinaryHeap<T> {
     if (lastNode == _root) {
       _root = null;
       _size = 0;
+      _removeNodeIndex(removedData, lastNode);
       return removedData;
     }
 
+    _removeNodeIndex(lastValue, lastNode);
     _Node<T> lastParent = lastNode.parent!;
     if (lastParent.left == lastNode) {
       lastParent.left = null;
@@ -257,7 +247,9 @@ class BinaryHeapTree<T> implements BinaryHeap<T> {
     }
     _size--;
     if (target != lastNode) {
+      _removeNodeIndex(removedData, target);
       target.value = lastValue;
+      _addNodeIndex(lastValue, target);
       _heapDown(target);
       _heapUp(target);
     }
@@ -285,18 +277,6 @@ class BinaryHeapTree<T> implements BinaryHeap<T> {
       mask >>= 1;
     }
     return curr;
-  }
-
-  _Node<T>? _findNodeByValue(_Node<T>? node, T value) {
-    if (node == null) return null;
-    int cmp = _compare(node.value, value);
-    if (cmp > 0) return null;
-
-    if (node.value == value) return node;
-
-    _Node<T>? res = _findNodeByValue(node.left, value);
-    if (res != null) return res;
-    return _findNodeByValue(node.right, value);
   }
 
   void _heapUp(_Node<T> node) {
@@ -328,9 +308,26 @@ class BinaryHeapTree<T> implements BinaryHeap<T> {
   }
 
   void _swapValue(_Node<T> a, _Node<T> b) {
+    _removeNodeIndex(a.value, a);
+    _removeNodeIndex(b.value, b);
     T temp = a.value;
     a.value = b.value;
     b.value = temp;
+    _addNodeIndex(a.value, a);
+    _addNodeIndex(b.value, b);
+  }
+
+  void _addNodeIndex(T value, _Node<T> node) {
+    _nodeIndex.putIfAbsent(value, () => HashSet.identity()).add(node);
+  }
+
+  void _removeNodeIndex(T value, _Node<T> node) {
+    final nodes = _nodeIndex[value];
+    if (nodes == null) return;
+    nodes.remove(node);
+    if (nodes.isEmpty) {
+      _nodeIndex.remove(value);
+    }
   }
 
   int _compare(T a, T b) {
@@ -342,16 +339,20 @@ class BinaryHeapTree<T> implements BinaryHeap<T> {
   T? getHeadValue() => _root?.value;
 
   @override
-  T? removeHead() => remove(_root?.value as T);
+  T? removeHead() {
+    if (_root == null) return null;
+    return remove(_root!.value);
+  }
 
   @override
   void clear() {
     _root = null;
     _size = 0;
+    _nodeIndex.clear();
   }
 
   @override
-  bool contains(T value) => _findNodeByValue(_root, value) != null;
+  bool contains(T value) => _nodeIndex[value]?.isNotEmpty ?? false;
 
   @override
   bool validate() => true;

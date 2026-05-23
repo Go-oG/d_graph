@@ -328,6 +328,11 @@ extension PathExt on Path {
       throw ArgumentError('dash values must be > 0');
     }
 
+    final double patternLength = pattern.fold<double>(
+      0.0,
+      (previous, element) => previous + element,
+    );
+
     int patIndex = 0;
     double patRemaining = pattern[0];
     bool draw = startWithDraw;
@@ -350,19 +355,15 @@ extension PathExt on Path {
       }
 
       if (phase > 0) {
-        double skipped = 0.0;
-        while (skipped + eps < phase) {
-          final double consume = (patRemaining <= (phase - skipped))
-              ? patRemaining
-              : (phase - skipped);
-          skipped += consume;
-          patRemaining -= consume;
-
-          if (patRemaining <= eps) {
-            patIndex = (patIndex + 1) % pattern.length;
-            patRemaining = pattern[patIndex];
-            draw = !draw;
-          }
+        double normalizedPhase = phase % patternLength;
+        while (normalizedPhase + eps >= patRemaining) {
+          normalizedPhase -= patRemaining;
+          patIndex = (patIndex + 1) % pattern.length;
+          patRemaining = pattern[patIndex];
+          draw = !draw;
+        }
+        if (normalizedPhase > eps) {
+          patRemaining -= normalizedPhase;
         }
         localPos = phase.clamp(0.0, subLen);
         phase = 0.0;
@@ -518,16 +519,19 @@ extension PathExt on Path {
 
   ///合并两个Path,并将其头相连，尾相连
   Path mergePath(Path p2) {
-    Path path = this;
-    PathMetric metric = p2.computeMetrics().single;
-    double length = metric.length;
-    while (length >= 0) {
-      Tangent? t = metric.getTangentForOffset(length);
-      if (t != null) {
-        Offset offset = t.position;
-        path.lineTo(offset.dx, offset.dy);
+    final path = Path()..addPath(this, Offset.zero);
+    for (final metric in p2.computeMetrics()) {
+      if (metric.length <= 0) {
+        continue;
       }
-      length -= 1;
+      final sampleCount = (metric.length / 8).ceil().clamp(2, 128).toInt();
+      for (var i = 0; i <= sampleCount; i++) {
+        final offset = metric.length * (1 - i / sampleCount);
+        final tangent = metric.getTangentForOffset(offset);
+        if (tangent != null) {
+          path.lineTo(tangent.position.dx, tangent.position.dy);
+        }
+      }
     }
     path.close();
     return path;

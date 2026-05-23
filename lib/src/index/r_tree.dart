@@ -2,8 +2,6 @@ import 'dart:collection';
 import 'dart:math' as math;
 import 'dart:ui';
 
-import 'package:dart_graph/src/util/extra_mixin.dart';
-
 import 'common.dart';
 
 typedef RTreeVisitor<T> = VisitResult Function(RNode<T> node);
@@ -48,7 +46,7 @@ final class RTree<E> {
 
   Rect? getBounds(E value) => _rectCacheMap[value];
 
-  List<E> all() => _rectCacheMap.keys.toList();
+  Iterable<E> all() => _rectCacheMap.keys;
 
   List<E> search(Rect rect) {
     if (!_intersectsRect(rect, _root)) {
@@ -404,6 +402,7 @@ final class RTree<E> {
       final index = _findItem(item, node.children);
       if (index != -1) {
         node.children.removeAt(index);
+        _markBBoxDirty(node);
         path.add(node);
         return true;
       }
@@ -426,6 +425,7 @@ final class RTree<E> {
         if (i + 1 < path.length) {
           final parent = path[i + 1];
           parent.children.remove(node);
+          _markBBoxDirty(parent);
         } else {
           clear();
         }
@@ -496,6 +496,22 @@ final class RTree<E> {
       final double bTop = bbox.top;
       final double bRight = bbox.right;
       final double bBottom = bbox.bottom;
+
+      if (strategy == RTreeStrategy.fastInsert) {
+        for (final child in node.children) {
+          if (child.left <= bLeft &&
+              child.top <= bTop &&
+              child.right >= bRight &&
+              child.bottom >= bBottom) {
+            targetNode = child;
+            break;
+          }
+        }
+        if (targetNode != null) {
+          node = targetNode;
+          continue;
+        }
+      }
 
       for (int i = 0; i < node.children.length; i++) {
         var child = node.children[i];
@@ -572,6 +588,7 @@ final class RTree<E> {
 
     final List<RNode<E>> removedItems = node.children.sublist(0, p);
     node.children.removeRange(0, p);
+    _markBBoxDirty(node);
     _calcBBox(node);
     _adjustParentBBoxes(node, path, level - 1);
     for (final item in removedItems.reversed) {
@@ -595,6 +612,7 @@ final class RTree<E> {
 
     List<RNode<E>> newChildren = node.children.sublist(splitIndex);
     node.children.length = splitIndex;
+    _markBBoxDirty(node);
 
     var newNode = _createNode(newChildren);
     newNode.height = node.height;
@@ -604,7 +622,9 @@ final class RTree<E> {
     _calcBBox(newNode);
 
     if (level != 0) {
-      insertPath[level - 1].children.add(newNode);
+      final parent = insertPath[level - 1];
+      parent.children.add(newNode);
+      _extend(parent, newNode);
     } else {
       _splitRoot(node, newNode);
     }
@@ -762,7 +782,15 @@ final class RTree<E> {
   }
 
   void _calcBBox(RNode<E> node) {
+    if (!node._bboxDirty) {
+      return;
+    }
     if (node.children.isEmpty) {
+      node.left = double.infinity;
+      node.top = double.infinity;
+      node.right = double.negativeInfinity;
+      node.bottom = double.negativeInfinity;
+      node._bboxDirty = false;
       return;
     }
 
@@ -781,13 +809,20 @@ final class RTree<E> {
     node.top = minY;
     node.right = maxX;
     node.bottom = maxY;
+    node._bboxDirty = false;
   }
 
   void _extend(RNode<E> a, RNode<E> b) {
+    final wasDirty = a._bboxDirty;
     if (b.left < a.left) a.left = b.left;
     if (b.top < a.top) a.top = b.top;
     if (b.right > a.right) a.right = b.right;
     if (b.bottom > a.bottom) a.bottom = b.bottom;
+    a._bboxDirty = wasDirty;
+  }
+
+  void _markBBoxDirty(RNode<E> node) {
+    node._bboxDirty = true;
   }
 
   int _compareNodeMinX(RNode a, RNode b) => a.left.compareTo(b.left);
@@ -839,7 +874,7 @@ final class RTree<E> {
   }
 }
 
-final class RNode<E> with ValueExtraMixin {
+final class RNode<E> {
   E? data;
   List<RNode<E>> children;
   int height;
@@ -848,6 +883,7 @@ final class RNode<E> with ValueExtraMixin {
   double top;
   double right;
   double bottom;
+  bool _bboxDirty = true;
 
   RNode({
     this.height = 1,

@@ -1,21 +1,24 @@
-
 import 'package:collection/collection.dart';
 import 'graph.dart';
 import 'utils.dart';
 
 /// Kruskal 最小生成树算法
 /// 仅适用于无向图 时间复杂度: O(E log E)
-extension KruskalExtension on Graph {
-  MSTResult minSpanningTreeByKruskal() {
+extension KruskalExtension<V, E> on Graph<V, E> {
+  MSTResult<E> minSpanningTreeByKruskal() {
     if (directed) {
-      throw StateError("Kruskal's algorithm typically requires an undirected graph.");
+      throw StateError(
+        "Kruskal's algorithm typically requires an undirected graph.",
+      );
     }
 
-    final List<Edge> mstEdges = [];
+    final List<Edge<E>> mstEdges = [];
     double totalCost = 0.0;
 
     final unionFind = _UnionFind(vertexMap.keys);
-    final edgeQueue = PriorityQueue<Edge>((a, b) => a.weight.compareTo(b.weight));
+    final edgeQueue = PriorityQueue<Edge<E>>(
+      (a, b) => a.weight.compareTo(b.weight),
+    );
 
     edgeQueue.addAll(edgeIterator);
 

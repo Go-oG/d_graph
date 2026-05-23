@@ -5,11 +5,11 @@ import 'package:dart_graph/dart_graph.dart';
 import 'graph.dart';
 
 ///拓扑排序 (Kahn's Algorithm) 返回拓扑排序后的顶点列表
-extension TopologicalSortExtension on Graph {
+extension TopologicalSortExtension<V, E> on Graph<V, E> {
   /// 普通拓扑排序
   /// - 成功时返回拓扑序
   /// - 如果图中存在环，返回 null
-  List<Vertex>? topologicalSort() {
+  List<Vertex<V>>? topologicalSort() {
     if (!directed) {
       throw StateError(
         'Topological sort can only be performed on directed graphs.',
@@ -31,13 +31,13 @@ extension TopologicalSortExtension on Graph {
         inDegrees[to] = old + 1;
       }
     }
-    final queue = ListQueue<Vertex>();
+    final queue = ListQueue<Vertex<V>>();
     for (final v in vertices) {
       if (inDegrees[v.id] == 0) {
         queue.add(v);
       }
     }
-    final result = <Vertex>[];
+    final result = <Vertex<V>>[];
     while (queue.isNotEmpty) {
       final u = queue.removeFirst();
       result.add(u);
@@ -65,7 +65,7 @@ extension TopologicalSortExtension on Graph {
   /// 层级定义：
   /// - 第 0 层：初始入度为 0 的所有点
   /// - 第 1 层：移除第 0 层后，入度变为 0 的所有点
-  Map<int, List<Vertex>>? topologicalLevelSort() {
+  Map<int, List<Vertex<V>>>? topologicalLevelSort() {
     if (!directed) {
       throw StateError(
         'Topological sort can only be performed on directed graphs.',
@@ -89,19 +89,19 @@ extension TopologicalSortExtension on Graph {
       }
     }
 
-    final currentQueue = ListQueue<Vertex>();
+    final currentQueue = ListQueue<Vertex<V>>();
     for (final v in vertices) {
       if (inDegrees[v.id] == 0) {
         currentQueue.add(v);
       }
     }
 
-    final result = <int, List<Vertex>>{};
+    final result = <int, List<Vertex<V>>>{};
     int level = 0;
     int visitedCount = 0;
     while (currentQueue.isNotEmpty) {
       final levelSize = currentQueue.length;
-      final levelNodes = <Vertex>[];
+      final levelNodes = <Vertex<V>>[];
 
       for (var i = 0; i < levelSize; i++) {
         final u = currentQueue.removeFirst();

@@ -1,8 +1,7 @@
-
 import 'package:dart_graph/dart_graph.dart';
 
-final class MatchingResult {
-  final Map<Vertex, Vertex> mate;
+final class MatchingResult<V> {
+  final Map<Vertex<V>, Vertex<V>> mate;
   late final int size;
 
   MatchingResult(this.mate) {
@@ -16,8 +15,8 @@ final class MatchingResult {
   }
 }
 
-final class MSTResult {
+final class MSTResult<E> {
   final double totalCost;
-  final List<Edge> edges;
+  final List<Edge<E>> edges;
   MSTResult(this.totalCost, this.edges);
 }

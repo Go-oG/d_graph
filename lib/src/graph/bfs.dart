@@ -5,22 +5,22 @@ import 'package:dart_graph/dart_graph.dart';
 import 'graph.dart';
 
 /// 基于邻接表遍历，性能为 O(V+E)
-extension BFSExtension on Graph {
-  List<Vertex> bfs(Vertex start) {
+extension BFSExtension<V, E> on Graph<V, E> {
+  List<Vertex<V>> bfs(Vertex<V> start) {
     if (!hasVertex(start.id)) return [];
 
     final Set<String> visited = {};
-    final List<Vertex> result = [];
-    final Queue<Vertex> queue = Queue();
+    final List<Vertex<V>> result = [];
+    final Queue<Vertex<V>> queue = Queue();
     visited.add(start.id);
     queue.add(start);
     result.add(start);
     while (queue.isNotEmpty) {
-      final Vertex current = queue.removeFirst();
-      final edgeMap = outEdges(current.id);
-
-      for (final edge in edgeMap.values) {
-        final String neighborId = (edge.from == current.id) ? edge.to : edge.from;
+      final Vertex<V> current = queue.removeFirst();
+      for (final edge in traversableEdges(current.id)) {
+        final String neighborId = (edge.from == current.id)
+            ? edge.to
+            : edge.from;
         if (!visited.contains(neighborId)) {
           final neighbor = vertexOfNull(neighborId);
           if (neighbor != null) {

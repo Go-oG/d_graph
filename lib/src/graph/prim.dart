@@ -7,8 +7,8 @@ import 'utils.dart';
 /// 边的子集，该子集形成一个包含每个顶点的树，其中
 /// 树中所有边的总重量最小化。
 /// 时间复杂度: O(E log E)
-extension PrimExtension on Graph {
-  MSTResult minSpanningTreeByPrim(Vertex start) {
+extension PrimExtension<V, E> on Graph<V, E> {
+  MSTResult<E> minSpanningTreeByPrim(Vertex<V> start) {
     if (directed) {
       throw StateError(
         "Prim's algorithm strictly requires an undirected graph.",
@@ -18,15 +18,15 @@ extension PrimExtension on Graph {
       throw ArgumentError("Start vertex not found in graph.");
     }
     double totalCost = 0.0;
-    final List<Edge> mstEdges = [];
+    final List<Edge<E>> mstEdges = [];
     final Set<String> visited = {};
-    final PriorityQueue<Edge> pq = PriorityQueue(
+    final PriorityQueue<Edge<E>> pq = PriorityQueue(
       (a, b) => a.weight.compareTo(b.weight),
     );
     _visit(start, visited, pq);
 
     while (pq.isNotEmpty) {
-      final Edge edge = pq.removeFirst();
+      final Edge<E> edge = pq.removeFirst();
       final nextId = visited.contains(edge.from) ? edge.to : edge.from;
       if (visited.contains(nextId)) {
         continue;
@@ -43,9 +43,9 @@ extension PrimExtension on Graph {
   }
 
   ///标记节点为已访问，并将其连接到未访问节点的边加入队列
-  void _visit(Vertex v, Set<String> visited, PriorityQueue<Edge> pq) {
+  void _visit(Vertex<V> v, Set<String> visited, PriorityQueue<Edge<E>> pq) {
     visited.add(v.id);
-    for (final edge in outEdges(v.id).values) {
+    for (final edge in traversableEdges(v.id)) {
       final nextId = edge.from == v.id ? edge.to : edge.from;
       if (!visited.contains(nextId)) {
         pq.add(edge);

@@ -1,5 +1,1 @@
-enum VisitResult {
-  continueVisit,
-  skipChildren,
-  stop;
-}
+enum VisitResult { continueVisit, skipChildren, stop }

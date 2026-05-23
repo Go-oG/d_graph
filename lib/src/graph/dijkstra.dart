@@ -2,9 +2,9 @@ import 'package:collection/collection.dart';
 
 import 'graph.dart';
 
-final class PathResult {
+final class PathResult<E> {
   final double cost;
-  final List<Edge> path;
+  final List<Edge<E>> path;
 
   PathResult(this.cost, this.path);
 
@@ -22,12 +22,12 @@ class _NodeCost implements Comparable<_NodeCost> {
   int compareTo(_NodeCost other) => cost.compareTo(other.cost);
 }
 
-extension DijkstraExtension on Graph {
-  Map<String, PathResult> shortestPaths(Vertex start) {
+extension DijkstraExtension<V, E> on Graph<V, E> {
+  Map<String, PathResult<E>> shortestPaths(Vertex<V> start) {
     _checkNegativeEdges();
 
     final Map<String, double> distances = {};
-    final Map<String, Edge> predecessors = {};
+    final Map<String, Edge<E>> predecessors = {};
 
     for (final v in vertexIterator) {
       distances[v.id] = double.infinity;
@@ -58,7 +58,7 @@ extension DijkstraExtension on Graph {
       }
     }
 
-    final Map<String, PathResult> results = {};
+    final Map<String, PathResult<E>> results = {};
     for (final vId in distances.keys) {
       if (distances[vId] == double.infinity) continue;
       results[vId] = _buildPath(start.id, vId, predecessors, distances[vId]!);
@@ -67,11 +67,11 @@ extension DijkstraExtension on Graph {
     return results;
   }
 
-  PathResult? shortestPathTo(Vertex start, Vertex end) {
+  PathResult<E>? shortestPathTo(Vertex<V> start, Vertex<V> end) {
     _checkNegativeEdges();
 
     final Map<String, double> distances = {};
-    final Map<String, Edge> predecessors = {};
+    final Map<String, Edge<E>> predecessors = {};
 
     distances[start.id] = 0;
 
@@ -83,11 +83,11 @@ extension DijkstraExtension on Graph {
       final uId = current.vertexId;
       final currentCost = current.cost;
 
+      if (currentCost > (distances[uId] ?? double.infinity)) continue;
+
       if (uId == end.id) {
         return _buildPath(start.id, end.id, predecessors, currentCost);
       }
-
-      if (currentCost > (distances[uId] ?? double.infinity)) continue;
 
       final u = vertexMap[uId];
       if (u == null) continue;
@@ -107,8 +107,13 @@ extension DijkstraExtension on Graph {
     return null;
   }
 
-  PathResult _buildPath(String startId, String endId, Map<String, Edge> predecessors, double totalCost) {
-    final List<Edge> path = [];
+  PathResult<E> _buildPath(
+    String startId,
+    String endId,
+    Map<String, Edge<E>> predecessors,
+    double totalCost,
+  ) {
+    final List<Edge<E>> path = [];
     String? currentId = endId;
 
     while (currentId != startId && currentId != null) {
@@ -121,12 +126,14 @@ extension DijkstraExtension on Graph {
     return PathResult(totalCost, path.reversed.toList());
   }
 
-  Iterable<Edge> _getOutEdges(Vertex v) => outEdges(v.id).values;
+  Iterable<Edge<E>> _getOutEdges(Vertex<V> v) => traversableEdges(v.id);
 
   void _checkNegativeEdges() {
     for (final edge in edgeIterator) {
       if (edge.weight < 0) {
-        throw StateError("Dijkstra algorithm does not support negative weight edges. Edge ID: ${edge.id}");
+        throw StateError(
+          "Dijkstra algorithm does not support negative weight edges. Edge ID: ${edge.id}",
+        );
       }
     }
   }

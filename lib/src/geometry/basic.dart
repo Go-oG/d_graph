@@ -1,11 +1,28 @@
-
 import 'package:dts/dts.dart' as dt;
 import 'package:flutter/material.dart';
 
 import '../extensions.dart';
 
 abstract class BasicGeometry {
-  late final Path path = onBuildPath();
+  Path? _path;
+  bool _buildingPath = false;
+  bool _buildingGeometry = false;
+
+  Path get path {
+    final cached = _path;
+    if (cached != null) {
+      return cached;
+    }
+    if (_buildingPath) {
+      throw StateError('Circular dependency while building geometry path');
+    }
+    _buildingPath = true;
+    try {
+      return _path = onBuildPath();
+    } finally {
+      _buildingPath = false;
+    }
+  }
 
   @protected
   Path onBuildPath();
@@ -19,15 +36,19 @@ abstract class BasicGeometry {
   Rect get bbox;
 
   ///是否有重叠 这个和JTS中的overlap有区别
-  bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) => asGeometry.intersects(geom.asGeometry);
+  bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) =>
+      asGeometry.intersects(geom.asGeometry);
 
   ///是否有重叠 这个和JTS中的overlap有区别
   bool isOverlapRect(Rect rect) => asGeometry.intersects(rect.asGeometry);
 
-  List<Offset> crossPoint(BasicGeometry geom) => BasicGeometry.pickCrossPoint(asGeometry.intersection(geom.asGeometry));
+  List<Offset> crossPoint(BasicGeometry geom) =>
+      BasicGeometry.pickCrossPoint(asGeometry.intersection(geom.asGeometry));
 
   List<Offset> crossPointWithRect(Rect rect) {
-    return BasicGeometry.pickCrossPoint(asGeometry.intersection(rect.asGeometry));
+    return BasicGeometry.pickCrossPoint(
+      asGeometry.intersection(rect.asGeometry),
+    );
   }
 
   double distance(BasicGeometry geom) => asGeometry.distance(geom.asGeometry);
@@ -38,7 +59,8 @@ abstract class BasicGeometry {
 
   bool contains(BasicGeometry geom) => asGeometry.contains(geom.asGeometry);
 
-  bool containsPoint(Offset p, {double eps = 1e-9}) => asGeometry.contains(p.asPoint);
+  bool containsPoint(Offset p, {double eps = 1e-9}) =>
+      asGeometry.contains(p.asPoint);
 
   static List<Offset> pickCrossPoint(dt.Geometry? res) {
     if (res == null || res.isEmpty()) {
@@ -60,10 +82,21 @@ abstract class BasicGeometry {
   dt.Geometry? _geometry;
 
   dt.Geometry get asGeometry {
-    return _geometry ??= buildGeometry();
+    final cached = _geometry;
+    if (cached != null) {
+      return cached;
+    }
+    if (_buildingGeometry) {
+      throw StateError('Circular dependency while building geometry');
+    }
+    _buildingGeometry = true;
+    try {
+      return _geometry = buildGeometry();
+    } finally {
+      _buildingGeometry = false;
+    }
   }
 
   @protected
   dt.Geometry buildGeometry();
 }
-

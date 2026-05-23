@@ -5,8 +5,8 @@ class _BTreeNode<T> {
   bool isLeaf = true;
 
   _BTreeNode(int maxKeys)
-      : keys = List<T?>.filled(maxKeys, null),
-        children = List<_BTreeNode<T>?>.filled(maxKeys + 1, null);
+    : keys = List<T?>.filled(maxKeys, null),
+      children = List<_BTreeNode<T>?>.filled(maxKeys + 1, null);
 
   /// 在节点内部使用二分查找
   /// 返回 index: 如果 >= 0，表示找到；如果 < 0，表示 -(插入点) - 1
@@ -41,9 +41,9 @@ class BTree<T extends Comparable<T>> extends Iterable<T> {
   int _length = 0;
 
   BTree([this.order = 2])
-      : _maxKeys = 2 * order - 1,
-        _maxChildren = 2 * order,
-        _minKeys = order - 1 {
+    : _maxKeys = 2 * order - 1,
+      _maxChildren = 2 * order,
+      _minKeys = order - 1 {
     if (order < 2) throw ArgumentError("Order must be at least 2");
   }
 
@@ -133,7 +133,6 @@ class BTree<T extends Comparable<T>> extends Iterable<T> {
       } else {
         curr = child;
       }
-
     }
   }
 
@@ -149,10 +148,16 @@ class BTree<T extends Comparable<T>> extends Iterable<T> {
     y.count = _minKeys;
     y.keys.fillRange(order, _maxKeys, null);
 
-    List.copyRange(parent.children, i + 2, parent.children, i + 1, parent.count + 1);
+    // Shift children right (from the end to avoid overlap issues)
+    for (int j = parent.count; j > i; j--) {
+      parent.children[j + 1] = parent.children[j];
+    }
     parent.children[i + 1] = z;
 
-    List.copyRange(parent.keys, i + 1, parent.keys, i, parent.count);
+    // Shift keys right
+    for (int j = parent.count - 1; j >= i; j--) {
+      parent.keys[j + 1] = parent.keys[j];
+    }
     parent.keys[i] = y.keys[order - 1];
     parent.count++;
 
@@ -208,7 +213,9 @@ class BTree<T extends Comparable<T>> extends Iterable<T> {
 
       if (child.count == _minKeys) {
         _BTreeNode<T>? leftSib = (idx > 0) ? node.children[idx - 1] : null;
-        _BTreeNode<T>? rightSib = (idx < node.count) ? node.children[idx + 1] : null;
+        _BTreeNode<T>? rightSib = (idx < node.count)
+            ? node.children[idx + 1]
+            : null;
 
         if (leftSib != null && leftSib.count >= order) {
           _borrowFromLeft(node, idx, child, leftSib);
@@ -241,18 +248,35 @@ class BTree<T extends Comparable<T>> extends Iterable<T> {
     List.copyRange(left.keys, left.count + 1, right.keys, 0, right.count);
 
     if (!left.isLeaf) {
-      List.copyRange(left.children, left.count + 1, right.children, 0, right.count + 1);
+      List.copyRange(
+        left.children,
+        left.count + 1,
+        right.children,
+        0,
+        right.count + 1,
+      );
     }
 
     left.count += right.count + 1;
     _arrayRemoveAt(parent.keys, idx, parent.count);
-    List.copyRange(parent.children, idx + 1, parent.children, idx + 2, parent.count + 1);
+    List.copyRange(
+      parent.children,
+      idx + 1,
+      parent.children,
+      idx + 2,
+      parent.count + 1,
+    );
     parent.children[parent.count] = null;
     parent.keys[parent.count - 1] = null;
     parent.count--;
   }
 
-  void _borrowFromLeft(_BTreeNode<T> parent, int idx, _BTreeNode<T> child, _BTreeNode<T> left) {
+  void _borrowFromLeft(
+    _BTreeNode<T> parent,
+    int idx,
+    _BTreeNode<T> child,
+    _BTreeNode<T> left,
+  ) {
     List.copyRange(child.keys, 1, child.keys, 0, child.count);
     if (!child.isLeaf) {
       List.copyRange(child.children, 1, child.children, 0, child.count + 1);
@@ -271,7 +295,12 @@ class BTree<T extends Comparable<T>> extends Iterable<T> {
     left.count--;
   }
 
-  void _borrowFromRight(_BTreeNode<T> parent, int idx, _BTreeNode<T> child, _BTreeNode<T> right) {
+  void _borrowFromRight(
+    _BTreeNode<T> parent,
+    int idx,
+    _BTreeNode<T> child,
+    _BTreeNode<T> right,
+  ) {
     child.keys[child.count] = parent.keys[idx];
     parent.keys[idx] = right.keys[0];
 

@@ -43,8 +43,10 @@ final class CoordUtil {
     double xQ = qRadius * qAngle.cos;
     double yQ = qRadius * qAngle.sin;
 
-    double xNew = (xP - xQ) * rotateAngle.cos - (yP - yQ) * rotateAngle.sin + xQ;
-    double yNew = (xP - xQ) * rotateAngle.sin + (yP - yQ) * rotateAngle.cos + yQ;
+    double xNew =
+        (xP - xQ) * rotateAngle.cos - (yP - yQ) * rotateAngle.sin + xQ;
+    double yNew =
+        (xP - xQ) * rotateAngle.sin + (yP - yQ) * rotateAngle.cos + yQ;
 
     double rNew = sqrt(xNew * xNew + yNew * yNew);
     double thetaNew = atan2(yNew, xNew);
@@ -52,18 +54,24 @@ final class CoordUtil {
   }
 
   ///给定缩放前返回和缩放中心 缩放系数 计算缩放后的范围
-  static List<double> scaleRange(List<double> range, double scaleCenter, double k) {
+  static List<double> scaleRange(
+    List<double> range,
+    double scaleCenter,
+    double k,
+  ) {
     double aScaled = scaleCenter + k * (range[0] - scaleCenter);
     double bScaled = scaleCenter + k * (range[1] - scaleCenter);
     return [aScaled, bScaled];
   }
 
   ///给定圆心 半径和角度计算坐标
-  static Offset circlePoint(num radius, Angle radian, {Offset center = Offset.zero}) {
+  static Offset circlePoint(
+    num radius,
+    Angle radian, {
+    Offset center = Offset.zero,
+  }) {
     double x = center.dx + radius * radian.cos;
     double y = center.dy + radius * radian.sin;
     return Offset(x, y);
   }
-
-
 }

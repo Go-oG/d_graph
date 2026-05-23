@@ -23,7 +23,11 @@ final class Triangle extends BasicGeometry {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Triangle && runtimeType == other.runtimeType && a == other.a && b == other.b && c == other.c;
+      other is Triangle &&
+          runtimeType == other.runtimeType &&
+          a == other.a &&
+          b == other.b &&
+          c == other.c;
 
   @override
   int get hashCode => Object.hash(a, b, c);
@@ -61,12 +65,18 @@ final class Triangle extends BasicGeometry {
   }
 
   @override
-  double distanceWithPoint(Offset p) => asGeometry.distance(geomFactory.createPoint4(p));
+  double distanceWithPoint(Offset p) =>
+      asGeometry.distance(geomFactory.createPoint4(p));
 
   @override
   double distanceWithRect(Rect rect) {
     final p1 = geomFactory.createPolygon5([a, b, c]);
-    final p2 = geomFactory.createPolygon5([rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft]);
+    final p2 = geomFactory.createPolygon5([
+      rect.topLeft,
+      rect.topRight,
+      rect.bottomRight,
+      rect.bottomLeft,
+    ]);
     return p1.distance(p2);
   }
 
@@ -107,15 +117,22 @@ final class Triangle extends BasicGeometry {
 
   @override
   double get area {
-    return (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)).abs() / 2.0;
+    return (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)).abs() /
+        2.0;
   }
 
   @override
   Rect get bbox {
-    final xMin = [a.x, b.x, c.x].reduce((v, e) => v < e ? v : e);
-    final xMax = [a.x, b.x, c.x].reduce((v, e) => v > e ? v : e);
-    final yMin = [a.y, b.y, c.y].reduce((v, e) => v < e ? v : e);
-    final yMax = [a.y, b.y, c.y].reduce((v, e) => v > e ? v : e);
+    var xMin = a.x;
+    var xMax = a.x;
+    var yMin = a.y;
+    var yMax = a.y;
+    for (final p in [b, c]) {
+      if (p.x < xMin) xMin = p.x;
+      if (p.x > xMax) xMax = p.x;
+      if (p.y < yMin) yMin = p.y;
+      if (p.y > yMax) yMax = p.y;
+    }
     return Rect.fromLTRB(xMin, yMin, xMax, yMax);
   }
 
@@ -133,13 +150,19 @@ final class Triangle extends BasicGeometry {
   }
 
   bool _isOverlapCircle(Offset center, double r) {
-    if ((a.x - center.x) * (a.x - center.x) + (a.y - center.y) * (a.y - center.y) <= r * r) {
+    if ((a.x - center.x) * (a.x - center.x) +
+            (a.y - center.y) * (a.y - center.y) <=
+        r * r) {
       return true;
     }
-    if ((b.x - center.x) * (b.x - center.x) + (b.y - center.y) * (b.y - center.y) <= r * r) {
+    if ((b.x - center.x) * (b.x - center.x) +
+            (b.y - center.y) * (b.y - center.y) <=
+        r * r) {
       return true;
     }
-    if ((c.x - center.x) * (c.x - center.x) + (c.y - center.y) * (c.y - center.y) <= r * r) {
+    if ((c.x - center.x) * (c.x - center.x) +
+            (c.y - center.y) * (c.y - center.y) <=
+        r * r) {
       return true;
     }
 
@@ -151,7 +174,8 @@ final class Triangle extends BasicGeometry {
     return d1 <= r || d2 <= r || d3 <= r;
   }
 
-  List<Offset> _crossPointWithLine(SegmentLine line) => line.crossPointWithTriangle(this);
+  List<Offset> _crossPointWithLine(SegmentLine line) =>
+      line.crossPointWithTriangle(this);
 
   List<Offset> _crossPointWithCircle(Offset center, double radius) {
     List<Offset> resultList = [];

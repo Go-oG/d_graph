@@ -4,9 +4,8 @@ import '../../dart_graph.dart';
 /// 计算图中所有顶点对之间的最短路径。
 /// 支持负权边，但不支持负权环。
 /// 时间复杂度: O(V^3)
-extension FloydWarshallExtension on Graph {
-
-  Map<Vertex, Map<Vertex, double>> getVertexAllShortestPaths() {
+extension FloydWarshallExtension<V, E> on Graph<V, E> {
+  Map<Vertex<V>, Map<Vertex<V>, double>> getVertexAllShortestPaths() {
     final vertices = vertexIterator.toList();
     final int n = vertices.length;
 
@@ -15,10 +14,10 @@ extension FloydWarshallExtension on Graph {
       idToIndex[vertices[i].id] = i;
     }
 
-    final List<List<double>> dist = List.generate(n, (_) => List.filled(n, double.infinity));
+    final List<double> dist = List.filled(n * n, double.infinity);
 
     for (int i = 0; i < n; i++) {
-      dist[i][i] = 0.0;
+      dist[i * n + i] = 0.0;
     }
 
     for (final edge in edgeIterator) {
@@ -26,49 +25,59 @@ extension FloydWarshallExtension on Graph {
       final v = idToIndex[edge.to];
 
       if (u != null && v != null) {
-        if (edge.weight < dist[u][v]) {
-          dist[u][v] = edge.weight;
+        final uv = u * n + v;
+        if (edge.weight < dist[uv]) {
+          dist[uv] = edge.weight;
         }
 
         if (!edge.directed) {
-          if (edge.weight < dist[v][u]) {
-            dist[v][u] = edge.weight;
+          final vu = v * n + u;
+          if (edge.weight < dist[vu]) {
+            dist[vu] = edge.weight;
           }
         }
       }
     }
 
     for (int k = 0; k < n; k++) {
+      final kOffset = k * n;
       for (int i = 0; i < n; i++) {
-        if (dist[i][k] == double.infinity) continue;
+        final ik = dist[i * n + k];
+        if (ik.isInfinite) continue;
+        final iOffset = i * n;
         for (int j = 0; j < n; j++) {
-          if (dist[k][j] == double.infinity) continue;
-          final newDist = dist[i][k] + dist[k][j];
-          if (newDist < dist[i][j]) {
-            dist[i][j] = newDist;
+          final kj = dist[kOffset + j];
+          if (kj.isInfinite) continue;
+          final newDist = ik + kj;
+          final ij = iOffset + j;
+          if (newDist < dist[ij]) {
+            dist[ij] = newDist;
           }
         }
       }
     }
 
     for (int i = 0; i < n; i++) {
-      if (dist[i][i] < 0) {
-        throw StateError("Graph contains a negative weight cycle. Floyd-Warshall cannot yield reliable results.");
+      if (dist[i * n + i] < 0) {
+        throw StateError(
+          "Graph contains a negative weight cycle. Floyd-Warshall cannot yield reliable results.",
+        );
       }
     }
 
-    final Map<Vertex, Map<Vertex, double>> result = {};
+    final Map<Vertex<V>, Map<Vertex<V>, double>> result = {};
     for (int i = 0; i < n; i++) {
       final vFrom = vertices[i];
-      final Map<Vertex, double> pathsFromV = {};
+      final Map<Vertex<V>, double> pathsFromV = {};
+      final iOffset = i * n;
       for (int j = 0; j < n; j++) {
-        if (dist[i][j] != double.infinity) {
-          pathsFromV[vertices[j]] = dist[i][j];
+        final distance = dist[iOffset + j];
+        if (!distance.isInfinite) {
+          pathsFromV[vertices[j]] = distance;
         }
       }
       result[vFrom] = pathsFromV;
     }
     return result;
   }
-
 }

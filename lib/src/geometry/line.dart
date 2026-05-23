@@ -337,7 +337,7 @@ final class RayLine extends BasicLine {
   Rect get bbox => _proxyLine.bbox;
 
   @override
-  dt.Geometry buildGeometry() => throw UnimplementedError();
+  dt.Geometry buildGeometry() => _proxyLine.asGeometry;
 
   @override
   Offset get center => _proxyLine.center;
@@ -376,10 +376,10 @@ final class RayLine extends BasicLine {
   double get length => double.infinity;
 
   @override
-  Path onBuildPath() => throw UnimplementedError();
+  Path onBuildPath() => _proxyLine.path;
 
   @override
-  Path get path => throw UnimplementedError();
+  Path get path => _proxyLine.path;
 
   SegmentLine get segmentLine => _proxyLine;
 }
@@ -402,7 +402,7 @@ final class Line extends BasicLine {
   Rect get bbox => _proxyLine.bbox;
 
   @override
-  dt.Geometry buildGeometry() => throw UnimplementedError();
+  dt.Geometry buildGeometry() => _proxyLine.asGeometry;
 
   @override
   Offset get center => _proxyLine.center;
@@ -441,29 +441,42 @@ final class Line extends BasicLine {
   double get length => double.infinity;
 
   @override
-  Path onBuildPath() => throw UnimplementedError();
+  Path onBuildPath() => _proxyLine.path;
 
   @override
-  Path get path => throw UnimplementedError();
+  Path get path => _proxyLine.path;
 
   SegmentLine get segmentLine => _proxyLine;
 }
 
 /// 简洁版：把直线 p1->p2 延伸成“超长”线段
 /// [L] 是半长度，返回 [start, end]
-List<Offset> _extendLineSimple(Offset p1, Offset p2, {double L = 1e10}) {
+List<Offset> _extendLineSimple(Offset p1, Offset p2, {double? L}) {
   final dx = p2.dx - p1.dx;
   final dy = p2.dy - p1.dy;
   final dist = sqrt(dx * dx + dy * dy);
+  final length = L ?? _defaultLineExtensionLength(p1, p2, dist);
 
   if (dist < 1e-12) {
-    return [Offset(p1.dx - L, p1.dy), Offset(p1.dx + L, p1.dy)];
+    return [Offset(p1.dx - length, p1.dy), Offset(p1.dx + length, p1.dy)];
   }
 
   final ux = dx / dist;
   final uy = dy / dist;
   final center = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
-  final start = Offset(center.dx - ux * L, center.dy - uy * L);
-  final end = Offset(center.dx + ux * L, center.dy + uy * L);
+  final start = Offset(center.dx - ux * length, center.dy - uy * length);
+  final end = Offset(center.dx + ux * length, center.dy + uy * length);
   return [start, end];
+}
+
+double _defaultLineExtensionLength(Offset p1, Offset p2, double dist) {
+  final scale = [
+    p1.dx.abs(),
+    p1.dy.abs(),
+    p2.dx.abs(),
+    p2.dy.abs(),
+    dist,
+    1.0,
+  ].reduce(max);
+  return max(scale * 1e6, 1e10);
 }

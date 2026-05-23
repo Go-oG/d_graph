@@ -151,14 +151,9 @@ class BinarySearchTree<T> extends ITree<T> {
       return null;
     }
 
-    BSNode<T>? greater = startingNode.right;
-    while (greater != null && greater.data != null) {
-      BSNode<T>? node = greater.right;
-      if (node != null && node.data != null) {
-        greater = node;
-      } else {
-        break;
-      }
+    BSNode<T>? greater = startingNode;
+    while (greater != null && greater.right != null && greater.right!.data != null) {
+      greater = greater.right;
     }
     return greater;
   }
@@ -168,14 +163,9 @@ class BinarySearchTree<T> extends ITree<T> {
       return null;
     }
 
-    BSNode<T>? lesser = startingNode.left;
-    while (lesser != null && lesser.data != null) {
-      BSNode<T>? node = lesser.left;
-      if (node != null && node.data != null) {
-        lesser = node;
-      } else {
-        break;
-      }
+    BSNode<T>? lesser = startingNode;
+    while (lesser != null && lesser.left != null && lesser.left!.data != null) {
+      lesser = lesser.left;
     }
     return lesser;
   }
@@ -264,12 +254,12 @@ class BinarySearchTree<T> extends ITree<T> {
       if (root != null) {
         root!.parent = null;
       }
-    } else if (parent.left != null && (compareFun.call(parent.left!.data, nodeToRemoved.data) == 0)) {
+    } else if (parent.left != null && identical(parent.left, nodeToRemoved)) {
       parent.left = replacementNode;
       if (replacementNode != null) {
         replacementNode.parent = parent;
       }
-    } else if (parent.right != null && (compareFun.call(parent.right!.data, nodeToRemoved.data) == 0)) {
+    } else if (parent.right != null && identical(parent.right, nodeToRemoved)) {
       parent.right = replacementNode;
       if (replacementNode != null) {
         replacementNode.parent = parent;
@@ -324,12 +314,11 @@ class BinarySearchTree<T> extends ITree<T> {
 
   static List<T> getBFSStatic<T>(BSNode<T>? start, int size, int Function(T a, T b) compareFun) {
     final Queue<BSNode<T>> queue = Queue();
-    final Map<int, T> values = {};
+    final values = <T>[];
 
-    int count = 0;
     BSNode<T>? node = start;
     while (node != null) {
-      values[count++] = node.data;
+      values.add(node.data);
       if (node.left != null) {
         queue.add(node.left!);
       }
@@ -342,10 +331,7 @@ class BinarySearchTree<T> extends ITree<T> {
         node = null;
       }
     }
-
-    final keyList = values.keys.toList();
-    keyList.sort((a, b) => a.compareTo(b));
-    return keyList.map((e) => values[e]!).toList();
+    return values;
   }
 
   List<T> getLevelOrder() {
@@ -357,20 +343,23 @@ class BinarySearchTree<T> extends ITree<T> {
   }
 
   static List<T> getDFSStatic<T>(
-      DepthFirstSearchOrder order, BSNode<T>? start, int size, int Function(T a, T b) compareFun) {
+    DepthFirstSearchOrder order,
+    BSNode<T>? start,
+    int size,
+    int Function(T a, T b) compareFun,
+  ) {
     final Set<BSNode<T>> added = <BSNode<T>>{};
-    final Map<int, T> nodes = {};
+    final nodes = <T>[];
 
-    int index = 0;
     BSNode<T>? node = start;
-    while (index < size && node != null) {
+    while (nodes.length < size && node != null) {
       BSNode<T>? parent = node.parent;
       BSNode<T>? lesser = (node.left != null && !added.contains(node.left)) ? node.left : null;
       BSNode<T>? greater = (node.right != null && !added.contains(node.right)) ? node.right : null;
 
       if (parent == null && lesser == null && greater == null) {
         if (!added.contains(node)) {
-          nodes[index++] = node.data;
+          nodes.add(node.data);
         }
         break;
       }
@@ -380,7 +369,7 @@ class BinarySearchTree<T> extends ITree<T> {
           node = lesser;
         } else {
           if (!added.contains(node)) {
-            nodes[index++] = node.data;
+            nodes.add(node.data);
             added.add(node);
           }
           if (greater != null) {
@@ -393,7 +382,7 @@ class BinarySearchTree<T> extends ITree<T> {
         }
       } else if (order == DepthFirstSearchOrder.preOrder) {
         if (!added.contains(node)) {
-          nodes[index++] = node.data;
+          nodes.add(node.data);
           added.add(node);
         }
         if (lesser != null) {
@@ -412,17 +401,14 @@ class BinarySearchTree<T> extends ITree<T> {
           if (greater != null) {
             node = greater;
           } else {
-            nodes[index++] = node.data;
+            nodes.add(node.data);
             added.add(node);
             node = parent;
           }
         }
       }
     }
-
-    final keyList = nodes.keys.toList();
-    keyList.sort((a, b) => a.compareTo(b));
-    return keyList.map((e) => nodes[e]!).toList();
+    return nodes;
   }
 
   List<T> getSorted() {

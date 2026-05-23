@@ -1,11 +1,12 @@
 import 'graph.dart';
 
 ///循环检测
-extension CycleDetection on Graph {
-
+extension CycleDetection<V, E> on Graph<V, E> {
   bool hasCycle() {
     if (directed) {
-      throw StateError("Current implementation only supports Undirected Graphs.");
+      throw StateError(
+        "Current implementation only supports Undirected Graphs.",
+      );
     }
 
     final Set<String> visited = {};
@@ -20,7 +21,12 @@ extension CycleDetection on Graph {
     return false;
   }
 
-  static bool _dfsDetectCycle(Graph g, Vertex current, Vertex? parent, Set<String> visited) {
+  bool _dfsDetectCycle(
+    Graph<V, E> g,
+    Vertex<V> current,
+    Vertex<V>? parent,
+    Set<String> visited,
+  ) {
     visited.add(current.id);
     final neighbors = _getNeighbors(g, current);
 
@@ -38,13 +44,6 @@ extension CycleDetection on Graph {
     return false;
   }
 
-  static Iterable<Vertex> _getNeighbors(Graph g, Vertex v) sync* {
-    final outEdges = g.outEdges(v.id);
-    for (final edge in outEdges.values) {
-      final neighborId = (edge.from == v.id) ? edge.to : edge.from;
-      if (neighborId == v.id) continue;
-      final neighbor = g.vertexMap[neighborId];
-      if (neighbor != null) yield neighbor;
-    }
-  }
+  Iterable<Vertex<V>> _getNeighbors(Graph<V, E> g, Vertex<V> v) =>
+      g.neighborVertices(v.id, includeIncoming: false);
 }

@@ -1,16 +1,16 @@
 import 'package:dart_graph/dart_graph.dart';
 
-extension DFSExtension on Graph {
-  List<Vertex> dfs(Vertex source) {
+extension DFSExtension<V, E> on Graph<V, E> {
+  List<Vertex<V>> dfs(Vertex<V> source) {
     if (!vertexMap.containsKey(source.id)) {
       throw ArgumentError(
         'Source vertex ${source.id} does not exist in the graph.',
       );
     }
 
-    final List<Vertex> result = [];
+    final List<Vertex<V>> result = [];
     final Set<String> visited = {};
-    final List<Vertex> stack = [];
+    final List<Vertex<V>> stack = [];
     stack.add(source);
     visited.add(source.id);
 
@@ -29,15 +29,6 @@ extension DFSExtension on Graph {
     return result;
   }
 
-  Iterable<Vertex> _getNeighbors(Vertex v) sync* {
-    final out = outEdges(v.id);
-    if (out.isNotEmpty) {
-      for (final edge in out.values) {
-        final targetId = edge.from == v.id ? edge.to : edge.from;
-        if (targetId == v.id && !allowSelfLoop) continue;
-        final target = vertexMap[targetId];
-        if (target != null) yield target;
-      }
-    }
-  }
+  Iterable<Vertex<V>> _getNeighbors(Vertex<V> v) =>
+      neighborVertices(v.id, includeIncoming: false);
 }

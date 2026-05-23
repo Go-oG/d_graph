@@ -112,16 +112,58 @@ class KdTree<T> {
     }
 
     if (tolerance > 0) {
-      final nearest = _nearest(_root, p, _root!, double.infinity, 0);
-      if (nearest != null) {
-        final distSq = (nearest.node.coordinate - p).distanceSquared;
-        if (distSq <= _toleranceSq) {
-          nearest.node.increment();
-          return nearest.node;
-        }
+      final result = _nearestWithInsertSlot(p);
+      if (result.bestDistSq <= _toleranceSq) {
+        result.bestNode.increment();
+        return result.bestNode;
       }
+      final newNode = KdNode(p, data);
+      if (result.insertLeft) {
+        result.insertParent._left = newNode;
+      } else {
+        result.insertParent._right = newNode;
+      }
+      _numberOfNodes++;
+      return newNode;
     }
     return _insertExact(p, data);
+  }
+
+  _InsertSearch<T> _nearestWithInsertSlot(Offset target) {
+    KdNode<T> bestNode = _root!;
+    double bestDistSq = double.infinity;
+    KdNode<T>? insertParent;
+    bool insertLeft = false;
+
+    void visit(KdNode<T>? node, int depth, bool onInsertPath) {
+      if (node == null) return;
+      final distSq = (node.coordinate - target).distanceSquared;
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        bestNode = node;
+      }
+
+      final axis = depth % 2;
+      final targetVal = axis == 0 ? target.dx : target.dy;
+      final nodeVal = axis == 0 ? node.coordinate.dx : node.coordinate.dy;
+      final goLeft = targetVal < nodeVal;
+      final diff = targetVal - nodeVal;
+      final near = goLeft ? node.left : node.right;
+      final far = goLeft ? node.right : node.left;
+
+      if (onInsertPath && near == null) {
+        insertParent = node;
+        insertLeft = goLeft;
+      }
+
+      visit(near, depth + 1, onInsertPath);
+      if (diff * diff < bestDistSq) {
+        visit(far, depth + 1, false);
+      }
+    }
+
+    visit(_root, 0, true);
+    return _InsertSearch(bestNode, bestDistSq, insertParent!, insertLeft);
   }
 
   KdNode<T> _insertExact(Offset p, [T? data]) {
@@ -269,6 +311,20 @@ class _BestNode<T> {
   final double distSq;
 
   _BestNode(this.node, this.distSq);
+}
+
+class _InsertSearch<T> {
+  final KdNode<T> bestNode;
+  final double bestDistSq;
+  final KdNode<T> insertParent;
+  final bool insertLeft;
+
+  _InsertSearch(
+    this.bestNode,
+    this.bestDistSq,
+    this.insertParent,
+    this.insertLeft,
+  );
 }
 
 class KdNode<T> {

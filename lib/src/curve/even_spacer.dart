@@ -87,17 +87,22 @@ class EvenSpacer2 {
     return mix(paramLower, paramUpper, segmentFraction);
   }
 
-  /// 数值积分计算弧长 (梯形法)
-  double _arcLengthAt(double t, {int steps = 20}) {
-    double length = 0.0;
-    Vector2 prev = curve.pointAt(0);
-    for (int i = 1; i <= steps; i++) {
-      double u = t * i / steps;
-      Vector2 p = curve.pointAt(u);
-      length += (p - prev).length;
-      prev = p;
+  double _arcLengthAt(double t) {
+    if (t <= 0) return 0.0;
+    if (t >= 1) return arcLength;
+
+    final scaledIndex = t * (curveLookUpTable.length - 1);
+    final lowerIndex = scaledIndex.floor();
+    final upperIndex = lowerIndex + 1;
+    if (upperIndex >= _cumulativeArcLengths.length) {
+      return arcLength;
     }
-    return length;
+    final segmentT = scaledIndex - lowerIndex;
+    return mix(
+      _cumulativeArcLengths[lowerIndex],
+      _cumulativeArcLengths[upperIndex],
+      segmentT,
+    );
   }
 
   List<double>? _evenTValues;
