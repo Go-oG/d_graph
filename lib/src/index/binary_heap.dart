@@ -168,7 +168,7 @@ class BinaryHeapArray<T> implements BinaryHeap<T> {
   @override
   void clear() {
     _size = 0;
-    _array.clear();
+    _array = List.filled(minSize, null);
   }
 
   @override
@@ -189,7 +189,8 @@ class BinaryHeapArray<T> implements BinaryHeap<T> {
   bool validate() => true;
 
   @override
-  Iterable<T> toCollection() => _JavaCompatibleBinaryHeapArray(compareFun, this);
+  Iterable<T> toCollection() =>
+      _JavaCompatibleBinaryHeapArray(compareFun, this);
 
   @override
   List<T> getHeap() {
@@ -401,7 +402,10 @@ class _Node<T> {
 class _JavaCompatibleBinaryHeapArray<T> extends Iterable<T> {
   late BinaryHeapArray<T> heap;
 
-  _JavaCompatibleBinaryHeapArray(int Function(T a, T b) compareFun, [BinaryHeapArray<T>? heap]) {
+  _JavaCompatibleBinaryHeapArray(
+    int Function(T a, T b) compareFun, [
+    BinaryHeapArray<T>? heap,
+  ]) {
     this.heap = heap ?? BinaryHeapArray(compareFun);
   }
 
@@ -499,6 +503,7 @@ class _BinaryHeapTreeIterator<C> implements Iterator<C> {
   late BinaryHeapTree<C> heap;
 
   _Node<C>? last;
+  C? _current;
 
   Queue<_Node<C>> toVisit = DoubleLinkedQueue();
 
@@ -520,7 +525,8 @@ class _BinaryHeapTreeIterator<C> implements Iterator<C> {
       if (n.left != null) toVisit.add(n.left!);
       if (n.right != null) toVisit.add(n.right!);
       last = n;
-      return n.value;
+      _current = n.value;
+      return _current;
     }
     return null;
   }
@@ -529,11 +535,11 @@ class _BinaryHeapTreeIterator<C> implements Iterator<C> {
 
   @override
   C get current {
-    return next()!;
+    return _current as C;
   }
 
   @override
   bool moveNext() {
-    return hasNext();
+    return next() != null;
   }
 }

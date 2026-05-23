@@ -21,22 +21,76 @@ class KdTree<T> {
 
   KdNode<T>? _buildBalanced(List<KdNode<T>> nodes, int depth) {
     if (nodes.isEmpty) return null;
-    final axis = depth % 2;
-    nodes.sort((a, b) {
-      if (axis == 0) {
-        return a.coordinate.dx.compareTo(b.coordinate.dx);
-      } else {
-        return a.coordinate.dy.compareTo(b.coordinate.dy);
-      }
-    });
+    return _buildBalancedRange(nodes, 0, nodes.length, depth);
+  }
 
-    final mid = nodes.length ~/ 2;
+  KdNode<T>? _buildBalancedRange(
+    List<KdNode<T>> nodes,
+    int start,
+    int end,
+    int depth,
+  ) {
+    if (start >= end) return null;
+    final axis = depth % 2;
+    final mid = start + (end - start) ~/ 2;
+    _selectByAxis(nodes, start, end - 1, mid, axis);
     final node = nodes[mid];
 
-    node._left = _buildBalanced(nodes.sublist(0, mid), depth + 1);
-    node._right = _buildBalanced(nodes.sublist(mid + 1), depth + 1);
+    node._left = _buildBalancedRange(nodes, start, mid, depth + 1);
+    node._right = _buildBalancedRange(nodes, mid + 1, end, depth + 1);
 
     return node;
+  }
+
+  void _selectByAxis(
+    List<KdNode<T>> nodes,
+    int left,
+    int right,
+    int target,
+    int axis,
+  ) {
+    while (left < right) {
+      final pivotIndex = (left + right) >> 1;
+      final pivotNewIndex = _partition(nodes, left, right, pivotIndex, axis);
+      if (target == pivotNewIndex) {
+        return;
+      }
+      if (target < pivotNewIndex) {
+        right = pivotNewIndex - 1;
+      } else {
+        left = pivotNewIndex + 1;
+      }
+    }
+  }
+
+  int _partition(
+    List<KdNode<T>> nodes,
+    int left,
+    int right,
+    int pivotIndex,
+    int axis,
+  ) {
+    final pivotValue = _axisValue(nodes[pivotIndex], axis);
+    _swap(nodes, pivotIndex, right);
+    int storeIndex = left;
+    for (int i = left; i < right; i++) {
+      if (_axisValue(nodes[i], axis) < pivotValue) {
+        _swap(nodes, storeIndex, i);
+        storeIndex++;
+      }
+    }
+    _swap(nodes, right, storeIndex);
+    return storeIndex;
+  }
+
+  double _axisValue(KdNode<T> node, int axis) =>
+      axis == 0 ? node.coordinate.dx : node.coordinate.dy;
+
+  void _swap(List<KdNode<T>> nodes, int a, int b) {
+    if (a == b) return;
+    final temp = nodes[a];
+    nodes[a] = nodes[b];
+    nodes[b] = temp;
   }
 
   int _countNodes(KdNode<T>? node) {
@@ -118,7 +172,12 @@ class KdTree<T> {
     return _nearest(_root, target, _root!, double.infinity, 0)?.node;
   }
 
-  void _queryRectRecursive(KdNode<T>? node, Rect range, int depth, List<KdNode<T>> results) {
+  void _queryRectRecursive(
+    KdNode<T>? node,
+    Rect range,
+    int depth,
+    List<KdNode<T>> results,
+  ) {
     if (node == null) return;
     if (range.contains(node.coordinate)) {
       results.add(node);
@@ -136,7 +195,12 @@ class KdTree<T> {
   }
 
   _BestNode<T>? _nearest(
-      KdNode<T>? node, Offset target, KdNode<T> currentBestNode, double currentMinDistSq, int depth) {
+    KdNode<T>? node,
+    Offset target,
+    KdNode<T> currentBestNode,
+    double currentMinDistSq,
+    int depth,
+  ) {
     if (node == null) return null;
     double dSq = (node.coordinate - target).distanceSquared;
     KdNode<T> bestNode = currentBestNode;
@@ -178,7 +242,10 @@ class KdTree<T> {
     return 1 + math.max(_maxDepth(node.left), _maxDepth(node.right));
   }
 
-  static List<Offset> toCoordinates<T>(List<KdNode<T>> nodes, [bool includeRepeated = false]) {
+  static List<Offset> toCoordinates<T>(
+    List<KdNode<T>> nodes, [
+    bool includeRepeated = false,
+  ]) {
     if (!includeRepeated) {
       return nodes.map((e) => e.coordinate).toList();
     }

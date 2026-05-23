@@ -52,7 +52,13 @@ abstract class CurveStyle implements LineStyle {
   Offset lerp(Offset a, Offset b, double t) => Offset.lerp(a, b, t)!;
 
   @protected
-  Offset bezierPoint(Offset a, Offset b, Offset c, List<double> multiArgs, double dived) {
+  Offset bezierPoint(
+    Offset a,
+    Offset b,
+    Offset c,
+    List<double> multiArgs,
+    double dived,
+  ) {
     if (multiArgs.length != 3 || dived == 0) {
       throw ArgumentError("");
     }
@@ -280,7 +286,13 @@ class BasisClosedCurve extends CurveStyle {
     points = fillPointsIfNeed(points, 3);
     final n = points.length;
     final curves = <Curve>[];
-    final ring = <Offset>[points[n - 2], points[n - 1], ...points, points[0], points[1]];
+    final ring = <Offset>[
+      points[n - 2],
+      points[n - 1],
+      ...points,
+      points[0],
+      points[1],
+    ];
 
     final List<double> args = [1, 4, 1];
     final double dived = 6;
@@ -294,7 +306,11 @@ class BasisClosedCurve extends CurveStyle {
       final endLinear = (p2 + p3) / 2;
       final start = lerp(startLinear, (p0 + (p1 * 2) + p2) / 4, smooth);
       final end = lerp(endLinear, (p1 + (p2 * 2) + p3) / 4, smooth);
-      final cp1 = lerp(startLinear, bezierPoint(p0, p1, p2, args, dived), smooth);
+      final cp1 = lerp(
+        startLinear,
+        bezierPoint(p0, p1, p2, args, dived),
+        smooth,
+      );
       final cp2 = lerp(endLinear, bezierPoint(p1, p2, p3, args, dived), smooth);
       curves.add(Curve.of(start, cp1, cp2, end));
     }
@@ -361,8 +377,12 @@ class BsplineCurve extends CurveStyle {
       final endLinear = (p2 + p3) / 2;
 
       result.add(
-        Curve.of(lerp(startLinear, startCurve, smooth), lerp(startLinear, cp1, smooth), lerp(endLinear, cp2, smooth),
-            lerp(endLinear, endCurve, smooth)),
+        Curve.of(
+          lerp(startLinear, startCurve, smooth),
+          lerp(startLinear, cp1, smooth),
+          lerp(endLinear, cp2, smooth),
+          lerp(endLinear, endCurve, smooth),
+        ),
       );
     }
 
@@ -388,7 +408,9 @@ class BumpXCurve extends CurveStyle {
 
       final mx1 = Offset((p0.dx * 2 + p1.dx) / 3, (2 * p0.dy + p1.dy) / 3);
       final mx2 = Offset((p0.dx + p1.dx * 2) / 3, (p0.dy + 2 * p1.dy) / 3);
-      result.add(Curve.of(p0, lerp(mx1, c1, smooth), lerp(mx2, c2, smooth), p1));
+      result.add(
+        Curve.of(p0, lerp(mx1, c1, smooth), lerp(mx2, c2, smooth), p1),
+      );
     }
 
     return result;
@@ -414,7 +436,9 @@ class BumpYCurve extends CurveStyle {
 
       final mx1 = Offset((2 * p0.dx + p1.dx) / 3, (2 * p0.dy + p1.dy) / 3);
       final mx2 = Offset((p0.dx + 2 * p1.dx) / 3, (p0.dy + 2 * p1.dy) / 3);
-      result.add(Curve.of(p0, lerp(mx1, c1, smooth), lerp(mx2, c2, smooth), p1));
+      result.add(
+        Curve.of(p0, lerp(mx1, c1, smooth), lerp(mx2, c2, smooth), p1),
+      );
     }
 
     return result;
@@ -473,7 +497,9 @@ class BundleAlphaCurve extends CurveStyle {
       final cp2 = p2 - t2;
       final mid = (p1 + p2) / 2;
 
-      curves.add(Curve.of(p1, lerp(cp1, mid, smooth), lerp(cp2, mid, smooth), p2));
+      curves.add(
+        Curve.of(p1, lerp(cp1, mid, smooth), lerp(cp2, mid, smooth), p2),
+      );
     }
 
     return curves;
@@ -513,7 +539,13 @@ class CardinalClosedCurve extends CurveStyle {
     final curves = <Curve>[];
     final s = (1 - smooth) / 2;
 
-    final ring = <Offset>[points[n - 2], points[n - 1], ...points, points[0], points[1]];
+    final ring = <Offset>[
+      points[n - 2],
+      points[n - 1],
+      ...points,
+      points[0],
+      points[1],
+    ];
 
     for (int i = 0; i < n; i++) {
       final p0 = ring[i];
@@ -521,8 +553,14 @@ class CardinalClosedCurve extends CurveStyle {
       final p2 = ring[i + 2];
       final p3 = ring[i + 3];
 
-      final cp1 = Offset(p1.dx + s * (p2.dx - p0.dx), p1.dy + s * (p2.dy - p0.dy));
-      final cp2 = Offset(p2.dx - s * (p3.dx - p1.dx), p2.dy - s * (p3.dy - p1.dy));
+      final cp1 = Offset(
+        p1.dx + s * (p2.dx - p0.dx),
+        p1.dy + s * (p2.dy - p0.dy),
+      );
+      final cp2 = Offset(
+        p2.dx - s * (p3.dx - p1.dx),
+        p2.dy - s * (p3.dy - p1.dy),
+      );
 
       curves.add(Curve.of(p1, cp1, cp2, p2));
     }
@@ -546,8 +584,14 @@ class CardinalOpenCurve extends CurveStyle {
       final p2 = extended[i + 2];
       final p3 = extended[i + 3];
 
-      final cp1 = Offset(p1.dx + s * (p2.dx - p0.dx), p1.dy + s * (p2.dy - p0.dy));
-      final cp2 = Offset(p2.dx - s * (p3.dx - p1.dx), p2.dy - s * (p3.dy - p1.dy));
+      final cp1 = Offset(
+        p1.dx + s * (p2.dx - p0.dx),
+        p1.dy + s * (p2.dy - p0.dy),
+      );
+      final cp2 = Offset(
+        p2.dx - s * (p3.dx - p1.dx),
+        p2.dy - s * (p3.dy - p1.dy),
+      );
       curves.add(Curve.of(p1, cp1, cp2, p2));
     }
 
@@ -584,8 +628,14 @@ class CardinalTensionCurve extends CurveStyle {
       final p1 = ring[i + 1];
       final p2 = ring[i + 2];
       final p3 = ring[i + 3];
-      final cp1 = Offset(p1.dx + s * (p2.dx - p0.dx), p1.dy + s * (p2.dy - p0.dy));
-      final cp2 = Offset(p2.dx - s * (p3.dx - p1.dx), p2.dy - s * (p3.dy - p1.dy));
+      final cp1 = Offset(
+        p1.dx + s * (p2.dx - p0.dx),
+        p1.dy + s * (p2.dy - p0.dy),
+      );
+      final cp2 = Offset(
+        p2.dx - s * (p3.dx - p1.dx),
+        p2.dy - s * (p3.dy - p1.dy),
+      );
       curves.add(Curve.of(p1, cp1, cp2, p2));
     }
     return curves;
@@ -609,8 +659,12 @@ class CatmullRomCurve extends CurveStyle {
       final d2 = (p2 - p1).distance;
       final d3 = (p3 - p2).distance;
 
-      final t1 = d1 == 0 ? Offset.zero : ((p2 - p0) * (smooth * d1 / (d1 + d2)));
-      final t2 = d2 == 0 ? Offset.zero : ((p3 - p1) * (smooth * d2 / (d2 + d3)));
+      final t1 = d1 == 0
+          ? Offset.zero
+          : ((p2 - p0) * (smooth * d1 / (d1 + d2)));
+      final t2 = d2 == 0
+          ? Offset.zero
+          : ((p3 - p1) * (smooth * d2 / (d2 + d3)));
 
       final cp1 = p1 + t1 / 3;
       final cp2 = p2 - t2 / 3;
@@ -639,8 +693,14 @@ class CatmullRomOpenCurve extends CurveStyle {
       final p1 = extended[i + 1];
       final p2 = extended[i + 2];
       final p3 = extended[i + 3];
-      final cp1 = Offset(p1.dx + s * (p2.dx - p0.dx), p1.dy + s * (p2.dy - p0.dy));
-      final cp2 = Offset(p2.dx - s * (p3.dx - p1.dx), p2.dy - s * (p3.dy - p1.dy));
+      final cp1 = Offset(
+        p1.dx + s * (p2.dx - p0.dx),
+        p1.dy + s * (p2.dy - p0.dy),
+      );
+      final cp2 = Offset(
+        p2.dx - s * (p3.dx - p1.dx),
+        p2.dy - s * (p3.dy - p1.dy),
+      );
       curves.add(Curve.of(p1, cp1, cp2, p2));
     }
 
@@ -652,7 +712,11 @@ class CatmullRomAlphaCurve extends CurveStyle {
   final double alpha;
   final bool closed;
 
-  const CatmullRomAlphaCurve({required this.alpha, this.closed = false, required super.smooth});
+  const CatmullRomAlphaCurve({
+    required this.alpha,
+    this.closed = false,
+    required super.smooth,
+  });
 
   @override
   List<Curve> onApply(List<Offset> points, double smooth) {
@@ -680,6 +744,13 @@ class CatmullRomAlphaCurve extends CurveStyle {
       final t1 = t0 + _powDist(p0, p1, alpha);
       final t2 = t1 + _powDist(p1, p2, alpha);
       final t3 = t2 + _powDist(p2, p3, alpha);
+
+      if ((t2 - t0).abs() < 1e-12 ||
+          (t3 - t1).abs() < 1e-12 ||
+          (t2 - t1).abs() < 1e-12) {
+        curves.add(CurveUtil.ofLine(p1, p2));
+        continue;
+      }
 
       final m1 = lerp(p0, p2, (t1 - t0) / (t2 - t0));
       final m2 = lerp(p1, p3, (t2 - t1) / (t3 - t1));
@@ -837,7 +908,13 @@ class NaturalCurve extends CurveStyle {
   @override
   List<Curve> onApply(List<Offset> points, double smooth) {
     int n = points.length;
-    final h = List<double>.generate(n - 1, (i) => points[i + 1].dx - points[i].dx);
+    final h = List<double>.generate(
+      n - 1,
+      (i) => points[i + 1].dx - points[i].dx,
+    );
+    if (h.any((e) => e.abs() < 1e-12)) {
+      return CurveUtil.buildCurve(points, smooth: smooth);
+    }
     final alpha = List<double>.filled(n - 1, 0);
     for (int i = 1; i < n - 1; i++) {
       final dy1 = (points[i].dy - points[i - 1].dy) / h[i - 1];
@@ -860,7 +937,9 @@ class NaturalCurve extends CurveStyle {
 
     for (int j = n - 2; j >= 0; j--) {
       c[j] = z[j] - mu[j] * c[j + 1];
-      b[j] = (points[j + 1].dy - points[j].dy) / h[j] - h[j] * (c[j + 1] + 2 * c[j]) / 3;
+      b[j] =
+          (points[j + 1].dy - points[j].dy) / h[j] -
+          h[j] * (c[j + 1] + 2 * c[j]) / 3;
       d[j] = (c[j + 1] - c[j]) / (3 * h[j]);
     }
 
@@ -880,8 +959,12 @@ class NaturalCurve extends CurveStyle {
       final cp2 = Offset(p1.dx - dx / 3, p1.dy - m1 * dx / 3);
 
       curves.add(
-        Curve.of(lerp(startLinear, p0, smooth), lerp((p0 + p1) / 2, cp1, smooth), lerp((p0 + p1) / 2, cp2, smooth),
-            lerp(endLinear, p1, smooth)),
+        Curve.of(
+          lerp(startLinear, p0, smooth),
+          lerp((p0 + p1) / 2, cp1, smooth),
+          lerp((p0 + p1) / 2, cp2, smooth),
+          lerp(endLinear, p1, smooth),
+        ),
       );
     }
     return curves;

@@ -1,6 +1,6 @@
 name: dart_graph
 description: "A geometry util library"
-version: 1.2.1
+version: 1.2.2
 homepage: https://github.com/Go-oG/d_graph
 
 environment:

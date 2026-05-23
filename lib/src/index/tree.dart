@@ -99,7 +99,9 @@ class Tree<T> {
 
     TreeNode<T>? tmp = newParent;
     while (tmp != null) {
-      if (tmp == node) throw StateError('Cannot move node into its own descendant');
+      if (tmp == node) {
+        throw StateError('Cannot move node into its own descendant');
+      }
       tmp = tmp.parent;
     }
 
@@ -115,7 +117,6 @@ class Tree<T> {
 
     _invalidateAncestors(oldParent);
     _invalidateAncestors(newParent);
-    node._updateDepth(newParent.depth + 1);
     _reindexDepth(node, newParent.depth + 1);
   }
 
@@ -209,6 +210,7 @@ class Tree<T> {
     _root = null;
     _nodeMap.clear();
     _leafMap.clear();
+    _depthNodeMap.clear();
   }
 
   int get maxDepth {
@@ -247,7 +249,8 @@ class Tree<T> {
     return result;
   }
 
-  Iterable<TreeNode<T>> getNodesAtDepthFast(int depth) => _depthNodeMap[depth] ?? <TreeNode<T>>{};
+  Iterable<TreeNode<T>> getNodesAtDepthFast(int depth) =>
+      _depthNodeMap[depth] ?? <TreeNode<T>>{};
 
   Tree<T> copySubtree(T rootData) {
     final startNode = getNode(rootData);
@@ -353,7 +356,11 @@ class Tree<T> {
     return null;
   }
 
-  List<TreeNode<T>> findWhere(bool Function(TreeNode<T>) where, {bool iterator = true, int limit = -1}) {
+  List<TreeNode<T>> findWhere(
+    bool Function(TreeNode<T>) where, {
+    bool iterator = true,
+    int limit = -1,
+  }) {
     if (_root == null) return [];
     return _root!.findWhere(where, iterator: iterator, limit: limit);
   }
@@ -517,22 +524,6 @@ class TreeNode<T> {
     return _descendantCount;
   }
 
-  void _updateDepth(int startDepth) {
-    final stack = <({TreeNode<T> node, int depth})>[];
-    stack.add((node: this, depth: startDepth));
-
-    while (stack.isNotEmpty) {
-      final current = stack.removeLast();
-      final currNode = current.node;
-      final currDepth = current.depth;
-      currNode._depth = currDepth;
-      final children = currNode._children;
-      for (var i = children.length - 1; i >= 0; i--) {
-        stack.add((node: children[i], depth: currDepth + 1));
-      }
-    }
-  }
-
   /// 获取所有祖先节点 [父, 爷, ..., 根]
   List<TreeNode<T>> get ancestors {
     List<TreeNode<T>> list = [];
@@ -634,7 +625,11 @@ class TreeNode<T> {
     }
   }
 
-  List<TreeNode<T>> findWhere(bool Function(TreeNode<T>) where, {bool iterator = true, int limit = -1}) {
+  List<TreeNode<T>> findWhere(
+    bool Function(TreeNode<T>) where, {
+    bool iterator = true,
+    int limit = -1,
+  }) {
     final result = <TreeNode<T>>[];
     final maxCount = limit <= 0 ? 2147483647 : limit;
 
@@ -833,7 +828,9 @@ class _ChildList<T> extends ListBase<TreeNode<T>> {
 
   @override
   void sort([int Function(TreeNode<T> a, TreeNode<T> b)? compare]) {
-    sortWithIndex(compare ?? (a, b) => (a.data as Comparable).compareTo(b.data));
+    sortWithIndex(
+      compare ?? (a, b) => (a.data as Comparable).compareTo(b.data),
+    );
   }
 
   void sortWithIndex(Comparator<TreeNode<T>> compare) {
@@ -888,7 +885,11 @@ extension TreeExt<T> on Tree<T> {
     return [leftTree, rightTree];
   }
 
-  void _copyBranchTo(TreeNode<T> sourceNode, Tree<T> targetTree, T targetParentData) {
+  void _copyBranchTo(
+    TreeNode<T> sourceNode,
+    Tree<T> targetTree,
+    T targetParentData,
+  ) {
     targetTree.add(targetParentData, sourceNode.data);
     for (var child in sourceNode.children) {
       _copyBranchTo(child, targetTree, sourceNode.data);

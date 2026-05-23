@@ -35,7 +35,8 @@ class AVLNode<T> extends BSNode<T> {
 }
 
 class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
-  AVLTree([Comparator<T>? compareFun]) : super(compareFun ?? (a, b) => a.compareTo(b));
+  AVLTree([Comparator<T>? compareFun])
+    : super(compareFun ?? (a, b) => a.compareTo(b));
 
   @override
   AVLNode<T>? get root => super.root as AVLNode<T>?;
@@ -44,9 +45,14 @@ class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
   bool add(T value) {
     if (root == null) {
       super.root = AVLNode<T>(value);
+      mSize++;
       return true;
     }
+    final exists = contains(value);
     super.root = _insert(root!, value);
+    if (!exists) {
+      mSize++;
+    }
     return true;
   }
 
@@ -55,18 +61,19 @@ class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
     if (root == null) return null;
     AVLNode<T>? current = root;
     while (current != null) {
-      int cmp = value.compareTo(current.data);
+      int cmp = compareFun(value, current.data);
       if (cmp == 0) break;
       current = cmp < 0 ? current.leftNode : current.rightNode;
     }
     if (current == null) return null;
     T removedValue = current.data;
     super.root = _delete(root!, value);
+    mSize--;
     return removedValue;
   }
 
   AVLNode<T> _insert(AVLNode<T> node, T value) {
-    int cmp = value.compareTo(node.data);
+    int cmp = compareFun(value, node.data);
 
     if (cmp < 0) {
       if (node.leftNode == null) {
@@ -91,7 +98,7 @@ class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
   }
 
   AVLNode<T>? _delete(AVLNode<T> node, T value) {
-    int cmp = value.compareTo(node.data);
+    int cmp = compareFun(value, node.data);
 
     if (cmp < 0) {
       if (node.leftNode != null) {
@@ -200,11 +207,15 @@ class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
     if (h != 1 + math.max(lh, rh)) return false;
 
     // 验证父指针一致性 (Debug用)
-    if (node.leftNode != null && node.leftNode!.parentNode != node) return false;
-    if (node.rightNode != null && node.rightNode!.parentNode != node) return false;
+    if (node.leftNode != null && node.leftNode!.parentNode != node) {
+      return false;
+    }
+    if (node.rightNode != null && node.rightNode!.parentNode != node) {
+      return false;
+    }
 
-    bool lOk = node.leftNode == null || _validateNode(node.leftNode!);
-    bool rOk = node.rightNode == null || _validateNode(node.rightNode!);
+    final lOk = node.leftNode == null || _validateNode(node.leftNode!);
+    final rOk = node.rightNode == null || _validateNode(node.rightNode!);
     return lOk && rOk;
   }
 }

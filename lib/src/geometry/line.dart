@@ -38,7 +38,10 @@ abstract class BasicLine extends BasicGeometry {
     if (identical(other, this)) {
       return true;
     }
-    return other is BasicLine && other.start == start && other.end == end && other.runtimeType == runtimeType;
+    return other is BasicLine &&
+        other.start == start &&
+        other.end == end &&
+        other.runtimeType == runtimeType;
   }
 
   @override
@@ -103,14 +106,27 @@ class SegmentLine extends BasicLine {
 
   @override
   double distanceWithPoint(Offset p) {
-    final line = geomFactory.createLinearRing4([start, end]);
-    return line.distance(geomFactory.createPoint4(p));
+    final ab = end - start;
+    final lenSq = ab.distanceSquared;
+    if (lenSq <= 0) {
+      return (p - start).distance;
+    }
+    final ap = p - start;
+    final t = (ap.dx * ab.dx + ap.dy * ab.dy) / lenSq;
+    final clamped = t.clamp(0.0, 1.0);
+    final projection = start + ab * clamped;
+    return (p - projection).distance;
   }
 
   @override
   double distanceWithRect(Rect rect) {
     final line = geomFactory.createLineString3([start, end]);
-    final rr = geomFactory.createPolygon5([rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft]);
+    final rr = geomFactory.createPolygon5([
+      rect.topLeft,
+      rect.topRight,
+      rect.bottomRight,
+      rect.bottomLeft,
+    ]);
     return rr.distance(line);
   }
 
@@ -123,7 +139,9 @@ class SegmentLine extends BasicLine {
   }
 
   double distanceWithTriangle(Triangle triangle) {
-    if (triangle.containsPoint(start) || triangle.containsPoint(end)) return 0.0;
+    if (triangle.containsPoint(start) || triangle.containsPoint(end)) {
+      return 0.0;
+    }
     double minDist = double.infinity;
     for (var edge in triangle.lines) {
       double dist = distanceWithLine(edge);
@@ -152,6 +170,9 @@ class SegmentLine extends BasicLine {
   /// 如果是射线 或者直线 则为垂直距离
   /// 如果为线段 则为最近距离
   double distanceWithLine(SegmentLine line) {
+    if (IntersectUtil.intersectWithLine(start, end, line.start, line.end)) {
+      return 0;
+    }
     double dis = double.infinity;
     dis = min(dis, distanceWithPoint(line.start));
     dis = min(dis, distanceWithPoint(line.end));
@@ -183,7 +204,9 @@ class SegmentLine extends BasicLine {
       return crossPointWithPolygon(geom);
     }
 
-    return BasicGeometry.pickCrossPoint(asGeometry.intersection(geom.asGeometry));
+    return BasicGeometry.pickCrossPoint(
+      asGeometry.intersection(geom.asGeometry),
+    );
   }
 
   @override
@@ -237,7 +260,11 @@ class SegmentLine extends BasicLine {
     return list;
   }
 
-  List<Offset> crossPointWithCircle(Offset center, double radius, {double eps = 1e-10}) {
+  List<Offset> crossPointWithCircle(
+    Offset center,
+    double radius, {
+    double eps = 1e-10,
+  }) {
     final d = end - start;
     final fx = start.x - center.x;
     final fy = start.y - center.y;
@@ -319,13 +346,15 @@ final class RayLine extends BasicLine {
   bool contains(BasicGeometry geom) => _proxyLine.contains(geom);
 
   @override
-  bool containsPoint(Offset p, {double eps = 1e-9}) => _proxyLine.containsPoint(p, eps: eps);
+  bool containsPoint(Offset p, {double eps = 1e-9}) =>
+      _proxyLine.containsPoint(p, eps: eps);
 
   @override
   List<Offset> crossPoint(BasicGeometry geom) => _proxyLine.crossPoint(geom);
 
   @override
-  List<Offset> crossPointWithRect(Rect rect) => _proxyLine.crossPointWithRect(rect);
+  List<Offset> crossPointWithRect(Rect rect) =>
+      _proxyLine.crossPointWithRect(rect);
 
   @override
   double distance(BasicGeometry geom) => _proxyLine.distance(geom);
@@ -337,7 +366,8 @@ final class RayLine extends BasicLine {
   double distanceWithRect(Rect rect) => _proxyLine.distanceWithRect(rect);
 
   @override
-  bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) => _proxyLine.isOverlap(geom, eps: eps);
+  bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) =>
+      _proxyLine.isOverlap(geom, eps: eps);
 
   @override
   bool isOverlapRect(Rect rect) => _proxyLine.isOverlapRect(rect);
@@ -381,13 +411,15 @@ final class Line extends BasicLine {
   bool contains(BasicGeometry geom) => _proxyLine.contains(geom);
 
   @override
-  bool containsPoint(Offset p, {double eps = 1e-9}) => _proxyLine.containsPoint(p, eps: eps);
+  bool containsPoint(Offset p, {double eps = 1e-9}) =>
+      _proxyLine.containsPoint(p, eps: eps);
 
   @override
   List<Offset> crossPoint(BasicGeometry geom) => _proxyLine.crossPoint(geom);
 
   @override
-  List<Offset> crossPointWithRect(Rect rect) => _proxyLine.crossPointWithRect(rect);
+  List<Offset> crossPointWithRect(Rect rect) =>
+      _proxyLine.crossPointWithRect(rect);
 
   @override
   double distance(BasicGeometry geom) => _proxyLine.distance(geom);
@@ -399,7 +431,8 @@ final class Line extends BasicLine {
   double distanceWithRect(Rect rect) => _proxyLine.distanceWithRect(rect);
 
   @override
-  bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) => _proxyLine.isOverlap(geom, eps: eps);
+  bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) =>
+      _proxyLine.isOverlap(geom, eps: eps);
 
   @override
   bool isOverlapRect(Rect rect) => _proxyLine.isOverlapRect(rect);

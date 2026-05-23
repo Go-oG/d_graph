@@ -8,10 +8,11 @@ import 'utils.dart';
 /// 树中所有边的总重量最小化。
 /// 时间复杂度: O(E log E)
 extension PrimExtension on Graph {
-
   MSTResult minSpanningTreeByPrim(Vertex start) {
     if (directed) {
-      throw StateError("Prim's algorithm strictly requires an undirected graph.");
+      throw StateError(
+        "Prim's algorithm strictly requires an undirected graph.",
+      );
     }
     if (!vertexMap.containsKey(start.id)) {
       throw ArgumentError("Start vertex not found in graph.");
@@ -19,18 +20,21 @@ extension PrimExtension on Graph {
     double totalCost = 0.0;
     final List<Edge> mstEdges = [];
     final Set<String> visited = {};
-    final PriorityQueue<Edge> pq = PriorityQueue((a, b) => a.weight.compareTo(b.weight));
+    final PriorityQueue<Edge> pq = PriorityQueue(
+      (a, b) => a.weight.compareTo(b.weight),
+    );
     _visit(start, visited, pq);
 
     while (pq.isNotEmpty) {
       final Edge edge = pq.removeFirst();
-      if (visited.contains(edge.to)) {
+      final nextId = visited.contains(edge.from) ? edge.to : edge.from;
+      if (visited.contains(nextId)) {
         continue;
       }
       mstEdges.add(edge);
       totalCost += edge.weight;
 
-      final nextVertex = vertexMap[edge.to];
+      final nextVertex = vertexMap[nextId];
       if (nextVertex != null) {
         _visit(nextVertex, visited, pq);
       }
@@ -42,7 +46,8 @@ extension PrimExtension on Graph {
   void _visit(Vertex v, Set<String> visited, PriorityQueue<Edge> pq) {
     visited.add(v.id);
     for (final edge in outEdges(v.id).values) {
-      if (!visited.contains(edge.to)) {
+      final nextId = edge.from == v.id ? edge.to : edge.from;
+      if (!visited.contains(nextId)) {
         pq.add(edge);
       }
     }

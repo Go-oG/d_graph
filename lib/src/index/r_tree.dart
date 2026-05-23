@@ -34,11 +34,17 @@ final class RTree<E> {
   // R*：记录单次插入操作中，哪些层级已经执行过重插
   final Set<int> _reinsertedLevels = {};
 
-  RTree(this.boundsFun, {int maxEntries = 9, this.strategy = RTreeStrategy.fastInsert}) {
+  RTree(
+    this.boundsFun, {
+    int maxEntries = 9,
+    this.strategy = RTreeStrategy.fastInsert,
+  }) {
     this.maxEntries = math.max(4, maxEntries);
     minEntries = math.max(2, (this.maxEntries * 0.4).ceil());
     clear();
   }
+
+  int get allCount => _rectCacheMap.length;
 
   Rect? getBounds(E value) => _rectCacheMap[value];
 
@@ -57,13 +63,19 @@ final class RTree<E> {
     final List<RNode<E>> stack = [_root];
     while (stack.isNotEmpty) {
       final node = stack.removeLast();
-      if (node.left >= rLeft && node.right <= rRight && node.top >= rTop && node.bottom <= rBottom) {
+      if (node.left >= rLeft &&
+          node.right <= rRight &&
+          node.top >= rTop &&
+          node.bottom <= rBottom) {
         _collectAll(node, result);
         continue;
       }
 
       for (var child in node.children) {
-        if (child.left <= rRight && child.right >= rLeft && child.top <= rBottom && child.bottom >= rTop) {
+        if (child.left <= rRight &&
+            child.right >= rLeft &&
+            child.top <= rBottom &&
+            child.bottom >= rTop) {
           if (node.leaf) {
             if (child.data != null) {
               result.add(child.data as E);
@@ -105,14 +117,20 @@ final class RTree<E> {
 
     while (stack.isNotEmpty) {
       final node = stack.removeLast();
-      if (node.left >= rLeft && node.right <= rRight && node.top >= rTop && node.bottom <= rBottom) {
+      if (node.left >= rLeft &&
+          node.right <= rRight &&
+          node.top >= rTop &&
+          node.bottom <= rBottom) {
         final res = _searchSingleInSubtree(node, testFun);
         if (res != null) return res;
         continue;
       }
 
       for (var child in node.children) {
-        if (child.left <= rRight && child.right >= rLeft && child.top <= rBottom && child.bottom >= rTop) {
+        if (child.left <= rRight &&
+            child.right >= rLeft &&
+            child.top <= rBottom &&
+            child.bottom >= rTop) {
           if (node.leaf) {
             final d = child.data;
             if (d != null && testFun(d)) {
@@ -145,8 +163,9 @@ final class RTree<E> {
 
   RTree<E> visit(RTreeVisitor<E> test) {
     final List<RNode<E>> next = [_root];
-    while (next.isNotEmpty) {
-      var node = next.removeAt(0);
+    int head = 0;
+    while (head < next.length) {
+      var node = next[head++];
       switch (test(node)) {
         case VisitResult.stop:
           return this;
@@ -208,9 +227,15 @@ final class RTree<E> {
     while (stack.isNotEmpty) {
       var node = stack.removeLast();
       for (var child in node.children) {
-        if (child.left <= rRight && child.right >= rLeft && child.top <= rBottom && child.bottom >= rTop) {
+        if (child.left <= rRight &&
+            child.right >= rLeft &&
+            child.top <= rBottom &&
+            child.bottom >= rTop) {
           if (node.leaf ||
-              (child.left >= rLeft && child.right <= rRight && child.top >= rTop && child.bottom <= rBottom)) {
+              (child.left >= rLeft &&
+                  child.right <= rRight &&
+                  child.top >= rTop &&
+                  child.bottom <= rBottom)) {
             return true;
           }
           stack.add(child);
@@ -223,7 +248,13 @@ final class RTree<E> {
   RTree<E> add(E value) {
     final rect = boundsFun(value);
     _rectCacheMap[value] = rect;
-    final node = RNode(data: value, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom);
+    final node = RNode(
+      data: value,
+      left: rect.left,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+    );
 
     if (strategy == RTreeStrategy.highQuality) {
       _reinsertedLevels.clear();
@@ -251,7 +282,15 @@ final class RTree<E> {
     for (var value in data) {
       final rect = boundsFun(value);
       _rectCacheMap[value] = rect;
-      buildList.add(RNode(data: value, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom));
+      buildList.add(
+        RNode(
+          data: value,
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+        ),
+      );
     }
 
     var node = _build(buildList, 0, buildList.length - 1, 0);
@@ -280,8 +319,6 @@ final class RTree<E> {
       return this;
     }
     if (oldRect == newRect) return this;
-    _rectCacheMap[value] = newRect;
-
     remove(value);
     add(value);
     return this;
@@ -318,7 +355,9 @@ final class RTree<E> {
     final int total = _rectCacheMap.length;
 
     if (targets.length > total * 0.4) {
-      final remaining = _rectCacheMap.keys.where((e) => !targets.contains(e));
+      final remaining = _rectCacheMap.keys
+          .where((e) => !targets.contains(e))
+          .toList();
       clear();
       addAll(remaining);
       return this;
@@ -349,7 +388,12 @@ final class RTree<E> {
     return this;
   }
 
-  bool _removeRecursive(RNode<E> node, E item, Rect targetRect, List<RNode<E>> path) {
+  bool _removeRecursive(
+    RNode<E> node,
+    E item,
+    Rect targetRect,
+    List<RNode<E>> path,
+  ) {
     if (node.left > targetRect.left ||
         node.right < targetRect.right ||
         node.top > targetRect.top ||
@@ -434,7 +478,12 @@ final class RTree<E> {
     return node;
   }
 
-  RNode<E> _chooseSubtree(RNode<E> bbox, RNode<E> node, int level, List<RNode<E>> path) {
+  RNode<E> _chooseSubtree(
+    RNode<E> bbox,
+    RNode<E> node,
+    int level,
+    List<RNode<E>> path,
+  ) {
     while (true) {
       path.add(node);
       if (node.leaf || path.length - 1 == level) break;
@@ -456,7 +505,9 @@ final class RTree<E> {
         double enlargedLeft = child.left < bLeft ? child.left : bLeft;
         double enlargedBottom = child.bottom > bBottom ? child.bottom : bBottom;
         double enlargedTop = child.top < bTop ? child.top : bTop;
-        double enlargement = ((enlargedRight - enlargedLeft) * (enlargedBottom - enlargedTop)) - area;
+        double enlargement =
+            ((enlargedRight - enlargedLeft) * (enlargedBottom - enlargedTop)) -
+            area;
 
         if (enlargement < minEnlargement) {
           minEnlargement = enlargement;
@@ -487,7 +538,9 @@ final class RTree<E> {
     while (currentLevel >= 0) {
       final currentNode = insertPath[currentLevel];
       if (currentNode.children.length > maxEntries) {
-        if (strategy == RTreeStrategy.highQuality && currentLevel != 0 && !_reinsertedLevels.contains(currentLevel)) {
+        if (strategy == RTreeStrategy.highQuality &&
+            currentLevel != 0 &&
+            !_reinsertedLevels.contains(currentLevel)) {
           _reinsertedLevels.add(currentLevel);
           _forceReinsert(currentNode, currentLevel, insertPath);
           _adjustParentBBoxes(null, insertPath, currentLevel - 1);
@@ -503,7 +556,10 @@ final class RTree<E> {
   }
 
   void _forceReinsert(RNode<E> node, int level, List<RNode<E>> path) {
-    final int p = (node.children.length * 0.3).floor().clamp(1, node.children.length - 1);
+    final int p = (node.children.length * 0.3).floor().clamp(
+      1,
+      node.children.length - 1,
+    );
 
     final double centerX = (node.left + node.right) / 2;
     final double centerY = (node.top + node.bottom) / 2;
@@ -567,7 +623,10 @@ final class RTree<E> {
     double minArea = double.infinity;
 
     for (int i = m; i <= M - m; i++) {
-      double b1L = double.infinity, b1T = double.infinity, b1R = double.negativeInfinity, b1B = double.negativeInfinity;
+      double b1L = double.infinity,
+          b1T = double.infinity,
+          b1R = double.negativeInfinity,
+          b1B = double.negativeInfinity;
       for (int k = 0; k < i; k++) {
         var c = node.children[k];
         if (c.left < b1L) b1L = c.left;
@@ -577,7 +636,10 @@ final class RTree<E> {
       }
       double area1 = (b1R - b1L) * (b1B - b1T);
 
-      double b2L = double.infinity, b2T = double.infinity, b2R = double.negativeInfinity, b2B = double.negativeInfinity;
+      double b2L = double.infinity,
+          b2T = double.infinity,
+          b2R = double.negativeInfinity,
+          b2B = double.negativeInfinity;
       for (int k = i; k < M; k++) {
         var c = node.children[k];
         if (c.left < b2L) b2L = c.left;
@@ -613,7 +675,12 @@ final class RTree<E> {
     if (xMargin < yMargin) node.children.sort(compareMinXF);
   }
 
-  double _calcMargin(RNode<E> node, int m, int M, int Function(RNode, RNode) compare) {
+  double _calcMargin(
+    RNode<E> node,
+    int m,
+    int M,
+    int Function(RNode, RNode) compare,
+  ) {
     node.children.sort(compare);
 
     double leftL = double.infinity,
@@ -641,7 +708,11 @@ final class RTree<E> {
       if (c.bottom > rightB) rightB = c.bottom;
     }
 
-    double margin = (leftR - leftL) + (leftB - leftT) + (rightR - rightL) + (rightB - rightT);
+    double margin =
+        (leftR - leftL) +
+        (leftB - leftT) +
+        (rightR - rightL) +
+        (rightB - rightT);
 
     for (int i = m; i < M - m; i++) {
       var child = node.children[i];
@@ -662,7 +733,11 @@ final class RTree<E> {
     return margin;
   }
 
-  void _adjustParentBBoxes(RNode<E>? child, List<RNode<E>> path, int startLevel) {
+  void _adjustParentBBoxes(
+    RNode<E>? child,
+    List<RNode<E>> path,
+    int startLevel,
+  ) {
     for (int i = startLevel; i >= 0; i--) {
       var node = path[i];
       if (child != null) {
@@ -720,7 +795,10 @@ final class RTree<E> {
   int _compareNodeMinY(RNode a, RNode b) => a.top.compareTo(b.top);
 
   bool _intersectsRect(Rect a, RNode b) {
-    return b.left <= a.right && b.top <= a.bottom && b.right >= a.left && b.bottom >= a.top;
+    return b.left <= a.right &&
+        b.top <= a.bottom &&
+        b.right >= a.left &&
+        b.bottom >= a.top;
   }
 
   RNode<E> _createNode(List<RNode<E>> children) {
@@ -735,7 +813,13 @@ final class RTree<E> {
     );
   }
 
-  void _multiSelect(List<RNode> arr, int left, int right, int n, int Function(RNode, RNode) compare) {
+  void _multiSelect(
+    List<RNode> arr,
+    int left,
+    int right,
+    int n,
+    int Function(RNode, RNode) compare,
+  ) {
     List<int> stack = [left, right];
 
     while (stack.isNotEmpty) {
@@ -786,7 +870,13 @@ final class RNode<E> with ValueExtraMixin {
 }
 
 class _FastSelect {
-  static void fastSelect<T>(List<T> arr, int k, [int left = 0, int? right, int Function(T a, T b)? compare]) {
+  static void fastSelect<T>(
+    List<T> arr,
+    int k, [
+    int left = 0,
+    int? right,
+    int Function(T a, T b)? compare,
+  ]) {
     if (left < 0) left = 0;
     right ??= arr.length - 1;
     if (right >= arr.length) right = arr.length - 1;
@@ -795,14 +885,21 @@ class _FastSelect {
     _fastSelectStep(arr, k, left, right, compare);
   }
 
-  static _fastSelectStep<T>(List<T> arr, int k, int left, int right, int Function(T a, T b) compare) {
+  static _fastSelectStep<T>(
+    List<T> arr,
+    int k,
+    int left,
+    int right,
+    int Function(T a, T b) compare,
+  ) {
     while (right > left) {
       if (right - left > 600) {
         int n = right - left + 1;
         int m = k - left + 1;
         double z = math.log(n);
         double s = 0.5 * math.exp(2 * z / 3);
-        double sd = 0.5 * math.sqrt(z * s * (n - s) / n) * (m - n / 2 < 0 ? -1 : 1);
+        double sd =
+            0.5 * math.sqrt(z * s * (n - s) / n) * (m - n / 2 < 0 ? -1 : 1);
         int newLeft = math.max(left, (k - m * s / n + sd).floor());
         int newRight = math.min(right, (k + (n - m) * s / n + sd).floor());
         _fastSelectStep(arr, k, newLeft, newRight, compare);
@@ -852,8 +949,8 @@ class _FastSelect {
       return a < b
           ? -1
           : a > b
-              ? 1
-              : 0;
+          ? 1
+          : 0;
     }
 
     var a1 = a.hashCode;
@@ -861,7 +958,7 @@ class _FastSelect {
     return a1 < b2
         ? -1
         : a1 > b2
-            ? 1
-            : 0;
+        ? 1
+        : 0;
   }
 }

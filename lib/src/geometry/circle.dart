@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:d_util/d_util.dart';
 import 'package:dart_graph/dart_graph.dart';
 import 'package:dts/dts.dart' as dt;
 
@@ -15,7 +14,10 @@ final class Circle extends BasicGeometry {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Circle && runtimeType == other.runtimeType && center == other.center && radius == other.radius;
+      other is Circle &&
+          runtimeType == other.runtimeType &&
+          center == other.center &&
+          radius == other.radius;
 
   @override
   int get hashCode => Object.hash(center, radius);
@@ -97,7 +99,12 @@ final class Circle extends BasicGeometry {
   @override
   bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) {
     if (geom is Circle) {
-      return IntersectUtil.intersectWithCircle(center, radius, geom.center, geom.radius);
+      return IntersectUtil.intersectWithCircle(
+        center,
+        radius,
+        geom.center,
+        geom.radius,
+      );
     }
     if (geom is BasicLine) {
       return _isCrossLine(geom, eps: eps);
@@ -157,10 +164,19 @@ final class Circle extends BasicGeometry {
   }
 
   bool _isCrossLine(BasicLine line, {double eps = 1e-9}) {
-    return IntersectUtil.intersectLineWithCircle(line.start, line.end, center, radius);
+    return IntersectUtil.intersectLineWithCircle(
+      line.start,
+      line.end,
+      center,
+      radius,
+    );
   }
 
   bool _isCrossTriangle(Triangle triangle) {
+    if (triangle.containsPoint(center)) return true;
+    for (final p in triangle.vertices) {
+      if (containsPoint(p)) return true;
+    }
     for (final line in triangle.lines) {
       if (_isCrossLine(line)) {
         return true;
@@ -170,6 +186,10 @@ final class Circle extends BasicGeometry {
   }
 
   bool _isCrossPolygon(Polygon polygon) {
+    if (polygon.containsPoint(center)) return true;
+    for (final p in polygon.vertices) {
+      if (containsPoint(p)) return true;
+    }
     for (final line in polygon.lines) {
       if (_isCrossLine(line)) {
         return true;
@@ -178,7 +198,8 @@ final class Circle extends BasicGeometry {
     return false;
   }
 
-  List<Offset> _crossPointWithLine(SegmentLine line) => line.crossPointWithCircle(center, radius);
+  List<Offset> _crossPointWithLine(SegmentLine line) =>
+      line.crossPointWithCircle(center, radius);
 
   List<Offset> _crossPointWithTriangle(Triangle triangle) {
     List<Offset> list = [];
@@ -200,23 +221,20 @@ final class Circle extends BasicGeometry {
     final d = (center - this.center).distance;
     final rSum = radius + this.radius;
 
-    if (d > rSum || d < (radius - this.radius).abs()) return [];
+    if (d <= 1e-12 || d > rSum || d < (radius - this.radius).abs()) return [];
 
     final r0 = radius;
     final r1 = this.radius;
 
     final a = (r0 * r0 - r1 * r1 + d * d) / (2 * d);
-    final h = sqrt(r0 * r0 - a * a);
+    final h = sqrt(max(0, r0 * r0 - a * a));
     final x2 = x0 + a * dx / d;
     final y2 = y0 + a * dy / d;
 
     final rx = -dy * (h / d);
     final ry = dx * (h / d);
 
-    final list = [
-      Offset(x2 + rx, y2 + ry),
-      Offset(x2 - rx, y2 - ry),
-    ];
+    final list = [Offset(x2 + rx, y2 + ry), Offset(x2 - rx, y2 - ry)];
     if (list.first == list.last) {
       list.removeLast();
     }
@@ -231,7 +249,8 @@ final class Circle extends BasicGeometry {
     return list;
   }
 
-  double _distanceWithLine(SegmentLine line) => line.distanceWithCircle(center, radius);
+  double _distanceWithLine(SegmentLine line) =>
+      line.distanceWithCircle(center, radius);
 
   double _distanceWithCircle(Offset center, double radius) {
     final u = center - this.center;
@@ -243,6 +262,7 @@ final class Circle extends BasicGeometry {
   }
 
   double _distanceWithTriangle(Triangle triangle) {
+    if (_isCrossTriangle(triangle)) return 0;
     double dis = double.infinity;
     for (var line in triangle.lines) {
       final d = line.distanceWithPoint(center);
@@ -251,10 +271,11 @@ final class Circle extends BasicGeometry {
       }
       dis = min(d, dis);
     }
-    return dis;
+    return max(0, dis - radius);
   }
 
   double _distanceWithPolygon(Polygon polygon) {
+    if (_isCrossPolygon(polygon)) return 0;
     double dis = double.infinity;
     for (var line in polygon.lines) {
       final d = line.distanceWithPoint(center);
@@ -263,12 +284,17 @@ final class Circle extends BasicGeometry {
       }
       dis = min(d, dis);
     }
-    return dis;
+    return max(0, dis - radius);
   }
 
   @override
   dt.Geometry buildGeometry() {
-    List<Offset> list = AnnularSectorFactory.buildPoints(radius, Angle.zero, Angle.radians(2 * pi - 0.0001), center);
+    List<Offset> list = AnnularSectorFactory.buildPoints(
+      radius,
+      Angle.zero,
+      Angle.radians(2 * pi - 0.0001),
+      center,
+    );
     return geomFactory.createPolygon5(list);
   }
 }

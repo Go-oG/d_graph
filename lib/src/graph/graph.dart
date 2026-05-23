@@ -5,11 +5,7 @@ final class Vertex<T> {
   final T? data;
   double weight;
 
-  Vertex({
-    required this.id,
-    this.data,
-    this.weight = 0,
-  });
+  Vertex({required this.id, this.data, this.weight = 0});
 
   Map<String, dynamic> toMap() {
     return {'id': id, 'data': data, "weight": weight};
@@ -21,7 +17,8 @@ final class Vertex<T> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is Vertex && runtimeType == other.runtimeType && id == other.id;
+      identical(this, other) ||
+      other is Vertex && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
@@ -46,7 +43,14 @@ final class Edge<T> {
   });
 
   Map<String, dynamic> toMap() {
-    return {'id': id, 'from': from, 'to': to, 'directed': directed, 'weight': weight, 'data': data};
+    return {
+      'id': id,
+      'from': from,
+      'to': to,
+      'directed': directed,
+      'weight': weight,
+      'data': data,
+    };
   }
 
   static Edge fromMap<T>(Map<String, dynamic> map) {
@@ -126,9 +130,15 @@ final class Graph<V, E> {
       directed: graph['directed'],
       allowMultiEdge: graph['allowMultiEdge'] ?? false,
       allowSelfLoop: graph['allowSelfLoop'] ?? false,
-      meta: graph['meta'] != null ? Map<String, dynamic>.from(graph['meta']) : null,
-      vertices: (graph['vertices'] as List).map((v) => Vertex.fromMap(Map<String, dynamic>.from(v))).toList(),
-      edges: (graph['edges'] as List).map((e) => Edge.fromMap(Map<String, dynamic>.from(e))).toList(),
+      meta: graph['meta'] != null
+          ? Map<String, dynamic>.from(graph['meta'])
+          : null,
+      vertices: (graph['vertices'] as List)
+          .map((v) => Vertex.fromMap(Map<String, dynamic>.from(v)))
+          .toList(),
+      edges: (graph['edges'] as List)
+          .map((e) => Edge.fromMap(Map<String, dynamic>.from(e)))
+          .toList(),
     );
   }
 
@@ -157,13 +167,20 @@ final class Graph<V, E> {
     bool? direct,
     E? value,
   }) {
-    final edge = Edge(id: id, from: fromVid, to: toVid, data: value, directed: direct ?? directed, weight: weight);
+    final edge = Edge(
+      id: id,
+      from: fromVid,
+      to: toVid,
+      data: value,
+      directed: direct ?? directed,
+      weight: weight,
+    );
     return _addEdge(edge);
   }
 
   bool _addEdge(Edge<E> edge) {
     final fromId = edge.from;
-    final toVid = edge.from;
+    final toVid = edge.to;
     if (!_vertexMap.containsKey(fromId) || !_vertexMap.containsKey(toVid)) {
       throw StateError('Edge endpoint does not exist');
     }
@@ -177,8 +194,13 @@ final class Graph<V, E> {
       final outEdges = _vertexOutEdges[fromId];
       if (outEdges != null) {
         for (final existing in outEdges.values) {
-          if (existing.to == toVid) {
-            throw StateError('Multi-edge is not allowed between $fromId and $toVid');
+          if ((existing.from == fromId && existing.to == toVid) ||
+              (!existing.directed &&
+                  existing.from == toVid &&
+                  existing.to == fromId)) {
+            throw StateError(
+              'Multi-edge is not allowed between $fromId and $toVid',
+            );
           }
         }
       }
@@ -203,7 +225,6 @@ final class Graph<V, E> {
       return null;
     }
 
-    _degree._onVertexRemoved(vertex);
     final edgesToRemove = <Edge>{};
     _vertexOutEdges[id]?.values.forEach(edgesToRemove.add);
     _vertexInEdges[id]?.values.forEach(edgesToRemove.add);
@@ -213,6 +234,7 @@ final class Graph<V, E> {
     _vertexOutEdges.remove(id);
     _vertexInEdges.remove(id);
     _vertexMap.remove(id);
+    _degree._onVertexRemoved(vertex);
     return vertex;
   }
 
@@ -265,12 +287,25 @@ final class Graph<V, E> {
   Vertex<V>? vertexOfNull(String vid) => _vertexMap[vid];
 
   List<Vertex<V>> neighbours(String vid) {
-    Set<Vertex<V>> nodeSet = <Vertex<V>>{};
-    for (var e in edges(vid)) {
-      nodeSet.add(vertexOf(e.from));
-      nodeSet.add(vertexOf(e.to));
+    final vertex = _vertexMap[vid];
+    if (vertex == null) {
+      return [];
     }
-    nodeSet.remove(vertexOf(vid));
+    Set<Vertex<V>> nodeSet = <Vertex<V>>{};
+    void addNeighbor(Edge<E> edge) {
+      final neighborId = edge.from == vid ? edge.to : edge.from;
+      final neighbor = _vertexMap[neighborId];
+      if (neighbor != null && neighbor != vertex) {
+        nodeSet.add(neighbor);
+      }
+    }
+
+    for (var e in _vertexOutEdges[vid]?.values ?? const Iterable.empty()) {
+      addNeighbor(e);
+    }
+    for (var e in _vertexInEdges[vid]?.values ?? const Iterable.empty()) {
+      addNeighbor(e);
+    }
     return nodeSet.toList();
   }
 
@@ -278,13 +313,22 @@ final class Graph<V, E> {
 
   Edge<E>? edgeOfNull(String id) => _edgeMap[id];
 
-  Edge<E>? edgeFrom(String from, String to) => _vertexOutEdges[from]?[to];
+  Edge<E>? edgeFrom(String from, String to) {
+    final outEdges = _vertexOutEdges[from];
+    if (outEdges == null) return null;
+    for (final edge in outEdges.values) {
+      if (edge.from == from && edge.to == to) return edge;
+      if (!edge.directed && edge.from == to && edge.to == from) return edge;
+    }
+    return null;
+  }
 
   void clear() {
     _vertexMap.clear();
     _edgeMap.clear();
     _vertexInEdges.clear();
     _vertexOutEdges.clear();
+    _degree.clear();
   }
 
   bool hasEdge(String eid) => _edgeMap.containsKey(eid);
@@ -295,9 +339,11 @@ final class Graph<V, E> {
 
   WeightDegree weightDegreeOf(String vid) => _degree.weightDegreeOf(vid);
 
-  Map<String, Edge<E>> inEdges(String vid) => _vertexInEdges.putIfAbsent(vid, () => {});
+  Map<String, Edge<E>> inEdges(String vid) =>
+      _vertexInEdges.putIfAbsent(vid, () => {});
 
-  Map<String, Edge<E>> outEdges(String vid) => _vertexOutEdges.putIfAbsent(vid, () => {});
+  Map<String, Edge<E>> outEdges(String vid) =>
+      _vertexOutEdges.putIfAbsent(vid, () => {});
 
   List<Edge<E>> edges(String vid) {
     final vertex = _vertexMap[vid];
@@ -433,7 +479,14 @@ final class GraphDegree {
 
   Degree degreeOf(String vid) => _degreeMap[vid] ?? Degree();
 
-  WeightDegree weightDegreeOf(String vid) => _weightedDegreeMap[vid] ?? WeightDegree();
+  WeightDegree weightDegreeOf(String vid) =>
+      _weightedDegreeMap[vid] ?? WeightDegree();
+
+  void clear() {
+    _degreeMap.clear();
+    _weightedDegreeMap.clear();
+    _dirty = false;
+  }
 }
 
 final class Degree {
@@ -458,7 +511,8 @@ final class WeightDegree {
   }
 
   @override
-  String toString() => 'WeightedDegree(in: $inWeight, out: $outWeight, total: $total)';
+  String toString() =>
+      'WeightedDegree(in: $inWeight, out: $outWeight, total: $total)';
 }
 
 class CostPath {

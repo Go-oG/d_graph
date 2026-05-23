@@ -1,13 +1,18 @@
 import 'dart:math' as math;
 import 'dart:math';
 
-import 'package:d_util/d_util.dart';
 import 'package:dart_graph/dart_graph.dart';
 import 'package:dts/dts.dart' as dt;
 import 'package:flutter/painting.dart';
 
 class AnnularSectorFactory {
-  static dt.Geometry createAnnularSector(Offset center, double ir, double or, Angle startAngle, Angle endAngle) {
+  static dt.Geometry createAnnularSector(
+    Offset center,
+    double ir,
+    double or,
+    Angle startAngle,
+    Angle endAngle,
+  ) {
     Angle sw = (endAngle - startAngle).abs;
     startAngle = startAngle.normalized;
     endAngle = endAngle.normalized;
@@ -30,7 +35,12 @@ class AnnularSectorFactory {
     return geomFactory.createPolygon5(coords, true);
   }
 
-  static List<Offset> buildPoints(double radius, Angle startAngle, Angle endAngle, Offset center) {
+  static List<Offset> buildPoints(
+    double radius,
+    Angle startAngle,
+    Angle endAngle,
+    Offset center,
+  ) {
     List<Offset> list = [];
     final int steps = _computeSegments(radius, startAngle, endAngle);
     Angle step = (endAngle - startAngle) / steps;
@@ -45,8 +55,13 @@ class AnnularSectorFactory {
 
   static int _computeSegments(double radius, Angle startAngle, Angle endAngle) {
     if (radius <= 0) return 1;
-    double theta = 2 * acos(1 / radius);
-    int seg = ((endAngle - startAngle) / theta).radians.ceil();
+    final sweep = (endAngle - startAngle).abs.radians;
+    if (sweep <= 0) return 1;
+    if (radius <= 1) {
+      return max(3, (sweep / (pi / 4)).ceil());
+    }
+    double theta = 2 * acos((1 - 1 / radius).clamp(-1.0, 1.0));
+    int seg = (sweep / theta).ceil();
     if (seg < 3) seg = 3;
     return seg;
   }
@@ -109,7 +124,10 @@ final class AnnularSector {
     final checkAngles = [0.0, math.pi / 2, math.pi, 3 * math.pi / 2];
     for (final angle in checkAngles) {
       if (_isAngleBetween(angle, _startRad, _sweepRad)) {
-        add(center.dx + math.cos(angle) * outerRadius, center.dy + math.sin(angle) * outerRadius);
+        add(
+          center.dx + math.cos(angle) * outerRadius,
+          center.dy + math.sin(angle) * outerRadius,
+        );
       }
     }
 
@@ -118,9 +136,11 @@ final class AnnularSector {
 
   Rect get aabb => _aabb;
 
-  double get area => 0.5 * _sweepRad * (outerRadius * outerRadius - innerRadius * innerRadius);
+  double get area =>
+      0.5 * _sweepRad * (outerRadius * outerRadius - innerRadius * innerRadius);
 
-  double get perimeter => _sweepRad * (outerRadius + innerRadius) + 2 * (outerRadius - innerRadius);
+  double get perimeter =>
+      _sweepRad * (outerRadius + innerRadius) + 2 * (outerRadius - innerRadius);
 
   bool contains(Offset p, {double epsilon = 1e-9}) {
     if (!_aabb.contains(p)) return false;
@@ -138,11 +158,14 @@ final class AnnularSector {
   }
 
   bool isIntersectsCircle(Offset circleCenter, double circleRadius) {
-    if (!_aabb.overlaps(Rect.fromCircle(center: circleCenter, radius: circleRadius))) {
+    if (!_aabb.overlaps(
+      Rect.fromCircle(center: circleCenter, radius: circleRadius),
+    )) {
       return false;
     }
     Offset closest = _closestPointOnSector(circleCenter);
-    return (circleCenter - closest).distanceSquared <= circleRadius * circleRadius;
+    return (circleCenter - closest).distanceSquared <=
+        circleRadius * circleRadius;
   }
 
   bool isIntersectsPolygon(List<Offset> polygon) {
@@ -161,8 +184,12 @@ final class AnnularSector {
     if (!_aabb.overlaps(Rect.fromPoints(p1, p2))) return false;
     if (contains(p1) || contains(p2)) return true;
     final corners = getBoundaryPoints();
-    if (IntersectUtil.intersectWithLine(p1, p2, corners[2], corners[0])) return true;
-    if (IntersectUtil.intersectWithLine(p1, p2, corners[3], corners[1])) return true;
+    if (IntersectUtil.intersectWithLine(p1, p2, corners[2], corners[0])) {
+      return true;
+    }
+    if (IntersectUtil.intersectWithLine(p1, p2, corners[3], corners[1])) {
+      return true;
+    }
     if (_lineIntersectArc(p1, p2, innerRadius)) return true;
     if (_lineIntersectArc(p1, p2, outerRadius)) return true;
 
@@ -195,7 +222,8 @@ final class AnnularSector {
         clampedTheta = _endRad;
       }
     }
-    return center + Offset(math.cos(clampedTheta), math.sin(clampedTheta)) * clampedR;
+    return center +
+        Offset(math.cos(clampedTheta), math.sin(clampedTheta)) * clampedR;
   }
 
   List<Offset> getBoundaryPoints() {
@@ -213,7 +241,12 @@ final class AnnularSector {
 
   bool _lineIntersectArc(Offset p1, Offset p2, double r) {
     if (r <= 0) return false;
-    List<Offset> hits = IntersectUtil.crossPointsLineWithCircle(p1, p2, center, r);
+    List<Offset> hits = IntersectUtil.crossPointsLineWithCircle(
+      p1,
+      p2,
+      center,
+      r,
+    );
 
     for (var hit in hits) {
       if (!ContainsUtil.pointOnSegment(hit, p1, p2)) continue;
@@ -223,7 +256,12 @@ final class AnnularSector {
     return false;
   }
 
-  static bool _isAngleBetween(double target, double start, double sweep, [double epsilon = 1e-9]) {
+  static bool _isAngleBetween(
+    double target,
+    double start,
+    double sweep, [
+    double epsilon = 1e-9,
+  ]) {
     double diff = target - start;
     while (diff < -epsilon) {
       diff += 2 * math.pi;
@@ -234,7 +272,11 @@ final class AnnularSector {
     return diff <= sweep + epsilon;
   }
 
-  static bool intersect(AnnularSector s1, AnnularSector s2, {double epsilon = 1e-9}) {
+  static bool intersect(
+    AnnularSector s1,
+    AnnularSector s2, {
+    double epsilon = 1e-9,
+  }) {
     if (!s1.aabb.overlaps(s2.aabb)) return false;
 
     double d2 = (s1.center - s2.center).distanceSquared;
@@ -243,18 +285,22 @@ final class AnnularSector {
 
     double s2MidAngle = s2._startRad + s2._sweepRad / 2;
     double s2MidRadius = (s2.innerRadius + s2.outerRadius) / 2;
-    Offset s2MidPoint = s2.center + Offset(math.cos(s2MidAngle), math.sin(s2MidAngle)) * s2MidRadius;
+    Offset s2MidPoint =
+        s2.center +
+        Offset(math.cos(s2MidAngle), math.sin(s2MidAngle)) * s2MidRadius;
     if (s1.contains(s2MidPoint)) return true;
 
     double s1MidAngle = s1._startRad + s1._sweepRad / 2;
     double s1MidRadius = (s1.innerRadius + s1.outerRadius) / 2;
-    Offset s1MidPoint = s1.center + Offset(math.cos(s1MidAngle), math.sin(s1MidAngle)) * s1MidRadius;
+    Offset s1MidPoint =
+        s1.center +
+        Offset(math.cos(s1MidAngle), math.sin(s1MidAngle)) * s1MidRadius;
     if (s2.contains(s1MidPoint)) return true;
 
     List<Offset> s1Pts = s1.getBoundaryPoints();
     List<List<Offset>> s1Lines = [
       [s1Pts[2], s1Pts[0]],
-      [s1Pts[3], s1Pts[1]]
+      [s1Pts[3], s1Pts[1]],
     ];
 
     List<double> s1Radii = [s1.innerRadius, s1.outerRadius];
@@ -266,7 +312,7 @@ final class AnnularSector {
     List<Offset> s2Pts = s2.getBoundaryPoints();
     List<List<Offset>> s2Lines = [
       [s2Pts[2], s2Pts[0]],
-      [s2Pts[3], s2Pts[1]]
+      [s2Pts[3], s2Pts[1]],
     ];
     for (var line in s2Lines) {
       if (s1.isIntersectsLine(line[0], line[1])) return true;
@@ -281,20 +327,32 @@ final class AnnularSector {
     return false;
   }
 
-  static bool _arcArcIntersect(AnnularSector s1, double r1, AnnularSector s2, double r2) {
+  static bool _arcArcIntersect(
+    AnnularSector s1,
+    double r1,
+    AnnularSector s2,
+    double r2,
+  ) {
     double d = (s1.center - s2.center).distance;
     if (d > r1 + r2 || d < (r1 - r2).abs() || d == 0) return false;
     double a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
     double h = math.sqrt(math.max(0, r1 * r1 - a * a));
 
     Offset p2 = s1.center + (s2.center - s1.center) * (a / d);
-    Offset i1 = Offset(p2.dx + h * (s2.center.dy - s1.center.dy) / d, p2.dy - h * (s2.center.dx - s1.center.dx) / d);
-    Offset i2 = Offset(p2.dx - h * (s2.center.dy - s1.center.dy) / d, p2.dy + h * (s2.center.dx - s1.center.dx) / d);
+    Offset i1 = Offset(
+      p2.dx + h * (s2.center.dy - s1.center.dy) / d,
+      p2.dy - h * (s2.center.dx - s1.center.dx) / d,
+    );
+    Offset i2 = Offset(
+      p2.dx - h * (s2.center.dy - s1.center.dy) / d,
+      p2.dy + h * (s2.center.dx - s1.center.dx) / d,
+    );
 
     bool check(Offset p) {
       double a1 = math.atan2(p.dy - s1.center.dy, p.dx - s1.center.dx);
       double a2 = math.atan2(p.dy - s2.center.dy, p.dx - s2.center.dx);
-      return _isAngleBetween(a1, s1._startRad, s1._sweepRad) && _isAngleBetween(a2, s2._startRad, s2._sweepRad);
+      return _isAngleBetween(a1, s1._startRad, s1._sweepRad) &&
+          _isAngleBetween(a2, s2._startRad, s2._sweepRad);
     }
 
     return check(i1) || check(i2);

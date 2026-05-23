@@ -46,7 +46,12 @@ class Polygon extends BasicGeometry {
   }
 
   bool containsRect(Rect rect) {
-    for (var item in [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft]) {
+    for (var item in [
+      rect.topLeft,
+      rect.topRight,
+      rect.bottomRight,
+      rect.bottomLeft,
+    ]) {
       if (!containsPoint(item)) {
         return false;
       }
@@ -77,6 +82,9 @@ class Polygon extends BasicGeometry {
   @override
   Path onBuildPath() {
     Path path = Path();
+    if (vertices.isEmpty) {
+      return path;
+    }
     bool hasMove = false;
     for (final p in vertices) {
       hasMove ? path.lineTo(p.x, p.y) : path.moveTo(p.x, p.y);
@@ -92,13 +100,20 @@ class Polygon extends BasicGeometry {
     final ch = dt.ConvexHull.of(asGeometry);
     final hull = ch.getConvexHull();
     if (hull is dt.Polygon) {
-      return hull.getExteriorRing().getCoordinates().map((e) => e.asOffset).toList();
+      return hull
+          .getExteriorRing()
+          .getCoordinates()
+          .map((e) => e.asOffset)
+          .toList();
     }
     return hull.getCoordinates().map((e) => e.asOffset).toList();
   }
 
   @override
   dt.Geometry buildGeometry() {
+    if (vertices.isEmpty) {
+      return geomFactory.createEmpty(2);
+    }
     return geomFactory.createPolygon5(vertices, false);
   }
 }

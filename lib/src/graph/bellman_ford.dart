@@ -3,7 +3,7 @@ import 'graph.dart';
 /// 最短路径：贝尔曼-福特算法
 /// 适用于负加权和正加权边。还可以检测负权重循环。返回最短路径和路径。
 extension BellmanFordExtension on Graph {
-  /// Map<VertexId, CostPath>
+  /// `Map<VertexId, CostPath>`
   Map<String, CostPath> shortestPathsByBellmanFord(String start) {
     if (!hasVertex(start)) return {};
 
@@ -35,7 +35,9 @@ extension BellmanFordExtension on Graph {
     for (final edge in edgeIterator) {
       bool hasCycle = false;
       if (_canRelax(edge, edge.from, edge.to, dist)) hasCycle = true;
-      if (!edge.directed && _canRelax(edge, edge.to, edge.from, dist)) hasCycle = true;
+      if (!edge.directed && _canRelax(edge, edge.to, edge.from, dist)) {
+        hasCycle = true;
+      }
 
       if (hasCycle) {
         throw StateError("Graph contains a negative weight cycle.");
@@ -60,7 +62,13 @@ extension BellmanFordExtension on Graph {
   }
 
   /// 执行松弛操作 return true 表示距离被更新了
-  bool _relax(Edge edge, String sourceId, String targetId, Map<String, double> dist, Map<String, Edge> cameFrom) {
+  bool _relax(
+    Edge edge,
+    String sourceId,
+    String targetId,
+    Map<String, double> dist,
+    Map<String, Edge> cameFrom,
+  ) {
     final double distU = dist[sourceId] ?? double.infinity;
     final double distV = dist[targetId] ?? double.infinity;
 
@@ -82,7 +90,11 @@ extension BellmanFordExtension on Graph {
     return distV > distU + edge.weight;
   }
 
-  List<Edge> _reconstructPath(Map<String, Edge> cameFrom, String startId, String endId) {
+  List<Edge> _reconstructPath(
+    Map<String, Edge> cameFrom,
+    String startId,
+    String endId,
+  ) {
     if (startId == endId) return [];
 
     final List<Edge> path = [];

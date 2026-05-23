@@ -4,7 +4,6 @@ import 'dart:ui';
 
 import 'package:d_util/d_util.dart';
 
-
 final class BoundsUtil {
   BoundsUtil._();
 
@@ -14,10 +13,10 @@ final class BoundsUtil {
     if (rects.isEmpty) {
       return null;
     }
-    double left = double.maxFinite;
-    double top = double.maxFinite;
-    double bottom = double.minPositive;
-    double right = double.minPositive;
+    double left = double.infinity;
+    double top = double.infinity;
+    double bottom = double.negativeInfinity;
+    double right = double.negativeInfinity;
 
     for (var p0 in rects) {
       if (p0 == null) {
@@ -29,7 +28,7 @@ final class BoundsUtil {
       bottom = max(p0.dy, bottom);
     }
 
-    if (left >= right || top >= bottom) {
+    if (left.isInfinite) {
       return null;
     }
     return Rect.fromLTRB(left, top, right, bottom);
@@ -60,8 +59,13 @@ final class BoundsUtil {
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
-  static Rect? boundsOf<T>(Iterable<T> nodes, double Function(T node) leftFun, double Function(T node) topFun,
-      double Function(T node) rightFun, double Function(T node) bottomFun) {
+  static Rect? boundsOf<T>(
+    Iterable<T> nodes,
+    double Function(T node) leftFun,
+    double Function(T node) topFun,
+    double Function(T node) rightFun,
+    double Function(T node) bottomFun,
+  ) {
     double left = double.infinity;
     double top = double.infinity;
     double right = double.negativeInfinity;
@@ -126,7 +130,11 @@ final class BoundsUtil {
     return Rect.fromLTRB(minX, minY, maxX, maxY);
   }
 
-  static bool _angleInSweep(Angle startAngle, Angle sweepAngle, double angleRad) {
+  static bool _angleInSweep(
+    Angle startAngle,
+    Angle sweepAngle,
+    double angleRad,
+  ) {
     final sa = _norm0ToTau(startAngle.radians);
     final a = _norm0ToTau(angleRad);
     final sweep = sweepAngle.normalized.radians;

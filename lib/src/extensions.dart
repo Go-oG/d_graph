@@ -1,7 +1,6 @@
 import 'dart:math' as m;
 import 'dart:ui';
 
-import 'package:d_util/d_util.dart';
 import 'package:dart_graph/dart_graph.dart';
 import 'package:dts/dts.dart' as dt;
 import 'package:flutter/gestures.dart';
@@ -9,7 +8,10 @@ import 'package:flutter/painting.dart';
 
 extension RectExt on Rect {
   bool contains2(Offset offset) {
-    return offset.dx >= left && offset.dx <= right && offset.dy >= top && offset.dy <= bottom;
+    return offset.dx >= left &&
+        offset.dx <= right &&
+        offset.dy >= top &&
+        offset.dy <= bottom;
   }
 
   bool contains3(num x, num y) {
@@ -25,7 +27,12 @@ extension RectExt on Rect {
     if (left == 0 && right == 0 && top == 0 && bottom == 0) {
       return this;
     }
-    return Rect.fromLTRB(this.left - left, this.top - top, this.right - right, this.bottom - bottom);
+    return Rect.fromLTRB(
+      this.left + left,
+      this.top + top,
+      this.right - right,
+      this.bottom - bottom,
+    );
   }
 
   double get centerX {
@@ -42,7 +49,10 @@ extension RectExt on Rect {
     double xMax = right;
     double yMax = bottom;
     for (var point in polygon.vertices) {
-      if (point.dx < xMin || point.dx > xMax || point.dy < yMin || point.dy > yMax) {
+      if (point.dx < xMin ||
+          point.dx > xMax ||
+          point.dy < yMin ||
+          point.dy > yMax) {
         return false;
       }
     }
@@ -59,7 +69,12 @@ extension RectExt on Rect {
     return path;
   }
 
-  dt.Geometry get asGeometry => geomFactory.createPolygon5([topLeft, topRight, bottomRight, bottomLeft], true);
+  dt.Geometry get asGeometry => geomFactory.createPolygon5([
+    topLeft,
+    topRight,
+    bottomRight,
+    bottomLeft,
+  ], true);
 }
 
 extension RRectExt on RRect {
@@ -67,13 +82,29 @@ extension RRectExt on RRect {
     final path = Path();
     path.moveTo(left + tlRadiusX, top);
     path.lineTo(right - trRadiusX, top);
-    path.arcToPoint(Offset(right, top + trRadiusY), radius: trRadius, clockwise: false);
+    path.arcToPoint(
+      Offset(right, top + trRadiusY),
+      radius: trRadius,
+      clockwise: false,
+    );
     path.lineTo(right, bottom - brRadiusY);
-    path.arcToPoint(Offset(right - brRadiusX, bottom), radius: brRadius, clockwise: false);
+    path.arcToPoint(
+      Offset(right - brRadiusX, bottom),
+      radius: brRadius,
+      clockwise: false,
+    );
     path.lineTo(left + blRadiusX, bottom);
-    path.arcToPoint(Offset(left, bottom - blRadiusY), radius: blRadius, clockwise: false);
+    path.arcToPoint(
+      Offset(left, bottom - blRadiusY),
+      radius: blRadius,
+      clockwise: false,
+    );
     path.lineTo(left, top + tlRadiusY);
-    path.arcToPoint(Offset(left + tlRadiusX, top), radius: tlRadius, clockwise: false);
+    path.arcToPoint(
+      Offset(left + tlRadiusX, top),
+      radius: tlRadius,
+      clockwise: false,
+    );
     path.close();
     return path;
   }
@@ -168,8 +199,10 @@ extension OffsetExt on Offset {
   ///顺时针 angle 为正数
   Offset rotate(Angle angle, {Offset center = Offset.zero}) {
     angle = angle.normalized;
-    double x = (dx - center.dx) * angle.cos - (dy - center.dy) * angle.sin + center.dx;
-    double y = (dx - center.dx) * angle.sin + (dy - center.dy) * angle.cos + center.dy;
+    double x =
+        (dx - center.dx) * angle.cos - (dy - center.dy) * angle.sin + center.dx;
+    double y =
+        (dx - center.dx) * angle.sin + (dy - center.dy) * angle.cos + center.dy;
     return Offset(x, y);
   }
 
@@ -185,8 +218,12 @@ extension OffsetExt on Offset {
   }
 
   Offset symmetryPoint(Offset start, Offset end) {
-    double v1 = (dx - start.dx) * (end.dx - start.dx) + (dy - start.dy) * (end.dy - start.dy);
-    double v2 = (end.dx - start.dx) * (end.dx - start.dx) + (end.dy - start.dy) * (end.dy - start.dy);
+    double v1 =
+        (dx - start.dx) * (end.dx - start.dx) +
+        (dy - start.dy) * (end.dy - start.dy);
+    double v2 =
+        (end.dx - start.dx) * (end.dx - start.dx) +
+        (end.dy - start.dy) * (end.dy - start.dy);
     double t = v1 / v2;
     double qdx = start.dx + (end.dx - start.dx) * t;
     double qdy = start.dy + (end.dy - start.dy) * t;
@@ -239,7 +276,10 @@ extension PathExt on Path {
         m4.translateByDouble(zone.width / 2, zone.height / 2, 0, 1);
         m4.scaleByDouble(xScale, yScale, 1, 1);
         m4.translateByDouble(-zone.width / 2, -zone.height / 2, 0, 1);
-        canvas.drawPath(path.shift(shadow.offset).transform(m4.storage), shadowPainter);
+        canvas.drawPath(
+          path.shift(shadow.offset).transform(m4.storage),
+          shadowPainter,
+        );
       }
     }
   }
@@ -250,8 +290,15 @@ extension PathExt on Path {
       return this;
     }
     num dashLength = dash[0];
-    num dashGapLength = dashLength >= 2 ? dash[1] : dash[0];
-    final properties = _DashedProperties(path: Path(), dashLength: dashLength, dashGapLength: dashGapLength);
+    num dashGapLength = dash.length >= 2 ? dash[1] : dash[0];
+    if (dashLength <= 0 || dashGapLength <= 0) {
+      throw ArgumentError('dash values must be > 0');
+    }
+    final properties = _DashedProperties(
+      path: Path(),
+      dashLength: dashLength,
+      dashGapLength: dashGapLength,
+    );
     final metricsIterator = computeMetrics().iterator;
     while (metricsIterator.moveNext()) {
       final metric = metricsIterator.current;
@@ -277,6 +324,9 @@ extension PathExt on Path {
     final result = <Offset>[];
     if (dash.isEmpty) return result;
     final pattern = dash.map((d) => d.toDouble()).toList();
+    if (pattern.any((d) => d <= 0)) {
+      throw ArgumentError('dash values must be > 0');
+    }
 
     int patIndex = 0;
     double patRemaining = pattern[0];
@@ -302,7 +352,9 @@ extension PathExt on Path {
       if (phase > 0) {
         double skipped = 0.0;
         while (skipped + eps < phase) {
-          final double consume = (patRemaining <= (phase - skipped)) ? patRemaining : (phase - skipped);
+          final double consume = (patRemaining <= (phase - skipped))
+              ? patRemaining
+              : (phase - skipped);
           skipped += consume;
           patRemaining -= consume;
 
@@ -318,7 +370,9 @@ extension PathExt on Path {
 
       while (localPos + eps < subLen) {
         final double available = subLen - localPos;
-        final double consume = (patRemaining <= available) ? patRemaining : available;
+        final double consume = (patRemaining <= available)
+            ? patRemaining
+            : available;
 
         if (draw && pendingStart == null) {
           final t = pm.getTangentForOffset(localPos);
@@ -418,7 +472,7 @@ extension PathExt on Path {
 
   Offset? lastOffset() {
     PathMetrics metrics = computeMetrics();
-    List<Offset> ol = [];
+    Offset? last;
     for (PathMetric metric in metrics) {
       if (metric.length <= 0) {
         continue;
@@ -427,12 +481,9 @@ extension PathExt on Path {
       if (result == null) {
         continue;
       }
-      ol.add(result.position);
+      last = result.position;
     }
-    if (ol.isEmpty) {
-      return null;
-    }
-    return ol[ol.length - 1];
+    return last;
   }
 
   ///将当前Path进行拆分
@@ -514,13 +565,13 @@ class _DashedProperties {
     required this.path,
     required num dashLength,
     required num dashGapLength,
-  })  : assert(dashLength > 0.0, 'dashLength must be > 0.0'),
-        assert(dashGapLength > 0.0, 'dashGapLength must be > 0.0'),
-        _dashLength = dashLength,
-        _remainingDashLength = dashLength,
-        _remainingDashGapLength = dashGapLength,
-        _previousWasDash = false,
-        extractedPathLength = 0.0;
+  }) : assert(dashLength > 0.0, 'dashLength must be > 0.0'),
+       assert(dashGapLength > 0.0, 'dashGapLength must be > 0.0'),
+       _dashLength = dashLength,
+       _remainingDashLength = dashLength,
+       _remainingDashGapLength = dashGapLength,
+       _previousWasDash = false,
+       extractedPathLength = 0.0;
 
   bool get addDashNext {
     if (!_previousWasDash || _remainingDashLength != _dashLength) {
@@ -551,8 +602,12 @@ class _DashedProperties {
     Tangent tangent = metric.getTangentForOffset(end.toDouble())!;
     path.moveTo(tangent.position.dx, tangent.position.dy);
     final delta = end - extractedPathLength;
-    _remainingDashGapLength =
-        _updateRemainingLength(delta: delta, end: end, availableEnd: availableEnd, initialLength: dashGapLength);
+    _remainingDashGapLength = _updateRemainingLength(
+      delta: delta,
+      end: end,
+      availableEnd: availableEnd,
+      initialLength: dashGapLength,
+    );
     extractedPathLength = end;
     _previousWasDash = false;
   }

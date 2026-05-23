@@ -3,7 +3,9 @@ import 'package:dart_graph/dart_graph.dart';
 extension DFSExtension on Graph {
   List<Vertex> dfs(Vertex source) {
     if (!vertexMap.containsKey(source.id)) {
-      throw ArgumentError('Source vertex ${source.id} does not exist in the graph.');
+      throw ArgumentError(
+        'Source vertex ${source.id} does not exist in the graph.',
+      );
     }
 
     final List<Vertex> result = [];
@@ -31,7 +33,7 @@ extension DFSExtension on Graph {
     final out = outEdges(v.id);
     if (out.isNotEmpty) {
       for (final edge in out.values) {
-        final targetId = edge.to;
+        final targetId = edge.from == v.id ? edge.to : edge.from;
         if (targetId == v.id && !allowSelfLoop) continue;
         final target = vertexMap[targetId];
         if (target != null) yield target;

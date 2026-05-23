@@ -1,4 +1,3 @@
-
 import 'package:bezier/bezier.dart';
 import 'package:vector_math/vector_math.dart';
 
@@ -25,7 +24,16 @@ class EvenSpacer2 {
     }
 
     final totalLength = _cumulativeArcLengths.last;
-    _arcFractions = List.unmodifiable(_cumulativeArcLengths.map((l) => l / totalLength));
+    if (totalLength <= 0) {
+      final paramCount = curveLookUpTable.length - 1;
+      _arcFractions = List.unmodifiable(
+        List<double>.generate(curveLookUpTable.length, (i) => i / paramCount),
+      );
+    } else {
+      _arcFractions = List.unmodifiable(
+        _cumulativeArcLengths.map((l) => l / totalLength),
+      );
+    }
   }
 
   double get arcLength => _cumulativeArcLengths.last;
@@ -63,10 +71,16 @@ class EvenSpacer2 {
   }
 
   double _interpolateT(int upperIndex, double tFraction) {
+    if (upperIndex <= 0) return 0.0;
+    if (upperIndex >= _arcFractions.length) return 1.0;
     final lowerIndex = upperIndex - 1;
     final fractionLower = _arcFractions[lowerIndex];
     final fractionUpper = _arcFractions[upperIndex];
-    final segmentFraction = (tFraction - fractionLower) / (fractionUpper - fractionLower);
+    if ((fractionUpper - fractionLower).abs() < 1e-12) {
+      return lowerIndex / (curveLookUpTable.length - 1);
+    }
+    final segmentFraction =
+        (tFraction - fractionLower) / (fractionUpper - fractionLower);
     final paramCount = curveLookUpTable.length - 1;
     final paramLower = lowerIndex / paramCount;
     final paramUpper = upperIndex / paramCount;
@@ -121,6 +135,9 @@ class EvenSpacer2 {
     final upperIndex = low;
     final lenLower = _cumulativeArcLengths[lowerIndex];
     final lenUpper = _cumulativeArcLengths[upperIndex];
+    if ((lenUpper - lenLower).abs() < 1e-12) {
+      return curve.pointAt(lowerIndex / (curveLookUpTable.length - 1));
+    }
     final segFraction = (S - lenLower) / (lenUpper - lenLower);
     final paramCount = curveLookUpTable.length - 1;
     final tLower = lowerIndex / paramCount;
@@ -142,6 +159,7 @@ class EvenSpacer2 {
 
   Vector2 tangentAtLength(double S) {
     final totalLength = arcLength;
+    if (totalLength <= 0) return Vector2.zero();
     final tFraction = (S / totalLength).clamp(0, 1);
     final t = evenTValueAt(tFraction.toDouble());
     final derivative = curve.derivativeAt(t);

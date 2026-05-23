@@ -13,8 +13,13 @@ final class PushRelabel {
   late final _Vertex _source;
   late final _Vertex _sink;
 
-  static int getMaximumFlow(g.Graph graph, Map<g.Edge, int> edgesToCapacities, g.Vertex source, g.Vertex sink) {
-    if (source == sink) return double.maxFinite.toInt();
+  static int getMaximumFlow(
+    g.Graph graph,
+    Map<g.Edge, int> edgesToCapacities,
+    g.Vertex source,
+    g.Vertex sink,
+  ) {
+    if (source == sink) return 0;
 
     final Map<String, _Vertex> vertexMap = {};
 
@@ -83,7 +88,7 @@ final class PushRelabel {
       }
     }
     // 源点高度固定为 n (除非不可达，但也设为 n 以触发 push)
-     _source.height = _n;
+    _source.height = _n;
   }
 
   /// 推流操作

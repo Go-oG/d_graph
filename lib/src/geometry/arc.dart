@@ -2,9 +2,7 @@ import 'dart:math' as m;
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:d_util/d_util.dart';
 import 'package:dart_graph/dart_graph.dart';
-import 'package:dart_graph/src/util/coord_util.dart';
 import 'package:dts/dts.dart' show Geometry;
 
 class Arc extends BasicGeometry {
@@ -35,7 +33,9 @@ class Arc extends BasicGeometry {
     if (padRadius != null && padRadius >= outRadius) {
       this.padRadius = padRadius;
     } else {
-      this.padRadius = m.sqrt(innerRadius * innerRadius + outRadius * outRadius);
+      this.padRadius = m.sqrt(
+        innerRadius * innerRadius + outRadius * outRadius,
+      );
     }
     if (innerRadius > outRadius) {
       throw ("参数违法");
@@ -104,7 +104,16 @@ class Arc extends BasicGeometry {
     }
 
     /// 空心扇形
-    return _buildHollowArc(center, startAngle, sweepAngle, ir, or, corner, padAngle, padRadius);
+    return _buildHollowArc(
+      center,
+      startAngle,
+      sweepAngle,
+      ir,
+      or,
+      corner,
+      padAngle,
+      padRadius,
+    );
   }
 
   Rect _onBuildBound() {
@@ -131,7 +140,16 @@ class Arc extends BasicGeometry {
 
   @override
   int get hashCode {
-    return Object.hash(innerRadius, outRadius, startAngle, sweepAngle, cornerRadius, center, padAngle, padRadius);
+    return Object.hash(
+      innerRadius,
+      outRadius,
+      startAngle,
+      sweepAngle,
+      cornerRadius,
+      center,
+      padAngle,
+      padRadius,
+    );
   }
 
   @override
@@ -162,7 +180,8 @@ class Arc extends BasicGeometry {
   }
 
   @override
-  bool containsPoint(Offset p, {double eps = 1e-9}) => annularSector.contains(p, epsilon: eps);
+  bool containsPoint(Offset p, {double eps = 1e-9}) =>
+      annularSector.contains(p, epsilon: eps);
 
   @override
   bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) {
@@ -186,13 +205,18 @@ class Arc extends BasicGeometry {
     return super.isOverlap(geom, eps: eps);
   }
 
-  AnnularSector get annularSector {
-    return AnnularSector(
-        center: center, innerRadius: innerRadius, outerRadius: outRadius, startAngle: startAngle, endAngle: endAngle);
-  }
+  late final AnnularSector annularSector = AnnularSector(
+    center: center,
+    innerRadius: innerRadius,
+    outerRadius: outRadius,
+    startAngle: startAngle,
+    endAngle: endAngle,
+  );
 
   bool _containsArc(Arc arc) {
-    if (arc.innerRadius < innerRadius || arc.outRadius > outRadius) return false;
+    if (arc.innerRadius < innerRadius || arc.outRadius > outRadius) {
+      return false;
+    }
     return _angleContains(startAngle, endAngle, arc.startAngle, arc.endAngle);
   }
 
@@ -215,7 +239,9 @@ class Arc extends BasicGeometry {
     final dx = x - center.x;
     final dy = y - center.y;
     final dist = sqrt(dx * dx + dy * dy);
-    if (dist - rCircle < A.innerRadius || dist + rCircle > A.outerRadius) return false;
+    if (dist - rCircle < A.innerRadius || dist + rCircle > A.outerRadius) {
+      return false;
+    }
     if (dist == 0) {
       return rCircle <= (A.outerRadius) && rCircle >= (A.innerRadius);
     }
@@ -227,11 +253,21 @@ class Arc extends BasicGeometry {
   }
 
   @override
-  Geometry buildGeometry() =>
-      AnnularSectorFactory.createAnnularSector(center, innerRadius, outRadius, startAngle, endAngle);
+  Geometry buildGeometry() => AnnularSectorFactory.createAnnularSector(
+    center,
+    innerRadius,
+    outRadius,
+    startAngle,
+    endAngle,
+  );
 
   ///普通圆形
-  static Path _buildCircle(Offset center, Angle startAngle, double or, int direction) {
+  static Path _buildCircle(
+    Offset center,
+    Angle startAngle,
+    double or,
+    int direction,
+  ) {
     final piOffset = pi * direction;
     Path path = Path();
     Offset o1 = CoordUtil.circlePoint(or, startAngle, center: center);
@@ -244,16 +280,36 @@ class Arc extends BasicGeometry {
   }
 
   ///空心圆形
-  static Path _buildHollowCircle(Offset center, Angle startAngle, double ir, double or, int direction) {
+  static Path _buildHollowCircle(
+    Offset center,
+    Angle startAngle,
+    double ir,
+    double or,
+    int direction,
+  ) {
     final path = Path();
-    path.addArc(Rect.fromCircle(center: center, radius: or), 0, 2 * pi * direction);
-    path.addArc(Rect.fromCircle(center: center, radius: ir), 0, -2 * pi * direction);
+    path.addArc(
+      Rect.fromCircle(center: center, radius: or),
+      0,
+      2 * pi * direction,
+    );
+    path.addArc(
+      Rect.fromCircle(center: center, radius: ir),
+      0,
+      -2 * pi * direction,
+    );
     path.close();
     return path;
   }
 
   ///扇形
-  static Path _buildNormalArc(Offset center, Angle startAngle, Angle sweepAngle, double or, double corner) {
+  static Path _buildNormalArc(
+    Offset center,
+    Angle startAngle,
+    Angle sweepAngle,
+    double or,
+    double corner,
+  ) {
     Path path = Path();
     path.moveTo(center.dx, center.dy);
     Rect orRect = Rect.fromCircle(center: center, radius: or);
@@ -273,7 +329,12 @@ class Arc extends BasicGeometry {
     final lt = _computeCornerPoint(center, or, corner, startAngle, true, true);
     final rt = _computeCornerPoint(center, or, corner, endAngle, false, true);
     path.lineTo2(clockwise ? lt.p1 : rt.p2);
-    path.arcToPoint(clockwise ? lt.p2 : rt.p1, radius: cr, largeArc: false, clockwise: clockwise);
+    path.arcToPoint(
+      clockwise ? lt.p2 : rt.p1,
+      radius: cr,
+      largeArc: false,
+      clockwise: clockwise,
+    );
 
     Angle a, b;
     if (clockwise) {
@@ -290,7 +351,12 @@ class Arc extends BasicGeometry {
       }
     }
     path.arcTo(orRect, a.radians, (b - a).radians, false);
-    path.arcToPoint(clockwise ? rt.p2 : lt.p1, radius: cr, largeArc: false, clockwise: clockwise);
+    path.arcToPoint(
+      clockwise ? rt.p2 : lt.p1,
+      radius: cr,
+      largeArc: false,
+      clockwise: clockwise,
+    );
     path.close();
     return path;
   }
@@ -360,10 +426,29 @@ class Arc extends BasicGeometry {
     ///外圈层
     if (outCorner >= _cornerMin) {
       final Radius radius = Radius.circular(outCorner);
-      final lt = _computeCornerPoint(center, or, outCorner, clockwise ? osa : oea, true, true);
-      final rt = _computeCornerPoint(center, or, outCorner, clockwise ? oea : osa, false, true);
+      final lt = _computeCornerPoint(
+        center,
+        or,
+        outCorner,
+        clockwise ? osa : oea,
+        true,
+        true,
+      );
+      final rt = _computeCornerPoint(
+        center,
+        or,
+        outCorner,
+        clockwise ? oea : osa,
+        false,
+        true,
+      );
       path.moveTo2(clockwise ? lt.p1 : rt.p2);
-      path.arcToPoint(clockwise ? lt.p2 : rt.p1, radius: radius, largeArc: false, clockwise: clockwise);
+      path.arcToPoint(
+        clockwise ? lt.p2 : rt.p1,
+        radius: radius,
+        largeArc: false,
+        clockwise: clockwise,
+      );
       Angle a, b;
       a = (clockwise ? lt.p2 : rt.p1).angle(center);
       b = (clockwise ? rt.p1 : lt.p2).angle(center);
@@ -375,7 +460,12 @@ class Arc extends BasicGeometry {
       }
       path.arcTo2(outRect, a, b - a, false);
       path.lineTo2(clockwise ? rt.p1 : lt.p2);
-      path.arcToPoint(clockwise ? rt.p2 : lt.p1, radius: radius, largeArc: false, clockwise: clockwise);
+      path.arcToPoint(
+        clockwise ? rt.p2 : lt.p1,
+        radius: radius,
+        largeArc: false,
+        clockwise: clockwise,
+      );
     } else {
       path.moveTo2(CoordUtil.circlePoint(or, osa, center: center));
       if (outSweep.radians > 1e-6) {
@@ -386,10 +476,29 @@ class Arc extends BasicGeometry {
     ///内圈层
     if (inCorner >= _cornerMin) {
       final Radius radius = Radius.circular(inCorner);
-      final lb = _computeCornerPoint(center, ir, inCorner, clockwise ? isa : iea, true, false);
-      final rb = _computeCornerPoint(center, ir, inCorner, clockwise ? iea : isa, false, false);
+      final lb = _computeCornerPoint(
+        center,
+        ir,
+        inCorner,
+        clockwise ? isa : iea,
+        true,
+        false,
+      );
+      final rb = _computeCornerPoint(
+        center,
+        ir,
+        inCorner,
+        clockwise ? iea : isa,
+        false,
+        false,
+      );
       path.lineTo2(clockwise ? rb.p1 : lb.p2);
-      path.arcToPoint(clockwise ? rb.p2 : lb.p1, radius: radius, largeArc: false, clockwise: clockwise);
+      path.arcToPoint(
+        clockwise ? rb.p2 : lb.p1,
+        radius: radius,
+        largeArc: false,
+        clockwise: clockwise,
+      );
       Angle a, b;
       a = (clockwise ? rb.p2 : lb.p1).angle(center);
       b = (clockwise ? lb.p1 : rb.p2).angle(center);
@@ -401,7 +510,12 @@ class Arc extends BasicGeometry {
       }
       path.arcTo2(inRect, a, b - a, false);
       path.lineTo2(clockwise ? lb.p1 : rb.p2);
-      path.arcToPoint(clockwise ? lb.p2 : rb.p1, radius: radius, largeArc: false, clockwise: clockwise);
+      path.arcToPoint(
+        clockwise ? lb.p2 : rb.p1,
+        radius: radius,
+        largeArc: false,
+        clockwise: clockwise,
+      );
     } else {
       path.lineTo2(CoordUtil.circlePoint(ir, iea, center: center));
       if (inSweep.radians > 1e-6) {
@@ -422,12 +536,24 @@ class Arc extends BasicGeometry {
   ) {
     List<Angle> il = [startAngle, startAngle + sweepAngle];
     il = _offsetAngle(ir, startAngle, sweepAngle, padAngle, maxRadius);
-    List<Angle> ol = _offsetAngle(or, startAngle, sweepAngle, padAngle, maxRadius);
+    List<Angle> ol = _offsetAngle(
+      or,
+      startAngle,
+      sweepAngle,
+      padAngle,
+      maxRadius,
+    );
     il.addAll(ol);
     return il;
   }
 
-  static List<Angle> _offsetAngle(double r, Angle startAngle, Angle sweepAngle, Angle padAngle, double padRadius) {
+  static List<Angle> _offsetAngle(
+    double r,
+    Angle startAngle,
+    Angle sweepAngle,
+    Angle padAngle,
+    double padRadius,
+  ) {
     final sa = startAngle.radians;
     final sw = sweepAngle.radians;
     final pad = padAngle.radians;
@@ -436,8 +562,8 @@ class Arc extends BasicGeometry {
       return [startAngle, startAngle + sweepAngle];
     }
 
-    final outerPad = asin((padRadius / r) * sin(pad / 2)).clamp(-1, 1);
-    final innerPad = asin(sin(pad / 2)).clamp(-1, 1);
+    final outerPad = asin(((padRadius / r) * sin(pad / 2)).clamp(-1.0, 1.0));
+    final innerPad = asin(sin(pad / 2).clamp(-1.0, 1.0));
     double start = sa + outerPad - innerPad;
     double end = sa + sw - (outerPad - innerPad);
 
@@ -453,7 +579,14 @@ class Arc extends BasicGeometry {
   }
 
   ///计算切点位置
-  static _CornerOffset _computeCornerPoint(Offset center, num r, double corner, Angle angle, bool left, bool top) {
+  static _CornerOffset _computeCornerPoint(
+    Offset center,
+    num r,
+    double corner,
+    Angle angle,
+    bool left,
+    bool top,
+  ) {
     _CornerOffset result = _CornerOffset();
 
     final dis = (r + corner * (top ? -1 : 1.0)).abs();
@@ -485,6 +618,9 @@ class Arc extends BasicGeometry {
     num r22 = r2 * r2;
 
     double d = m.sqrt(dx * dx + dy * dy);
+    if (d <= 1e-12) {
+      return c1;
+    }
     double l = (r12 - r22 + d * d) / (2 * d);
     double h2 = r12 - l * l;
     double h;

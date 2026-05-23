@@ -2,7 +2,6 @@ import 'dart:core';
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:d_util/d_util.dart';
 import 'package:dart_graph/dart_graph.dart';
 
 abstract class CurveUtil {
@@ -19,7 +18,12 @@ abstract class CurveUtil {
   }
 
   ///所有单位都为弧度
-  static Curve ofArc(Rect rect, Angle startAngle, Angle sweepAngle, bool forceMoveTo) {
+  static Curve ofArc(
+    Rect rect,
+    Angle startAngle,
+    Angle sweepAngle,
+    bool forceMoveTo,
+  ) {
     final sinA = startAngle.sin;
 
     final cosA = startAngle.cos;
@@ -55,7 +59,10 @@ abstract class CurveUtil {
     bool clockwise,
   ) {
     final r = max(radius.x, radius.y);
-    double angle = acos((start.dx - end.dx) / (2 * r));
+    if (r <= 0) {
+      return ofLine(start, end);
+    }
+    double angle = acos(((start.dx - end.dx) / (2 * r)).clamp(-1.0, 1.0));
     if (!clockwise) {
       angle = -angle;
     }
@@ -168,7 +175,12 @@ abstract class CurveUtil {
     return Curve(start: s, end: e, c1: c1, c2: c2);
   }
 
-  static List<Curve> fromArc(Offset center, double radius, Angle startAngle, Angle sweepAngle) {
+  static List<Curve> fromArc(
+    Offset center,
+    double radius,
+    Angle startAngle,
+    Angle sweepAngle,
+  ) {
     double sa = startAngle.radians;
     double swa = sweepAngle.radians;
 
@@ -176,15 +188,29 @@ abstract class CurveUtil {
     final List<Curve> beziers = [];
 
     final int segments = (swa.abs() / maxSweep).ceil();
+    if (segments == 0) {
+      return [
+        ofLine(
+          CoordUtil.circlePoint(radius, startAngle, center: center),
+          CoordUtil.circlePoint(radius, startAngle, center: center),
+        ),
+      ];
+    }
     final double delta = swa / segments;
 
     for (int i = 0; i < segments; i++) {
       final double theta1 = sa + i * delta;
       final double theta2 = theta1 + delta;
 
-      final p0 = Offset(center.dx + radius * cos(theta1), center.dy + radius * sin(theta1));
+      final p0 = Offset(
+        center.dx + radius * cos(theta1),
+        center.dy + radius * sin(theta1),
+      );
 
-      final p3 = Offset(center.dx + radius * cos(theta2), center.dy + radius * sin(theta2));
+      final p3 = Offset(
+        center.dx + radius * cos(theta2),
+        center.dy + radius * sin(theta2),
+      );
 
       final alpha = (4 / 3) * tan((theta2 - theta1) / 4);
 
@@ -216,10 +242,19 @@ abstract class CurveUtil {
     // }
 
     if (dataList.length == 1) {
-      return [Curve(start: dataList.first, end: dataList.first, c1: dataList.first, c2: dataList.first)];
+      return [
+        Curve(
+          start: dataList.first,
+          end: dataList.first,
+          c1: dataList.first,
+          c2: dataList.first,
+        ),
+      ];
     }
 
-    List<Offset> points = reversed ? List.from(dataList.reversed) : List.from(dataList);
+    List<Offset> points = reversed
+        ? List.from(dataList.reversed)
+        : List.from(dataList);
     final controlPoints = _computeControlPoints(points, smooth);
 
     final resultList = <Curve>[];
@@ -235,7 +270,10 @@ abstract class CurveUtil {
     return resultList;
   }
 
-  static List<List<Offset>> _computeControlPoints(List<Offset> points, double smoothFactor) {
+  static List<List<Offset>> _computeControlPoints(
+    List<Offset> points,
+    double smoothFactor,
+  ) {
     final controlPoints = <List<Offset>>[];
     final n = points.length;
     for (var i = 0; i < n; i++) {
@@ -276,7 +314,14 @@ extension CurveExt on Iterable<Curve?> {
       if (curve.isLine) {
         path.lineTo2(curve.end);
       } else {
-        path.cubicTo(curve.c1.dx, curve.c1.dy, curve.c2.dx, curve.c2.dy, curve.end.dx, curve.end.dy);
+        path.cubicTo(
+          curve.c1.dx,
+          curve.c1.dy,
+          curve.c2.dx,
+          curve.c2.dy,
+          curve.end.dx,
+          curve.end.dy,
+        );
       }
     }
     if (close && !hasBreakPoint) {

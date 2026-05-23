@@ -6,19 +6,34 @@ import 'common.dart';
 
 typedef Accessor<T> = double Function(T data);
 
-typedef QuadTreeVisitor<T> = VisitResult Function(QuadNode<T> node, double x0, double y0, double x1, double y1);
+typedef QuadTreeVisitor<T> =
+    VisitResult Function(
+      QuadNode<T> node,
+      double x0,
+      double y0,
+      double x1,
+      double y1,
+    );
 
 class QuadTree<T> {
   final Accessor<T> xFun;
   final Accessor<T> yFun;
   QuadNode<T>? _root;
+  int _size = 0;
 
   double _x0 = double.nan;
   double _y0 = double.nan;
   double _x1 = double.nan;
   double _y1 = double.nan;
 
-  QuadTree(this.xFun, this.yFun, [double? x0, double? y0, double? x1, double? y1]) {
+  QuadTree(
+    this.xFun,
+    this.yFun, [
+    double? x0,
+    double? y0,
+    double? x1,
+    double? y1,
+  ]) {
     if (x0 != null && y0 != null && x1 != null && y1 != null) {
       _x0 = x0;
       _y0 = y0;
@@ -27,7 +42,11 @@ class QuadTree<T> {
     }
   }
 
-  static QuadTree<T> fromList<T>(Accessor<T> xFun, Accessor<T> yFun, List<T> nodes) {
+  static QuadTree<T> fromList<T>(
+    Accessor<T> xFun,
+    Accessor<T> yFun,
+    List<T> nodes,
+  ) {
     QuadTree<T> tree = QuadTree(xFun, yFun);
     tree.addAll(nodes);
     return tree;
@@ -38,18 +57,40 @@ class QuadTree<T> {
     final x = xFun(d);
     final y = yFun(d);
     if (x.isNaN || y.isNaN) return;
-    _removeInner(_root, null, 0, x, y, d, _x0, _y0, _x1, _y1);
+    if (_removeInner(_root, null, 0, x, y, d, _x0, _y0, _x1, _y1)) {
+      _size--;
+    }
   }
 
-  bool _removeInner(QuadNode<T>? node, QuadNode<T>? parent, int? parentIndex, double x, double y, T d, double x0,
-      double y0, double x1, double y1) {
+  bool _removeInner(
+    QuadNode<T>? node,
+    QuadNode<T>? parent,
+    int? parentIndex,
+    double x,
+    double y,
+    T d,
+    double x0,
+    double y0,
+    double x1,
+    double y1,
+  ) {
     if (node == null) return false;
     if (node.isInternal) {
       double xm = (x0 + x1) / 2, ym = (y0 + y1) / 2;
       int right = x >= xm ? 1 : 0, bottom = y >= ym ? 1 : 0;
       int i = bottom << 1 | right;
-      bool removed = _removeInner(node.children[i], node, i, x, y, d, right == 1 ? xm : x0, bottom == 1 ? ym : y0,
-          right == 1 ? x1 : xm, bottom == 1 ? y1 : ym);
+      bool removed = _removeInner(
+        node.children[i],
+        node,
+        i,
+        x,
+        y,
+        d,
+        right == 1 ? xm : x0,
+        bottom == 1 ? ym : y0,
+        right == 1 ? x1 : xm,
+        bottom == 1 ? y1 : ym,
+      );
       if (removed) {
         int childCount = 0;
         QuadNode<T>? onlyChild;
@@ -61,7 +102,9 @@ class QuadTree<T> {
         }
         if (childCount == 0 && parent != null) {
           parent.children[parentIndex!] = null;
-        } else if (childCount == 1 && onlyChild != null && !onlyChild.isInternal) {
+        } else if (childCount == 1 &&
+            onlyChild != null &&
+            !onlyChild.isInternal) {
           if (parent != null) {
             parent.children[parentIndex!] = onlyChild;
           } else {
@@ -105,6 +148,7 @@ class QuadTree<T> {
 
   void clear() {
     _root = null;
+    _size = 0;
     _x0 = _y0 = _x1 = _y1 = double.nan;
   }
 
@@ -114,6 +158,7 @@ class QuadTree<T> {
     if (x.isNaN || y.isNaN) return;
     _cover(x, y);
     _addInner(x, y, data);
+    _size++;
   }
 
   void addAll(List<T> data) {
@@ -143,7 +188,9 @@ class QuadTree<T> {
     _cover(maxX, maxY);
 
     for (int i = 0; i < n; ++i) {
+      if (xs[i].isNaN || ys[i].isNaN) continue;
       _addInner(xs[i], ys[i], data[i]);
+      _size++;
     }
   }
 
@@ -282,7 +329,16 @@ class QuadTree<T> {
     _root = node;
   }
 
-  void _pushCords(List<double> stack, int i, double x0, double y0, double xm, double ym, double x1, double y1) {
+  void _pushCords(
+    List<double> stack,
+    int i,
+    double x0,
+    double y0,
+    double xm,
+    double ym,
+    double x1,
+    double y1,
+  ) {
     if (i == 0) {
       stack.add(x0);
       stack.add(y0);
@@ -311,7 +367,9 @@ class QuadTree<T> {
 
   void visit(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
-    final List<_StackFrame<T>> stack = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
+    final List<_StackFrame<T>> stack = [
+      _StackFrame(_root!, _x0, _y0, _x1, _y1),
+    ];
     while (stack.isNotEmpty) {
       final frame = stack.removeLast();
       final node = frame.node;
@@ -326,10 +384,18 @@ class QuadTree<T> {
       if (node.isInternal) {
         double xm = (frame.x0 + frame.x1) / 2;
         double ym = (frame.y0 + frame.y1) / 2;
-        if (node.children[3] != null) stack.add(_StackFrame(node.children[3]!, xm, ym, frame.x1, frame.y1));
-        if (node.children[2] != null) stack.add(_StackFrame(node.children[2]!, frame.x0, ym, xm, frame.y1));
-        if (node.children[1] != null) stack.add(_StackFrame(node.children[1]!, xm, frame.y0, frame.x1, ym));
-        if (node.children[0] != null) stack.add(_StackFrame(node.children[0]!, frame.x0, frame.y0, xm, ym));
+        if (node.children[3] != null) {
+          stack.add(_StackFrame(node.children[3]!, xm, ym, frame.x1, frame.y1));
+        }
+        if (node.children[2] != null) {
+          stack.add(_StackFrame(node.children[2]!, frame.x0, ym, xm, frame.y1));
+        }
+        if (node.children[1] != null) {
+          stack.add(_StackFrame(node.children[1]!, xm, frame.y0, frame.x1, ym));
+        }
+        if (node.children[0] != null) {
+          stack.add(_StackFrame(node.children[0]!, frame.x0, frame.y0, xm, ym));
+        }
       }
     }
   }
@@ -337,7 +403,9 @@ class QuadTree<T> {
   void visitInOrder(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
 
-    final List<_StackFrame<T>> stack = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
+    final List<_StackFrame<T>> stack = [
+      _StackFrame(_root!, _x0, _y0, _x1, _y1),
+    ];
 
     while (stack.isNotEmpty) {
       final frame = stack.removeLast();
@@ -349,10 +417,14 @@ class QuadTree<T> {
           double xm = (frame.x0 + frame.x1) / 2;
           double ym = (frame.y0 + frame.y1) / 2;
           if (node.children[1] != null) {
-            stack.add(_StackFrame(node.children[1]!, xm, frame.y0, frame.x1, ym));
+            stack.add(
+              _StackFrame(node.children[1]!, xm, frame.y0, frame.x1, ym),
+            );
           }
           if (node.children[0] != null) {
-            stack.add(_StackFrame(node.children[0]!, frame.x0, frame.y0, xm, ym));
+            stack.add(
+              _StackFrame(node.children[0]!, frame.x0, frame.y0, xm, ym),
+            );
           }
         }
       } else if (frame.stage == 1) {
@@ -371,10 +443,14 @@ class QuadTree<T> {
           double ym = (frame.y0 + frame.y1) / 2;
 
           if (node.children[3] != null) {
-            stack.add(_StackFrame(node.children[3]!, xm, ym, frame.x1, frame.y1));
+            stack.add(
+              _StackFrame(node.children[3]!, xm, ym, frame.x1, frame.y1),
+            );
           }
           if (node.children[2] != null) {
-            stack.add(_StackFrame(node.children[2]!, frame.x0, ym, xm, frame.y1));
+            stack.add(
+              _StackFrame(node.children[2]!, frame.x0, ym, xm, frame.y1),
+            );
           }
         }
       }
@@ -384,7 +460,9 @@ class QuadTree<T> {
   void visitAfter(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
 
-    final List<_StackFrame<T>> stack = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
+    final List<_StackFrame<T>> stack = [
+      _StackFrame(_root!, _x0, _y0, _x1, _y1),
+    ];
 
     while (stack.isNotEmpty) {
       final frame = stack.removeLast();
@@ -396,7 +474,9 @@ class QuadTree<T> {
         continue;
       }
 
-      stack.add(_StackFrame.of(node, frame.x0, frame.y0, frame.x1, frame.y1, true));
+      stack.add(
+        _StackFrame.of(node, frame.x0, frame.y0, frame.x1, frame.y1, true),
+      );
 
       if (node.isInternal) {
         final result = visitor(node, frame.x0, frame.y0, frame.x1, frame.y1);
@@ -407,17 +487,27 @@ class QuadTree<T> {
         double xm = (frame.x0 + frame.x1) / 2;
         double ym = (frame.y0 + frame.y1) / 2;
         final children = node.children;
-        if (children[3] != null) stack.add(_StackFrame(children[3]!, xm, ym, frame.x1, frame.y1));
-        if (children[2] != null) stack.add(_StackFrame(children[2]!, frame.x0, ym, xm, frame.y1));
-        if (children[1] != null) stack.add(_StackFrame(children[1]!, xm, frame.y0, frame.x1, ym));
-        if (children[0] != null) stack.add(_StackFrame(children[0]!, frame.x0, frame.y0, xm, ym));
+        if (children[3] != null) {
+          stack.add(_StackFrame(children[3]!, xm, ym, frame.x1, frame.y1));
+        }
+        if (children[2] != null) {
+          stack.add(_StackFrame(children[2]!, frame.x0, ym, xm, frame.y1));
+        }
+        if (children[1] != null) {
+          stack.add(_StackFrame(children[1]!, xm, frame.y0, frame.x1, ym));
+        }
+        if (children[0] != null) {
+          stack.add(_StackFrame(children[0]!, frame.x0, frame.y0, xm, ym));
+        }
       }
     }
   }
 
   void visitBFS(QuadTreeVisitor<T> visitor) {
     if (_root == null) return;
-    final List<_StackFrame<T>> queue = [_StackFrame(_root!, _x0, _y0, _x1, _y1)];
+    final List<_StackFrame<T>> queue = [
+      _StackFrame(_root!, _x0, _y0, _x1, _y1),
+    ];
     int head = 0;
     while (head < queue.length) {
       final frame = queue[head++];
@@ -432,10 +522,18 @@ class QuadTree<T> {
       if (node.isInternal) {
         double xm = (frame.x0 + frame.x1) / 2;
         double ym = (frame.y0 + frame.y1) / 2;
-        if (node.children[0] != null) queue.add(_StackFrame(node.children[0]!, frame.x0, frame.y0, xm, ym));
-        if (node.children[1] != null) queue.add(_StackFrame(node.children[1]!, xm, frame.y0, frame.x1, ym));
-        if (node.children[2] != null) queue.add(_StackFrame(node.children[2]!, frame.x0, ym, xm, frame.y1));
-        if (node.children[3] != null) queue.add(_StackFrame(node.children[3]!, xm, ym, frame.x1, frame.y1));
+        if (node.children[0] != null) {
+          queue.add(_StackFrame(node.children[0]!, frame.x0, frame.y0, xm, ym));
+        }
+        if (node.children[1] != null) {
+          queue.add(_StackFrame(node.children[1]!, xm, frame.y0, frame.x1, ym));
+        }
+        if (node.children[2] != null) {
+          queue.add(_StackFrame(node.children[2]!, frame.x0, ym, xm, frame.y1));
+        }
+        if (node.children[3] != null) {
+          queue.add(_StackFrame(node.children[3]!, xm, ym, frame.x1, frame.y1));
+        }
       }
     }
   }
@@ -476,7 +574,8 @@ class QuadTree<T> {
       if (!node.isInternal) {
         QuadNode<T>? leaf = node;
         while (leaf != null) {
-          double dSq = (leaf.x - x) * (leaf.x - x) + (leaf.y - y) * (leaf.y - y);
+          double dSq =
+              (leaf.x - x) * (leaf.x - x) + (leaf.y - y) * (leaf.y - y);
           if (dSq < minDistanceSq) {
             minDistanceSq = dSq;
             data = leaf.data;
@@ -513,7 +612,9 @@ class QuadTree<T> {
     double rL = rect.left, rT = rect.top, rR = rect.right, rB = rect.bottom;
 
     visit((node, x0, y0, x1, y1) {
-      if (x0 >= rR || x1 < rL || y0 >= rB || y1 < rT) return VisitResult.skipChildren;
+      if (x0 >= rR || x1 < rL || y0 >= rB || y1 < rT) {
+        return VisitResult.skipChildren;
+      }
 
       if (!node.isInternal) {
         QuadNode<T>? leaf = node;
@@ -533,6 +634,7 @@ class QuadTree<T> {
     QuadTree<T> copy = QuadTree(xFun, yFun, _x0, _y0, _x1, _y1);
     if (_root != null) {
       copy._root = _copyNode(_root!);
+      copy._size = _size;
     }
     return copy;
   }
@@ -551,7 +653,11 @@ class QuadTree<T> {
       var currentOld = node.next;
       var currentNew = newNode;
       while (currentOld != null) {
-        currentNew.next = QuadNode<T>.leaf(currentOld.data, currentOld.x, currentOld.y);
+        currentNew.next = QuadNode<T>.leaf(
+          currentOld.data,
+          currentOld.x,
+          currentOld.y,
+        );
         currentNew = currentNew.next!;
         currentOld = currentOld.next;
       }
@@ -560,7 +666,9 @@ class QuadTree<T> {
   }
 
   Rect? get extent {
-    if (_x0.isNaN) return null;
+    if (_x0.isNaN) {
+      return null;
+    }
     return Rect.fromLTRB(_x0, _y0, _x1, _y1);
   }
 
@@ -604,20 +712,7 @@ class QuadTree<T> {
     addAll(all);
   }
 
-  int get size {
-    int count = 0;
-    visit((node, x0, y0, x1, y1) {
-      if (!node.isInternal) {
-        QuadNode<T>? leaf = node;
-        while (leaf != null) {
-          count++;
-          leaf = leaf.next;
-        }
-      }
-      return VisitResult.continueVisit;
-    });
-    return count;
-  }
+  int get size => _size;
 
   bool get isEmpty => _root == null;
 }
@@ -632,9 +727,7 @@ class QuadNode<T> with ValueExtraMixin {
   double y = 0;
   double value = 0;
 
-  QuadNode.internal()
-      : data = null,
-        isInternal = true {
+  QuadNode.internal() : data = null, isInternal = true {
     children = List.filled(4, null);
   }
 
@@ -653,5 +746,12 @@ final class _StackFrame<T> {
 
   _StackFrame(this.node, this.x0, this.y0, this.x1, this.y1);
 
-  _StackFrame.of(this.node, this.x0, this.y0, this.x1, this.y1, [this.visited = false]);
+  _StackFrame.of(
+    this.node,
+    this.x0,
+    this.y0,
+    this.x1,
+    this.y1, [
+    this.visited = false,
+  ]);
 }

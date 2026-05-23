@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:d_util/d_util.dart';
 import 'package:dart_graph/dart_graph.dart';
 
 final class ContainsUtil {
@@ -32,14 +31,22 @@ final class ContainsUtil {
     Angle end = (start + sweepAngle).normalized;
     bool angleInSweep;
     if (sweepAngle.radians >= 0) {
-      angleInSweep = start <= end ? (angle >= start && angle <= end) : (angle >= start || angle <= end);
+      angleInSweep = start <= end
+          ? (angle >= start && angle <= end)
+          : (angle >= start || angle <= end);
     } else {
-      angleInSweep = start >= end ? (angle <= start && angle >= end) : (angle <= start || angle >= end);
+      angleInSweep = start >= end
+          ? (angle <= start && angle >= end)
+          : (angle <= start || angle >= end);
     }
     return angleInSweep;
   }
 
-  static bool circleContainsPoint({required Offset point, required double radius, Offset center = Offset.zero}) {
+  static bool circleContainsPoint({
+    required Offset point,
+    required double radius,
+    Offset center = Offset.zero,
+  }) {
     final dx = point.dx - center.dx;
     final dy = point.dy - center.dy;
     return dx * dx + dy * dy <= radius * radius;
@@ -51,15 +58,16 @@ final class ContainsUtil {
     double tolerance = 2.0,
     int samplePoints = 100,
   }) {
+    final toleranceSq = tolerance * tolerance;
     for (final metric in metrics) {
-      for (int i = 0; i <= samplePoints; i++) {
-        final t = i / samplePoints;
+      final steps = math.max(samplePoints, (metric.length / tolerance).ceil());
+      for (int i = 0; i <= steps; i++) {
+        final t = i / steps;
         final pos = metric.getTangentForOffset(metric.length * t)?.position;
         if (pos != null) {
           final dx = (pos.dx - point.dx);
           final dy = (pos.dy - point.dy);
-          final distance = math.sqrt(dx * dx + dy * dy);
-          if (distance <= tolerance) {
+          if (dx * dx + dy * dy <= toleranceSq) {
             return true;
           }
         }
@@ -68,7 +76,12 @@ final class ContainsUtil {
     return false;
   }
 
-  static bool pointOnSegment(Offset p, Offset a, Offset b, {double epsilon = 1e-10}) {
+  static bool pointOnSegment(
+    Offset p,
+    Offset a,
+    Offset b, {
+    double epsilon = 1e-10,
+  }) {
     double cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
     if (cross.abs() > epsilon) return false;
     double dot = (p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y);
@@ -78,7 +91,13 @@ final class ContainsUtil {
   }
 
   static bool pointIsOnArc(
-      Offset p, Offset center, double innerRadius, double outerRadius, Angle startAngle, Angle endAngle) {
+    Offset p,
+    Offset center,
+    double innerRadius,
+    double outerRadius,
+    Angle startAngle,
+    Angle endAngle,
+  ) {
     num disSquared = pow(p.dx - center.dx, 2) + pow(p.dy - center.dy, 2);
     num irSquared = pow(innerRadius, 2);
     num orSquared = pow(outerRadius, 2);
@@ -86,7 +105,10 @@ final class ContainsUtil {
     if (disSquared < irSquared || disSquared > orSquared) {
       return false;
     }
-    Angle angle = atan2(p.dy - center.dy, p.dx - center.dx).asRadians.normalized;
+    Angle angle = atan2(
+      p.dy - center.dy,
+      p.dx - center.dx,
+    ).asRadians.normalized;
     if (startAngle <= endAngle) {
       return angle >= startAngle && angle <= endAngle;
     } else {
@@ -100,7 +122,9 @@ final class ContainsUtil {
     for (int i = 0; i < polygon.length; j = i++) {
       if (((polygon[i].dy > p.dy) != (polygon[j].dy > p.dy)) &&
           (p.dx <
-              (polygon[j].dx - polygon[i].dx) * (p.dy - polygon[i].dy) / (polygon[j].dy - polygon[i].dy) +
+              (polygon[j].dx - polygon[i].dx) *
+                      (p.dy - polygon[i].dy) /
+                      (polygon[j].dy - polygon[i].dy) +
                   polygon[i].dx)) {
         inside = !inside;
       }
