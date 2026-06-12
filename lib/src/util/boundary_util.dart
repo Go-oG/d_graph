@@ -137,17 +137,15 @@ final class BoundsUtil {
   ) {
     final sa = _norm0ToTau(startAngle.radians);
     final a = _norm0ToTau(angleRad);
-    final sweep = sweepAngle.normalized.radians;
+    final sweep = sweepAngle.radians;
     final sAbs = sweep.abs();
     if (sAbs <= 1e-12) return false;
-    final end = _norm0ToTau(sa + sweep);
     if (sweep >= 0) {
-      if (sa <= end) return a >= sa && a <= end;
-      return a >= sa || a <= end;
-    } else {
-      if (end <= sa) return a >= end && a <= sa;
-      return a >= end || a <= sa;
+      if (sAbs >= _tau - 1e-12) return true;
+      return _norm0ToTau(a - sa) <= sAbs + 1e-12;
     }
+    if (sAbs >= _tau - 1e-12) return true;
+    return _norm0ToTau(sa - a) <= sAbs + 1e-12;
   }
 
   static double _norm0ToTau(double a) {

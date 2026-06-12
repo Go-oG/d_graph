@@ -9,6 +9,7 @@ class Arc extends BasicGeometry {
   static final zero = Arc();
   static const _cornerMin = 0.5;
   static const _innerMin = 0.01;
+  static const _minAdjustedSweep = 1e-9;
 
   @override
   final Offset center;
@@ -75,14 +76,14 @@ class Arc extends BasicGeometry {
 
   @override
   Path onBuildPath() {
-    if (sweepAngle.radians.abs() <= 1e-5) {
+    if (outRadius <= 0 || isEmpty || sweepAngle.radians.abs() <= 1e-5) {
       return Path();
     }
     final double ir = innerRadius <= 0.001 ? 0 : innerRadius;
     final double or = outRadius;
     final bool clockwise = sweepAngle.radians >= 0;
     final int direction = clockwise ? 1 : -1;
-    if (sweepAngle.isFull) {
+    if (_isFullSweep(sweepAngle)) {
       if (innerRadius <= 0.001) {
         return _buildCircle(center, startAngle, or, direction);
       }
@@ -117,7 +118,7 @@ class Arc extends BasicGeometry {
   }
 
   Rect _onBuildBound() {
-    return Rect.fromCircle(center: center, radius: outRadius.toDouble());
+    return Rect.fromCircle(center: center, radius: outRadius);
   }
 
   Offset centroid() {
@@ -221,17 +222,21 @@ class Arc extends BasicGeometry {
   }
 
   bool _angleContains(Angle aStart, Angle aEnd, Angle bStart, Angle bEnd) {
-    final pi2 = m.pi * 2;
-    aStart = aStart % pi2;
-    aEnd = aEnd % pi2;
-    bStart = bStart % pi2;
-    bEnd = bEnd % pi2;
-
-    if (aEnd >= aStart) {
-      return (bStart >= aStart && bEnd <= aEnd);
-    } else {
-      return (bStart >= aStart || bEnd <= aEnd);
+    final aParts = _angleRanges(aStart, aEnd);
+    final bParts = _angleRanges(bStart, bEnd);
+    for (final b in bParts) {
+      var covered = false;
+      for (final a in aParts) {
+        if (b.$1 >= a.$1 - 1e-10 && b.$2 <= a.$2 + 1e-10) {
+          covered = true;
+          break;
+        }
+      }
+      if (!covered) {
+        return false;
+      }
     }
+    return true;
   }
 
   bool _containsCircle(double rCircle, double x, double y) {
@@ -290,12 +295,12 @@ class Arc extends BasicGeometry {
     final path = Path();
     path.addArc(
       Rect.fromCircle(center: center, radius: or),
-      0,
+      startAngle.radians,
       2 * pi * direction,
     );
     path.addArc(
       Rect.fromCircle(center: center, radius: ir),
-      0,
+      startAngle.radians,
       -2 * pi * direction,
     );
     path.close();
@@ -468,7 +473,7 @@ class Arc extends BasicGeometry {
       );
     } else {
       path.moveTo2(CoordUtil.circlePoint(or, osa, center: center));
-      if (outSweep.radians > 1e-6) {
+      if (outSweep.radians.abs() > 1e-6) {
         path.arcTo2(outRect, osa, outSweep, false);
       }
     }
@@ -518,7 +523,7 @@ class Arc extends BasicGeometry {
       );
     } else {
       path.lineTo2(CoordUtil.circlePoint(ir, iea, center: center));
-      if (inSweep.radians > 1e-6) {
+      if (inSweep.radians.abs() > 1e-6) {
         path.arcTo2(inRect, iea, -inSweep, false);
       }
     }
@@ -534,8 +539,7 @@ class Arc extends BasicGeometry {
     Angle padAngle,
     double maxRadius,
   ) {
-    List<Angle> il = [startAngle, startAngle + sweepAngle];
-    il = _offsetAngle(ir, startAngle, sweepAngle, padAngle, maxRadius);
+    final il = _offsetAngle(ir, startAngle, sweepAngle, padAngle, maxRadius);
     List<Angle> ol = _offsetAngle(
       or,
       startAngle,
@@ -569,13 +573,44 @@ class Arc extends BasicGeometry {
 
     if (sw > 0 && end < start) {
       final mid = (sa + sa + sw) / 2;
-      start = end = mid;
+      start = mid - _minAdjustedSweep / 2;
+      end = mid + _minAdjustedSweep / 2;
     } else if (sw < 0 && end > start) {
       final mid = (sa + sa + sw) / 2;
-      start = end = mid;
+      start = mid + _minAdjustedSweep / 2;
+      end = mid - _minAdjustedSweep / 2;
     }
 
     return [Angle.radians(start), Angle.radians(end)];
+  }
+
+  static bool _isFullSweep(Angle sweepAngle) =>
+      (sweepAngle.radians.abs() - 2 * pi).abs() <= 1e-9;
+
+  static List<(double, double)> _angleRanges(Angle start, Angle end) {
+    const eps = 1e-10;
+    final rawSweep = end.radians - start.radians;
+    if (rawSweep.abs() >= 2 * pi - eps) {
+      return const [(0, 2 * pi)];
+    }
+
+    final s = _normalizeAngle(start.radians);
+    final e = _normalizeAngle(end.radians);
+    if ((e - s).abs() <= eps) {
+      return [(s, s)];
+    }
+    if (e >= s) {
+      return [(s, e)];
+    }
+    return [(s, 2 * pi), (0, e)];
+  }
+
+  static double _normalizeAngle(double angle) {
+    var value = angle % (2 * pi);
+    if (value < 0) {
+      value += 2 * pi;
+    }
+    return value;
   }
 
   ///计算切点位置

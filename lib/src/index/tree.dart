@@ -9,19 +9,19 @@ class Tree<T> {
   TreeNode<T>? _root;
 
   ///存放全部的节点
-  final Map<T, TreeNode<T>> _nodeMap = {};
+  final Map<T, LinkedHashSet<TreeNode<T>>> _nodeMap = {};
 
   ///存放叶子节点
-  final Map<T, TreeNode<T>> _leafMap = {};
+  final Map<T, LinkedHashSet<TreeNode<T>>> _leafMap = {};
 
   ///按深度存放节点
   final Map<int, Set<TreeNode<T>>> _depthNodeMap = {};
 
   TreeNode<T>? get root => _root;
 
-  Iterable<T> get allData => _nodeMap.keys;
+  Iterable<T> get allData => _nodes.map((node) => node.data);
 
-  Iterable<TreeNode<T>> get leaves => _leafMap.values;
+  Iterable<TreeNode<T>> get leaves => _leafMap.values.expand((nodes) => nodes);
 
   bool get isEmpty => _nodeMap.isEmpty;
 
@@ -29,7 +29,11 @@ class Tree<T> {
 
   Tree();
 
-  TreeNode<T>? getNode(T data) => _nodeMap[data];
+  Iterable<TreeNode<T>> get _nodes => _nodeMap.values.expand((nodes) => nodes);
+
+  TreeNode<T>? getNode(T data) => _firstNode(_nodeMap[data]);
+
+  List<TreeNode<T>> getNodes(T data) => _nodeMap[data]?.toList() ?? [];
 
   TreeNode<T>? getParent(T value) => getNode(value)?.parent;
 
@@ -37,25 +41,24 @@ class Tree<T> {
   /// [data] 新节点数据。
   /// return: 新创建的节点
   TreeNode<T> add(T? parentValue, T data) {
-    if (_nodeMap.containsKey(data)) {
-      throw ArgumentError('Tree already contains data: $data');
-    }
-
     TreeNode<T>? parentNode;
-    int depth = 0;
 
     if (parentValue != null) {
-      parentNode = _nodeMap[parentValue];
+      parentNode = getNode(parentValue);
       if (parentNode == null) {
         throw StateError('Parent node not found: $parentValue');
       }
-      depth = parentNode.depth + 1;
     } else {
       if (_root != null) {
         throw StateError('Root already exists.');
       }
     }
 
+    return _addNode(parentNode, data);
+  }
+
+  TreeNode<T> _addNode(TreeNode<T>? parentNode, T data) {
+    final depth = parentNode == null ? 0 : parentNode.depth + 1;
     final newNode = TreeNode._(data, depth);
     newNode._tree = this;
     newNode._parent = parentNode;
@@ -63,16 +66,14 @@ class Tree<T> {
     newNode._height = 0;
     if (parentNode != null) {
       parentNode._addChild(newNode);
-      if (_leafMap.containsKey(parentNode.data)) {
-        _leafMap.remove(parentNode.data);
-      }
+      _removeLeafIndex(parentNode);
       _increaseDescendantCount(parentNode, 1);
       _invalidateHeightOnly(parentNode);
     } else {
       _root = newNode;
     }
-    _nodeMap[data] = newNode;
-    _leafMap[data] = newNode;
+    _addNodeIndex(newNode);
+    _addLeafIndex(newNode);
     _depthNodeMap.putIfAbsent(depth, () => <TreeNode<T>>{}).add(newNode);
 
     return newNode;
@@ -105,14 +106,14 @@ class Tree<T> {
       tmp = tmp.parent;
     }
 
-    _leafMap.remove(newParent.data);
+    _removeLeafIndex(newParent);
 
     oldParent._removeChild(node);
     newParent._addChild(node);
     node._parent = newParent;
 
     if (oldParent.isLeaf) {
-      _leafMap[oldParent.data] = oldParent;
+      _addLeafIndex(oldParent);
     }
 
     _invalidateAncestors(oldParent);
@@ -135,15 +136,19 @@ class Tree<T> {
 
   /// 移除节点及其所有后代
   void remove(T data) {
-    final node = _nodeMap[data];
+    final node = getNode(data);
     if (node == null) return;
+    _removeNode(node);
+  }
+
+  void _removeNode(TreeNode<T> node) {
     final int removedCount = 1 + node.descendantCount;
     final parent = node.parent;
 
     if (parent != null) {
       parent._removeChild(node);
       if (parent.isLeaf) {
-        _leafMap[parent.data] = parent;
+        _addLeafIndex(parent);
       }
       _increaseDescendantCount(parent, -removedCount);
       _invalidateHeightOnly(parent);
@@ -152,14 +157,14 @@ class Tree<T> {
     }
 
     recursiveCleanup(TreeNode<T> node) {
-      _nodeMap.remove(node.data);
+      _removeNodeIndex(node);
       _depthNodeMap[node.depth]?.remove(node);
       if (_depthNodeMap[node.depth]?.isEmpty ?? false) {
         _depthNodeMap.remove(node.depth);
       }
 
       if (node.isLeaf) {
-        _leafMap.remove(node.data);
+        _removeLeafIndex(node);
       }
       node._tree = null;
       if (!node.isLeaf) {
@@ -174,20 +179,22 @@ class Tree<T> {
 
   /// 根据条件移除子树 [where] 返回 true 则移除该节点及其子树
   void removeSubtreesWhere(bool Function(TreeNode<T>) where) {
-    List<T> toRemove = [];
+    List<TreeNode<T>> toRemove = [];
     final queue = Queue<TreeNode<T>>();
     if (_root != null) queue.add(_root!);
     while (queue.isNotEmpty) {
       final node = queue.removeFirst();
       if (where(node)) {
-        toRemove.add(node.data);
+        toRemove.add(node);
       } else {
         queue.addAll(node.children);
       }
     }
 
-    for (var data in toRemove) {
-      remove(data);
+    for (var node in toRemove) {
+      if (node._tree == this) {
+        _removeNode(node);
+      }
     }
   }
 
@@ -197,10 +204,15 @@ class Tree<T> {
     while (changed) {
       changed = false;
       final currentLeaves = _leafMap.values.toList();
-      for (var leaf in currentLeaves) {
-        if (where(leaf)) {
-          remove(leaf.data);
-          changed = true;
+      for (var leaves in currentLeaves) {
+        for (var leaf in leaves.toList()) {
+          if (leaf._tree != this) {
+            continue;
+          }
+          if (where(leaf)) {
+            _removeNode(leaf);
+            changed = true;
+          }
         }
       }
     }
@@ -216,19 +228,19 @@ class Tree<T> {
   int get maxDepth {
     if (_root == null) return 0;
     int maxD = 0;
-    for (var leaf in _leafMap.values) {
+    for (var leaf in leaves) {
       maxD = max(maxD, leaf.depth);
     }
     return maxD;
   }
 
-  int get childrenCount => _nodeMap.length;
+  int get childrenCount => _nodes.length;
 
-  bool contains(T data) => _nodeMap.containsKey(data);
+  bool contains(T data) => _nodeMap[data]?.isNotEmpty ?? false;
 
   List<TreeNode<T>> getNodesAtDepth(int depth, {bool needOrder = false}) {
     if (!needOrder) {
-      return _nodeMap.values.where((n) => n.depth == depth).toList();
+      return _nodes.where((n) => n.depth == depth).toList();
     }
 
     List<TreeNode<T>> result = [];
@@ -258,18 +270,17 @@ class Tree<T> {
 
     Tree<T> newTree = Tree<T>();
 
-    final queue = Queue<TreeNode<T>>();
-    queue.add(startNode);
+    final queue = Queue<(TreeNode<T>, TreeNode<T>)>();
 
-    newTree.add(null, startNode.data);
+    final newRoot = newTree._addNode(null, startNode.data);
+    queue.add((startNode, newRoot));
 
     while (queue.isNotEmpty) {
-      final curr = queue.removeFirst();
-      final currInNewTree = newTree.getNode(curr.data)!;
+      final (source, targetParent) = queue.removeFirst();
 
-      for (var child in curr.children) {
-        newTree.add(currInNewTree.data, child.data);
-        queue.add(child);
+      for (var child in source.children) {
+        final copiedChild = newTree._addNode(targetParent, child.data);
+        queue.add((child, copiedChild));
       }
     }
     return newTree;
@@ -280,6 +291,10 @@ class Tree<T> {
     final nodeB = getNode(dataB);
     if (nodeA == null || nodeB == null) return null;
 
+    return _minCommonAncestorOf(nodeA, nodeB);
+  }
+
+  TreeNode<T>? _minCommonAncestorOf(TreeNode<T> nodeA, TreeNode<T> nodeB) {
     TreeNode<T>? p1 = nodeA;
     TreeNode<T>? p2 = nodeB;
     int d1 = p1.depth;
@@ -300,15 +315,63 @@ class Tree<T> {
     return p1;
   }
 
+  TreeNode<T>? _firstNode(LinkedHashSet<TreeNode<T>>? nodes) {
+    if (nodes == null || nodes.isEmpty) {
+      return null;
+    }
+    return nodes.first;
+  }
+
+  void _addNodeIndex(TreeNode<T> node) {
+    _nodeMap
+        .putIfAbsent(node.data, () => LinkedHashSet<TreeNode<T>>.identity())
+        .add(node);
+  }
+
+  void _removeNodeIndex(TreeNode<T> node) {
+    final nodes = _nodeMap[node.data];
+    if (nodes == null) {
+      return;
+    }
+    nodes.remove(node);
+    if (nodes.isEmpty) {
+      _nodeMap.remove(node.data);
+    }
+  }
+
+  void _addLeafIndex(TreeNode<T> node) {
+    _leafMap
+        .putIfAbsent(node.data, () => LinkedHashSet<TreeNode<T>>.identity())
+        .add(node);
+  }
+
+  void _removeLeafIndex(TreeNode<T> node) {
+    final nodes = _leafMap[node.data];
+    if (nodes == null) {
+      return;
+    }
+    nodes.remove(node);
+    if (nodes.isEmpty) {
+      _leafMap.remove(node.data);
+    }
+  }
+
   List<TreeNode<T>> findPath(T sourceData, T targetData) {
     final startNode = getNode(sourceData);
     final endNode = getNode(targetData);
 
     if (startNode == null || endNode == null) return [];
 
+    return _findPathBetween(startNode, endNode);
+  }
+
+  List<TreeNode<T>> _findPathBetween(
+    TreeNode<T> startNode,
+    TreeNode<T> endNode,
+  ) {
     if (startNode == endNode) return [startNode];
 
-    final lca = minCommonAncestor(sourceData, targetData);
+    final lca = _minCommonAncestorOf(startNode, endNode);
 
     if (lca == null) return [];
 
@@ -344,13 +407,13 @@ class Tree<T> {
   }
 
   List<TreeNode<T>> search(bool Function(TreeNode<T>) where) {
-    return _nodeMap.values.where(where).toList();
+    return _nodes.where(where).toList();
   }
 
   TreeNode<T>? find(bool Function(TreeNode<T>) where) => _root?.find(where);
 
   TreeNode<T>? findFirst(bool Function(TreeNode<T>) where) {
-    for (var node in _nodeMap.values) {
+    for (var node in _nodes) {
       if (where(node)) return node;
     }
     return null;
@@ -553,7 +616,7 @@ class TreeNode<T> {
     if (_tree == null || target._tree != _tree) {
       return [];
     }
-    return _tree!.findPath(data, target.data);
+    return _tree!._findPathBetween(this, target);
   }
 
   @override
@@ -874,12 +937,13 @@ extension TreeExt<T> on Tree<T> {
 
     Tree<T> leftTree = Tree<T>();
     Tree<T> rightTree = Tree<T>();
-    leftTree.add(null, _root!.data);
-    rightTree.add(null, _root!.data);
+    final leftRoot = leftTree._addNode(null, _root!.data);
+    final rightRoot = rightTree._addNode(null, _root!.data);
 
     for (int i = 0; i < children.length; i++) {
       final targetTree = (i < leftCount) ? leftTree : rightTree;
-      _copyBranchTo(children[i], targetTree, _root!.data);
+      final targetRoot = (i < leftCount) ? leftRoot : rightRoot;
+      _copyBranchTo(children[i], targetTree, targetRoot);
     }
 
     return [leftTree, rightTree];
@@ -888,22 +952,26 @@ extension TreeExt<T> on Tree<T> {
   void _copyBranchTo(
     TreeNode<T> sourceNode,
     Tree<T> targetTree,
-    T targetParentData,
+    TreeNode<T> targetParent,
   ) {
-    targetTree.add(targetParentData, sourceNode.data);
+    final copiedNode = targetTree._addNode(targetParent, sourceNode.data);
     for (var child in sourceNode.children) {
-      _copyBranchTo(child, targetTree, sourceNode.data);
+      _copyBranchTo(child, targetTree, copiedNode);
     }
   }
 
   List<Tree<T>> splitBy(bool Function(TreeNode<T>) belongsToLeft) {
     if (_root == null) return [Tree<T>(), Tree<T>()];
-    Tree<T> leftTree = Tree<T>()..add(null, _root!.data);
-    Tree<T> rightTree = Tree<T>()..add(null, _root!.data);
+    Tree<T> leftTree = Tree<T>();
+    Tree<T> rightTree = Tree<T>();
+    final leftRoot = leftTree._addNode(null, _root!.data);
+    final rightRoot = rightTree._addNode(null, _root!.data);
 
     for (var child in _root!.children) {
-      final targetTree = belongsToLeft(child) ? leftTree : rightTree;
-      _copyBranchTo(child, targetTree, _root!.data);
+      final useLeft = belongsToLeft(child);
+      final targetTree = useLeft ? leftTree : rightTree;
+      final targetRoot = useLeft ? leftRoot : rightRoot;
+      _copyBranchTo(child, targetTree, targetRoot);
     }
     return [leftTree, rightTree];
   }

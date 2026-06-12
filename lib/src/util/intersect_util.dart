@@ -24,9 +24,11 @@ final class IntersectUtil {
     bool closePoly1 = true,
     bool closePoly2 = true,
   }) {
+    if (polygon1.isEmpty || polygon2.isEmpty) return false;
+
     final rect1 = _computeBoundingBox(polygon1);
     final rect2 = _computeBoundingBox(polygon2);
-    if (!rect1.overlaps(rect2)) return false;
+    if (!rectsIntersect(rect1, rect2)) return false;
 
     final gf = geomFactory;
     final p1 = gf.createPolygon5(polygon1, closePoly1);
@@ -34,33 +36,36 @@ final class IntersectUtil {
     return p1.intersects(p2);
   }
 
-  static bool intersectWithLine(
-    Offset p1,
-    Offset p2,
-    Offset q1,
-    Offset q2, {
-    double eps = _defaultEpsilon,
-  }) {
-    if (math.max(p1.dx, p2.dx) < math.min(q1.dx, q2.dx) ||
-        math.max(q1.dx, q2.dx) < math.min(p1.dx, p2.dx) ||
-        math.max(p1.dy, p2.dy) < math.min(q1.dy, q2.dy) ||
-        math.max(q1.dy, q2.dy) < math.min(p1.dy, p2.dy)) {
+  static bool intersectWithLine(Offset p1, Offset p2, Offset q1, Offset q2, {double eps = _defaultEpsilon}) {
+    if (math.max(p1.dx, p2.dx) < math.min(q1.dx, q2.dx) - eps ||
+        math.max(q1.dx, q2.dx) < math.min(p1.dx, p2.dx) - eps ||
+        math.max(p1.dy, p2.dy) < math.min(q1.dy, q2.dy) - eps ||
+        math.max(q1.dy, q2.dy) < math.min(p1.dy, p2.dy) - eps) {
       return false;
     }
 
     final r = p2 - p1;
     final s = q2 - q1;
+    final rLenSq = r.distanceSquared;
+    final sLenSq = s.distanceSquared;
+    if (rLenSq <= eps * eps && sLenSq <= eps * eps) {
+      return (p1 - q1).distanceSquared <= eps * eps;
+    }
+    if (rLenSq <= eps * eps) {
+      return ContainsUtil.pointOnSegment(p1, q1, q2, epsilon: eps);
+    }
+    if (sLenSq <= eps * eps) {
+      return ContainsUtil.pointOnSegment(q1, p1, p2, epsilon: eps);
+    }
+
     final rxs = _crossProduct(r, s);
     final qpxr = _crossProduct(q1 - p1, r);
 
     if (rxs.abs() <= eps) {
       if (qpxr.abs() <= eps) {
-        final rDotr = r.dx * r.dx + r.dy * r.dy;
-        if (rDotr <= eps) return false;
-
         final q1p1 = q1 - p1;
-        double t0 = (q1p1.dx * r.dx + q1p1.dy * r.dy) / rDotr;
-        double t1 = t0 + (s.dx * r.dx + s.dy * r.dy) / rDotr;
+        double t0 = (q1p1.dx * r.dx + q1p1.dy * r.dy) / rLenSq;
+        double t1 = t0 + (s.dx * r.dx + s.dy * r.dy) / rLenSq;
 
         if (t0 > t1) {
           final temp = t0;
@@ -88,41 +93,63 @@ final class IntersectUtil {
     double epsilon = _defaultEpsilon,
   }) {
     final sectorBounds = Rect.fromCircle(center: center, radius: outerRadius);
-    if (!rect.overlaps(sectorBounds)) return false;
+    if (!rectsIntersect(rect, sectorBounds, epsilon: epsilon)) return false;
 
     final twoPi = math.pi * 2;
     double normalize(double angle) => (angle % twoPi + twoPi) % twoPi;
+
+    final rawSweep = (endAngleRad - startAngleRad).abs();
+    if (rawSweep < epsilon) return false;
 
     final normStart = normalize(startAngleRad);
     final normEnd = normalize(endAngleRad);
 
     double sweep = normEnd - normStart;
     if (sweep < 0) sweep += twoPi;
-    if (sweep < 1e-5) sweep = twoPi;
+    if (rawSweep >= twoPi - epsilon) sweep = twoPi;
 
     bool isAngleBetween(double target) {
+      if (sweep >= twoPi - epsilon) return true;
       double diff = normalize(target) - normStart;
       if (diff < 0) diff += twoPi;
       return diff <= sweep + epsilon;
     }
 
-    final corners = [
-      rect.topLeft,
-      rect.topRight,
-      rect.bottomRight,
-      rect.bottomLeft,
-    ];
+    final corners = [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
 
     for (final p in corners) {
       final v = p - center;
       final d2 = v.distanceSquared;
-      if (d2 >= math.pow(innerRadius - epsilon, 2) &&
-          d2 <= math.pow(outerRadius + epsilon, 2)) {
+      if (d2 >= math.pow(innerRadius - epsilon, 2) && d2 <= math.pow(outerRadius + epsilon, 2)) {
         if (isAngleBetween(math.atan2(v.dy, v.dx))) return true;
       }
     }
 
-    if (rect.contains(center) && innerRadius <= epsilon) return true;
+    if (ContainsUtil.rectContainsPoint(rect, center, epsilon) && innerRadius <= epsilon) {
+      return true;
+    }
+
+    Offset pointOnArc(double radius, double angle) {
+      return center + Offset(math.cos(angle), math.sin(angle)) * radius;
+    }
+
+    final midAngle = normStart + sweep / 2;
+    final midRadius = (innerRadius + outerRadius) / 2;
+    final sectorPoints = [
+      pointOnArc(outerRadius, normStart),
+      pointOnArc(outerRadius, normEnd),
+      pointOnArc(outerRadius, midAngle),
+      if (innerRadius > epsilon) pointOnArc(innerRadius, normStart),
+      if (innerRadius > epsilon) pointOnArc(innerRadius, normEnd),
+      if (innerRadius > epsilon) pointOnArc(innerRadius, midAngle),
+      if (midRadius > epsilon) pointOnArc(midRadius, normStart),
+      if (midRadius > epsilon) pointOnArc(midRadius, normEnd),
+      if (midRadius > epsilon) pointOnArc(midRadius, midAngle),
+    ];
+    for (final point in sectorPoints) {
+      if (ContainsUtil.rectContainsPoint(rect, point, epsilon)) return true;
+    }
+
     final edges = [
       [corners[0], corners[1]],
       [corners[1], corners[2]],
@@ -166,47 +193,29 @@ final class IntersectUtil {
     double radius, {
     double eps = _defaultEpsilon,
   }) {
-    return crossPointsLineWithCircle(
-      start,
-      end,
-      center,
-      radius,
-      eps: eps,
-    ).isNotEmpty;
+    final radiusSq = radius * radius;
+    if ((start - center).distanceSquared <= radiusSq + eps || (end - center).distanceSquared <= radiusSq + eps) {
+      return true;
+    }
+    return crossPointsLineWithCircle(start, end, center, radius, eps: eps).isNotEmpty;
   }
 
-  static bool intersectCircleWithRect(
-    Offset circleCenter,
-    double radius,
-    Rect rect,
-  ) {
+  static bool intersectCircleWithRect(Offset circleCenter, double radius, Rect rect) {
     double closestX = circleCenter.dx.clamp(rect.left, rect.right);
     double closestY = circleCenter.dy.clamp(rect.top, rect.bottom);
 
     double dx = circleCenter.dx - closestX;
     double dy = circleCenter.dy - closestY;
 
-    return (dx * dx + dy * dy) <= (radius * radius);
+    return (dx * dx + dy * dy) <= (radius * radius) + _defaultEpsilon;
   }
 
-  static Offset? crossPointWithLines(
-    Offset p1,
-    Offset p2,
-    Offset q1,
-    Offset q2,
-  ) {
-    final d =
-        (p1.dx - p2.dx) * (q1.dy - q2.dy) - (p1.dy - p2.dy) * (q1.dx - q2.dx);
+  static Offset? crossPointWithLines(Offset p1, Offset p2, Offset q1, Offset q2) {
+    final d = (p1.dx - p2.dx) * (q1.dy - q2.dy) - (p1.dy - p2.dy) * (q1.dx - q2.dx);
     if (d.abs() < _defaultEpsilon) return null;
 
-    final t =
-        ((p1.dx - q1.dx) * (q1.dy - q2.dy) -
-            (p1.dy - q1.dy) * (q1.dx - q2.dx)) /
-        d;
-    final u =
-        -((p1.dx - p2.dx) * (p1.dy - q1.dy) -
-            (p1.dy - p2.dy) * (p1.dx - q1.dx)) /
-        d;
+    final t = ((p1.dx - q1.dx) * (q1.dy - q2.dy) - (p1.dy - q1.dy) * (q1.dx - q2.dx)) / d;
+    final u = -((p1.dx - p2.dx) * (p1.dy - q1.dy) - (p1.dy - p2.dy) * (p1.dx - q1.dx)) / d;
 
     if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
       return Offset(p1.dx + t * (p2.dx - p1.dx), p1.dy + t * (p2.dy - p1.dy));
@@ -214,12 +223,7 @@ final class IntersectUtil {
     return null;
   }
 
-  static List<Offset> crossPointsWithCircle(
-    Offset c1,
-    double r1,
-    Offset c2,
-    double r2,
-  ) {
+  static List<Offset> crossPointsWithCircle(Offset c1, double r1, Offset c2, double r2) {
     final dx = c2.dx - c1.dx;
     final dy = c2.dy - c1.dy;
     final d2 = dx * dx + dy * dy;
@@ -251,9 +255,11 @@ final class IntersectUtil {
     bool closePoly1 = true,
     bool closePoly2 = true,
   }) {
+    if (polygon1.isEmpty || polygon2.isEmpty) return [];
+
     final rect1 = _computeBoundingBox(polygon1);
     final rect2 = _computeBoundingBox(polygon2);
-    if (!rect1.overlaps(rect2)) return [];
+    if (!rectsIntersect(rect1, rect2)) return [];
 
     final gf = geomFactory;
     final p1 = gf.createPolygon5(polygon1, closePoly1);
@@ -271,10 +277,12 @@ final class IntersectUtil {
     required double r,
     bool closePoly = true,
   }) {
+    if (polygon.isEmpty) return [];
+
     final polyBounds = _computeBoundingBox(polygon);
     final circleBounds = Rect.fromCircle(center: center, radius: r);
 
-    if (!polyBounds.overlaps(circleBounds)) {
+    if (!rectsIntersect(polyBounds, circleBounds)) {
       return [];
     }
 
@@ -319,8 +327,7 @@ final class IntersectUtil {
     final t2 = (-b + discriminant) / (2 * a);
     if (t1 >= -eps && t1 <= 1 + eps) result.add(p1 + d * t1);
     if (t2 >= -eps && t2 <= 1 + eps) {
-      if (result.isEmpty ||
-          (result.last - (p1 + d * t2)).distanceSquared > eps) {
+      if (result.isEmpty || (result.last - (p1 + d * t2)).distanceSquared > eps) {
         result.add(p1 + d * t2);
       }
     }
@@ -328,6 +335,13 @@ final class IntersectUtil {
   }
 
   static double _crossProduct(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
+
+  static bool rectsIntersect(Rect a, Rect b, {double epsilon = _defaultEpsilon}) {
+    return a.left <= b.right + epsilon &&
+        a.right + epsilon >= b.left &&
+        a.top <= b.bottom + epsilon &&
+        a.bottom + epsilon >= b.top;
+  }
 
   static Rect _computeBoundingBox(List<Offset> points) {
     if (points.isEmpty) return Rect.zero;
