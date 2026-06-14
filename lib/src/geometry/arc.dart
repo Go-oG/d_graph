@@ -7,7 +7,7 @@ import 'package:dts/dts.dart' show Geometry;
 
 class Arc extends BasicGeometry {
   static final zero = Arc();
-  static const _epsilon = 1e-12;
+  static const _epsilon = 1e-9;
   static const _tau = 2 * pi;
 
   @override
@@ -19,6 +19,16 @@ class Arc extends BasicGeometry {
   final double cornerRadius;
   final Angle padAngle;
   late final double padRadius;
+
+  late final annularSector = AnnularSector(
+    center: center,
+    innerRadius: innerRadius,
+    outerRadius: outRadius,
+    startAngle: startAngle,
+    endAngle: endAngle,
+  );
+
+  late final List<Curve> curveList = List.unmodifiable(_curveList());
 
   Arc({
     this.innerRadius = 0,
@@ -62,51 +72,21 @@ class Arc extends BasicGeometry {
     );
   }
 
-  late final annularSector = AnnularSector(
-    center: center,
-    innerRadius: innerRadius,
-    outerRadius: outRadius,
-    startAngle: startAngle,
-    endAngle: endAngle,
-  );
-
   @override
-  late final Rect bbox = _onBuildBound();
-
+  late final Rect bbox = BoundsUtil.arcBounds(
+    center: center,
+    ir: innerRadius,
+    or: outRadius,
+    startAngle: startAngle,
+    sweepAngle: sweepAngle,
+  );
   @override
   late final double length = annularSector.perimeter;
-
   @override
   late final double area = annularSector.area;
 
   @override
-  Path onBuildPath() {
-    if (outRadius <= 0 || isEmpty || sweepAngle.radians.abs() <= 1e-5) {
-      return Path();
-    }
-    final double ir = innerRadius <= 0.001 ? 0 : innerRadius;
-    final double or = outRadius;
-    final bool clockwise = sweepAngle.radians >= 0;
-    final int direction = clockwise ? 1 : -1;
-    if (_isFullSweep(sweepAngle)) {
-      if (innerRadius <= 0.001) {
-        return _buildCircle(center, startAngle, or, direction);
-      }
-      return _buildHollowCircle(center, startAngle, ir, or, direction);
-    }
-
-    return _buildArc(center, startAngle, sweepAngle, ir, or, cornerRadius, padAngle, padRadius);
-  }
-
-  Rect _onBuildBound() {
-    return BoundsUtil.arcBounds(
-      center: center,
-      ir: innerRadius,
-      or: outRadius,
-      startAngle: startAngle,
-      sweepAngle: sweepAngle,
-    );
-  }
+  Path onBuildPath() => _curvesToPath(curveList);
 
   Offset centroid() {
     var r = (innerRadius + outRadius) / 2;
@@ -119,6 +99,27 @@ class Arc extends BasicGeometry {
   Angle get endAngle => (startAngle + sweepAngle);
 
   bool get isEmpty => sweepAngle.isZero || (outRadius - innerRadius).abs() == 0;
+
+  List<Curve> _curveList() {
+    if (outRadius <= 0 || isEmpty || sweepAngle.radians.abs() <= 1e-5) {
+      return const [];
+    }
+    final double ir = innerRadius <= 0.001 ? 0 : innerRadius;
+    final double or = outRadius;
+    final bool clockwise = sweepAngle.radians >= 0;
+    final int direction = clockwise ? 1 : -1;
+    if (sweepAngle.isFull) {
+      if (innerRadius <= 0.001) {
+        return CurveUtil.fromArc(center, or, startAngle, (2 * pi * direction).asRadians);
+      }
+      return [
+        ...CurveUtil.fromArc(center, or, startAngle, (2 * pi * direction).asRadians),
+        ...CurveUtil.fromArc(center, ir, startAngle, (-2 * pi * direction).asRadians),
+      ];
+    }
+
+    return _buildArcCurves(center, startAngle, sweepAngle, ir, or, cornerRadius, padAngle, padRadius);
+  }
 
   @override
   String toString() {
@@ -229,29 +230,32 @@ class Arc extends BasicGeometry {
   Geometry buildGeometry() =>
       AnnularSectorFactory.createAnnularSector(center, innerRadius, outRadius, startAngle, endAngle);
 
-  ///普通圆形
-  static Path _buildCircle(Offset center, Angle startAngle, double or, int direction) {
-    final piOffset = pi * direction;
-    Path path = Path();
-    Offset o1 = CoordUtil.circlePoint(or, startAngle, center: center);
-    Rect orRect = Rect.fromCircle(center: center, radius: or);
-    path.moveTo(o1.dx, o1.dy);
-    path.arcTo(orRect, startAngle.radians, piOffset, false);
-    path.arcTo(orRect, startAngle.radians + piOffset, piOffset, false);
-    path.close();
-    return path;
-  }
-
-  ///空心圆形
-  static Path _buildHollowCircle(Offset center, Angle startAngle, double ir, double or, int direction) {
+  static Path _curvesToPath(List<Curve> curves) {
     final path = Path();
-    path.addArc(Rect.fromCircle(center: center, radius: or), startAngle.radians, 2 * pi * direction);
-    path.addArc(Rect.fromCircle(center: center, radius: ir), startAngle.radians, -2 * pi * direction);
-    path.close();
+    Offset? current;
+    var hasSubPath = false;
+    for (final curve in curves) {
+      if (current == null || !current.equal(curve.start)) {
+        if (hasSubPath) {
+          path.close();
+        }
+        path.moveTo(curve.start.dx, curve.start.dy);
+        hasSubPath = true;
+      }
+      if (curve.isLine) {
+        path.lineTo(curve.end.dx, curve.end.dy);
+      } else {
+        path.cubicTo(curve.c1.dx, curve.c1.dy, curve.c2.dx, curve.c2.dy, curve.end.dx, curve.end.dy);
+      }
+      current = curve.end;
+    }
+    if (hasSubPath) {
+      path.close();
+    }
     return path;
   }
 
-  static Path _buildArc(
+  static List<Curve> _buildArcCurves(
     Offset center,
     Angle startAngle,
     Angle sweepAngle,
@@ -261,7 +265,49 @@ class Arc extends BasicGeometry {
     Angle padAngle,
     double padRadius,
   ) {
-    final path = Path();
+    final curves = <Curve>[];
+    Offset? first;
+    Offset? current;
+
+    void moveTo(Offset p) {
+      first ??= p;
+      current = p;
+    }
+
+    void lineTo(Offset p) {
+      final from = current;
+      if (from == null) {
+        moveTo(p);
+        return;
+      }
+      if (!from.equal(p)) {
+        curves.add(CurveUtil.ofLine(from, p));
+      }
+      current = p;
+    }
+
+    void arcToCircle(Offset arcCenter, double radius, double start, double end, bool counterClockwise) {
+      if (radius <= _epsilon) {
+        return;
+      }
+      final sweep = _sweepRadians(start, end, counterClockwise);
+      if (sweep.abs() <= _epsilon) {
+        return;
+      }
+      final arcStart = CoordUtil.circlePoint(radius, start.asRadians, center: arcCenter);
+      final from = current;
+      if (from == null) {
+        moveTo(arcStart);
+      } else if (!from.equal(arcStart)) {
+        lineTo(arcStart);
+      }
+      final arcCurves = CurveUtil.fromArc(arcCenter, radius, start.asRadians, sweep.asRadians);
+      curves.addAll(arcCurves);
+      current = arcCurves.isEmpty
+          ? CoordUtil.circlePoint(radius, (start + sweep).asRadians, center: arcCenter)
+          : arcCurves.last.end;
+    }
+
     final a0 = startAngle.radians;
     final a1 = (startAngle + sweepAngle).radians;
     final da = (a1 - a0).abs();
@@ -340,7 +386,7 @@ class Arc extends BasicGeometry {
     }
 
     if (da1 <= _epsilon) {
-      path.moveTo(center.dx + x01, center.dy + y01);
+      moveTo(center.translate(x01, y01));
     } else if (rc1 > _epsilon) {
       final p11 = CoordUtil.circlePoint(or, a11.asRadians);
       final p00 = CoordUtil.circlePoint(ir, a00.asRadians);
@@ -351,49 +397,27 @@ class Arc extends BasicGeometry {
       final t0 = _cornerTangents(x00, y00, x01, y01, or, rc1, clockwise);
       final t1 = _cornerTangents(x11, y11, x10, y10, or, rc1, clockwise);
 
-      path.moveTo(center.dx + t0.cx + t0.x01, center.dy + t0.cy + t0.y01);
+      moveTo(center.translate(t0.cx + t0.x01, t0.cy + t0.y01));
       if (rc1 < rc) {
-        _arcToCircle(
-          path,
-          center.translate(t0.cx, t0.cy),
-          rc1,
-          atan2(t0.y01, t0.x01),
-          atan2(t1.y01, t1.x01),
-          !clockwise,
-        );
+        arcToCircle(center.translate(t0.cx, t0.cy), rc1, atan2(t0.y01, t0.x01), atan2(t1.y01, t1.x01), !clockwise);
       } else {
-        _arcToCircle(
-          path,
-          center.translate(t0.cx, t0.cy),
-          rc1,
-          atan2(t0.y01, t0.x01),
-          atan2(t0.y11, t0.x11),
-          !clockwise,
-        );
-        _arcToCircle(
-          path,
+        arcToCircle(center.translate(t0.cx, t0.cy), rc1, atan2(t0.y01, t0.x01), atan2(t0.y11, t0.x11), !clockwise);
+        arcToCircle(
           center,
           or,
           atan2(t0.cy + t0.y11, t0.cx + t0.x11),
           atan2(t1.cy + t1.y11, t1.cx + t1.x11),
           !clockwise,
         );
-        _arcToCircle(
-          path,
-          center.translate(t1.cx, t1.cy),
-          rc1,
-          atan2(t1.y11, t1.x11),
-          atan2(t1.y01, t1.x01),
-          !clockwise,
-        );
+        arcToCircle(center.translate(t1.cx, t1.cy), rc1, atan2(t1.y11, t1.x11), atan2(t1.y01, t1.x01), !clockwise);
       }
     } else {
-      path.moveTo(center.dx + x01, center.dy + y01);
-      _arcToCircle(path, center, or, a01, a11, !clockwise);
+      moveTo(center.translate(x01, y01));
+      arcToCircle(center, or, a01, a11, !clockwise);
     }
 
     if (ir <= _epsilon || da0 <= _epsilon) {
-      path.lineTo(center.dx + x10, center.dy + y10);
+      lineTo(center.translate(x10, y10));
     } else if (rc0 > _epsilon) {
       final p11 = CoordUtil.circlePoint(or, a11.asRadians);
       final p00 = CoordUtil.circlePoint(ir, a00.asRadians);
@@ -404,65 +428,29 @@ class Arc extends BasicGeometry {
       final t0 = _cornerTangents(x10, y10, x11, y11, ir, -rc0, clockwise);
       final t1 = _cornerTangents(x01, y01, x00, y00, ir, -rc0, clockwise);
 
-      path.lineTo(center.dx + t0.cx + t0.x01, center.dy + t0.cy + t0.y01);
+      lineTo(center.translate(t0.cx + t0.x01, t0.cy + t0.y01));
       if (rc0 < rc) {
-        _arcToCircle(
-          path,
-          center.translate(t0.cx, t0.cy),
-          rc0,
-          atan2(t0.y01, t0.x01),
-          atan2(t1.y01, t1.x01),
-          !clockwise,
-        );
+        arcToCircle(center.translate(t0.cx, t0.cy), rc0, atan2(t0.y01, t0.x01), atan2(t1.y01, t1.x01), !clockwise);
       } else {
-        _arcToCircle(
-          path,
-          center.translate(t0.cx, t0.cy),
-          rc0,
-          atan2(t0.y01, t0.x01),
-          atan2(t0.y11, t0.x11),
-          !clockwise,
-        );
-        _arcToCircle(
-          path,
+        arcToCircle(center.translate(t0.cx, t0.cy), rc0, atan2(t0.y01, t0.x01), atan2(t0.y11, t0.x11), !clockwise);
+        arcToCircle(
           center,
           ir,
           atan2(t0.cy + t0.y11, t0.cx + t0.x11),
           atan2(t1.cy + t1.y11, t1.cx + t1.x11),
           clockwise,
         );
-        _arcToCircle(
-          path,
-          center.translate(t1.cx, t1.cy),
-          rc0,
-          atan2(t1.y11, t1.x11),
-          atan2(t1.y01, t1.x01),
-          !clockwise,
-        );
+        arcToCircle(center.translate(t1.cx, t1.cy), rc0, atan2(t1.y11, t1.x11), atan2(t1.y01, t1.x01), !clockwise);
       }
     } else {
-      _arcToCircle(path, center, ir, a10, a00, clockwise);
+      arcToCircle(center, ir, a10, a00, clockwise);
     }
 
-    path.close();
-    return path;
-  }
-
-  static bool _isFullSweep(Angle sweepAngle) => sweepAngle.radians.abs() >= 2 * pi - 1e-9;
-
-  static void _arcToCircle(
-    Path path,
-    Offset center,
-    double radius,
-    double startAngle,
-    double endAngle,
-    bool counterClockwise,
-  ) {
-    final sweep = _sweepRadians(startAngle, endAngle, counterClockwise);
-    if (sweep.abs() <= _epsilon) {
-      return;
+    final closeTarget = first;
+    if (closeTarget != null) {
+      lineTo(closeTarget);
     }
-    path.arcTo(Rect.fromCircle(center: center, radius: radius), startAngle, sweep, false);
+    return curves;
   }
 
   static double _sweepRadians(double startAngle, double endAngle, bool counterClockwise) {
@@ -550,29 +538,20 @@ class Arc extends BasicGeometry {
   }
 
   static List<(double, double)> _angleRanges(Angle start, Angle end) {
-    const eps = 1e-10;
     final rawSweep = end.radians - start.radians;
-    if (rawSweep.abs() >= 2 * pi - eps) {
+    if (rawSweep.abs() >= 2 * pi - _epsilon) {
       return const [(0, 2 * pi)];
     }
 
-    final s = _normalizeAngle(start.radians);
-    final e = _normalizeAngle(end.radians);
-    if ((e - s).abs() <= eps) {
+    final s = start.normalized.radians;
+    final e = end.normalized.radians;
+    if ((e - s).abs() <= _epsilon) {
       return [(s, s)];
     }
     if (e >= s) {
       return [(s, e)];
     }
     return [(s, 2 * pi), (0, e)];
-  }
-
-  static double _normalizeAngle(double angle) {
-    var value = angle % (2 * pi);
-    if (value < 0) {
-      value += 2 * pi;
-    }
-    return value;
   }
 }
 

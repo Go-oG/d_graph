@@ -5,50 +5,27 @@ import 'package:dart_graph/dart_graph.dart';
 import 'package:vector_math/vector_math.dart';
 
 class Curve {
-  static final empty = Curve(
-    start: Offset.zero,
-    end: Offset.zero,
-    c1: Offset.zero,
-    c2: Offset.zero,
-  );
+  static final empty = Curve(start: Offset.zero, end: Offset.zero, c1: Offset.zero, c2: Offset.zero);
   final Offset start;
   final Offset end;
   final Offset c1;
   final Offset c2;
-  final CubicBezier bezier;
-  late final Rect boundary;
+  late final CubicBezier bezier = CubicBezier([
+    Vector2(start.dx, start.dy),
+    Vector2(c1.dx, c1.dy),
+    Vector2(c2.dx, c2.dy),
+    Vector2(end.dx, end.dy),
+  ]);
+  late final Rect boundary = _box();
   late final EvenSpacer2 evenSpacer = EvenSpacer2(bezier);
 
-  Curve({
-    required this.start,
-    required this.end,
-    required this.c1,
-    required this.c2,
-  }) : bezier = CubicBezier([
-         Vector2(start.dx, start.dy),
-         Vector2(c1.dx, c1.dy),
-         Vector2(c2.dx, c2.dy),
-         Vector2(end.dx, end.dy),
-       ]) {
-    final box = bezier.boundingBox;
-    boundary = Rect.fromPoints(
-      Offset(box.min.x, box.min.y),
-      Offset(box.max.x, box.max.y),
-    );
-  }
+  Curve({required this.start, required this.end, required this.c1, required this.c2});
 
-  Curve.of(this.start, this.c1, this.c2, this.end)
-    : bezier = CubicBezier([
-        Vector2(start.dx, start.dy),
-        Vector2(c1.dx, c1.dy),
-        Vector2(c2.dx, c2.dy),
-        Vector2(end.dx, end.dy),
-      ]) {
+  Curve.of(this.start, this.c1, this.c2, this.end);
+
+  Rect _box() {
     final box = bezier.boundingBox;
-    boundary = Rect.fromPoints(
-      Offset(box.min.x, box.min.y),
-      Offset(box.max.x, box.max.y),
-    );
+    return Rect.fromPoints(Offset(box.min.x, box.min.y), Offset(box.max.x, box.max.y));
   }
 
   Path? _path;
@@ -71,11 +48,7 @@ class Curve {
     if (identical(this, other)) {
       return true;
     }
-    return other is Curve &&
-        other.c1 == c1 &&
-        other.start == start &&
-        other.end == end &&
-        other.c2 == c2;
+    return other is Curve && other.c1 == c1 && other.start == start && other.end == end && other.c2 == c2;
   }
 
   Offset pointAt(double t) {
@@ -96,16 +69,8 @@ class Curve {
       return [this];
     }
 
-    final b1 = bezier
-        .leftSubcurveAt(t)
-        .points
-        .map((e) => Offset(e.x, e.y))
-        .toList();
-    final b2 = bezier
-        .rightSubcurveAt(t)
-        .points
-        .map((e) => Offset(e.x, e.y))
-        .toList();
+    final b1 = bezier.leftSubcurveAt(t).points.map((e) => Offset(e.x, e.y)).toList();
+    final b2 = bezier.rightSubcurveAt(t).points.map((e) => Offset(e.x, e.y)).toList();
 
     return [
       Curve(start: b1[0], c1: b1[1], c2: b1[2], end: b1[3]),

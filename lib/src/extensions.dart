@@ -231,7 +231,7 @@ extension OffsetExt on Offset {
     return Offset(2.0 * qdx - dx, 2.0 * qdy - dy);
   }
 
-  bool equal(Offset other, [double accurate = 1e-6]) {
+  bool equal(Offset other, [double accurate = 1e-9]) {
     var x = other.dx - dx;
     var y = other.dy - dy;
     return x.abs() <= accurate && y.abs() <= accurate;
