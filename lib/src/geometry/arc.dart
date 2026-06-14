@@ -7,9 +7,8 @@ import 'package:dts/dts.dart' show Geometry;
 
 class Arc extends BasicGeometry {
   static final zero = Arc();
-  static const _cornerMin = 0.5;
-  static const _innerMin = 0.01;
-  static const _minAdjustedSweep = 1e-9;
+  static const _epsilon = 1e-12;
+  static const _tau = 2 * pi;
 
   @override
   final Offset center;
@@ -31,12 +30,10 @@ class Arc extends BasicGeometry {
     this.center = Offset.zero,
     double? padRadius,
   }) {
-    if (padRadius != null && padRadius >= outRadius) {
+    if (padRadius != null && padRadius >= 0) {
       this.padRadius = padRadius;
     } else {
-      this.padRadius = m.sqrt(
-        innerRadius * innerRadius + outRadius * outRadius,
-      );
+      this.padRadius = m.sqrt(innerRadius * innerRadius + outRadius * outRadius);
     }
     if (innerRadius > outRadius) {
       throw ("参数违法");
@@ -65,6 +62,14 @@ class Arc extends BasicGeometry {
     );
   }
 
+  late final annularSector = AnnularSector(
+    center: center,
+    innerRadius: innerRadius,
+    outerRadius: outRadius,
+    startAngle: startAngle,
+    endAngle: endAngle,
+  );
+
   @override
   late final Rect bbox = _onBuildBound();
 
@@ -90,35 +95,17 @@ class Arc extends BasicGeometry {
       return _buildHollowCircle(center, startAngle, ir, or, direction);
     }
 
-    //修正corner
-    var corner = m.min(cornerRadius, (or - ir) / 2);
-    double dd = or * sweepAngle.abs.radians;
-    corner = m.min(dd / 2, corner);
-    corner = m.max(corner, 0);
-    if (corner <= 0.001) {
-      corner = 0;
-    }
-
-    ///普通扇形
-    if (ir <= _innerMin) {
-      return _buildNormalArc(center, startAngle, sweepAngle, or, corner);
-    }
-
-    /// 空心扇形
-    return _buildHollowArc(
-      center,
-      startAngle,
-      sweepAngle,
-      ir,
-      or,
-      corner,
-      padAngle,
-      padRadius,
-    );
+    return _buildArc(center, startAngle, sweepAngle, ir, or, cornerRadius, padAngle, padRadius);
   }
 
   Rect _onBuildBound() {
-    return Rect.fromCircle(center: center, radius: outRadius);
+    return BoundsUtil.arcBounds(
+      center: center,
+      ir: innerRadius,
+      or: outRadius,
+      startAngle: startAngle,
+      sweepAngle: sweepAngle,
+    );
   }
 
   Offset centroid() {
@@ -141,16 +128,7 @@ class Arc extends BasicGeometry {
 
   @override
   int get hashCode {
-    return Object.hash(
-      innerRadius,
-      outRadius,
-      startAngle,
-      sweepAngle,
-      cornerRadius,
-      center,
-      padAngle,
-      padRadius,
-    );
+    return Object.hash(innerRadius, outRadius, startAngle, sweepAngle, cornerRadius, center, padAngle, padRadius);
   }
 
   @override
@@ -181,8 +159,7 @@ class Arc extends BasicGeometry {
   }
 
   @override
-  bool containsPoint(Offset p, {double eps = 1e-9}) =>
-      annularSector.contains(p, epsilon: eps);
+  bool containsPoint(Offset p, {double eps = 1e-9}) => annularSector.contains(p, epsilon: eps);
 
   @override
   bool isOverlap(BasicGeometry geom, {double eps = 1e-9}) {
@@ -205,14 +182,6 @@ class Arc extends BasicGeometry {
 
     return super.isOverlap(geom, eps: eps);
   }
-
-  late final AnnularSector annularSector = AnnularSector(
-    center: center,
-    innerRadius: innerRadius,
-    outerRadius: outRadius,
-    startAngle: startAngle,
-    endAngle: endAngle,
-  );
 
   bool _containsArc(Arc arc) {
     if (arc.innerRadius < innerRadius || arc.outRadius > outRadius) {
@@ -241,16 +210,15 @@ class Arc extends BasicGeometry {
 
   bool _containsCircle(double rCircle, double x, double y) {
     final A = annularSector;
-    final dx = x - center.x;
-    final dy = y - center.y;
-    final dist = sqrt(dx * dx + dy * dy);
+    final polar = CoordUtil.pointToPolar(x, y, center);
+    final dist = polar.radius;
     if (dist - rCircle < A.innerRadius || dist + rCircle > A.outerRadius) {
       return false;
     }
     if (dist == 0) {
       return rCircle <= (A.outerRadius) && rCircle >= (A.innerRadius);
     }
-    final angleCenter = atan2(dy, dx).asRadians;
+    final angleCenter = polar.angle;
     final deltaAngle = asin(rCircle / dist).asRadians;
     final circleStart = angleCenter - deltaAngle;
     final circleEnd = angleCenter + deltaAngle;
@@ -258,21 +226,11 @@ class Arc extends BasicGeometry {
   }
 
   @override
-  Geometry buildGeometry() => AnnularSectorFactory.createAnnularSector(
-    center,
-    innerRadius,
-    outRadius,
-    startAngle,
-    endAngle,
-  );
+  Geometry buildGeometry() =>
+      AnnularSectorFactory.createAnnularSector(center, innerRadius, outRadius, startAngle, endAngle);
 
   ///普通圆形
-  static Path _buildCircle(
-    Offset center,
-    Angle startAngle,
-    double or,
-    int direction,
-  ) {
+  static Path _buildCircle(Offset center, Angle startAngle, double or, int direction) {
     final piOffset = pi * direction;
     Path path = Path();
     Offset o1 = CoordUtil.circlePoint(or, startAngle, center: center);
@@ -285,307 +243,311 @@ class Arc extends BasicGeometry {
   }
 
   ///空心圆形
-  static Path _buildHollowCircle(
+  static Path _buildHollowCircle(Offset center, Angle startAngle, double ir, double or, int direction) {
+    final path = Path();
+    path.addArc(Rect.fromCircle(center: center, radius: or), startAngle.radians, 2 * pi * direction);
+    path.addArc(Rect.fromCircle(center: center, radius: ir), startAngle.radians, -2 * pi * direction);
+    path.close();
+    return path;
+  }
+
+  static Path _buildArc(
     Offset center,
     Angle startAngle,
+    Angle sweepAngle,
     double ir,
     double or,
-    int direction,
+    double corner,
+    Angle padAngle,
+    double padRadius,
   ) {
     final path = Path();
-    path.addArc(
-      Rect.fromCircle(center: center, radius: or),
-      startAngle.radians,
-      2 * pi * direction,
-    );
-    path.addArc(
-      Rect.fromCircle(center: center, radius: ir),
-      startAngle.radians,
-      -2 * pi * direction,
-    );
+    final a0 = startAngle.radians;
+    final a1 = (startAngle + sweepAngle).radians;
+    final da = (a1 - a0).abs();
+    final clockwise = a1 > a0;
+    var a01 = a0;
+    var a11 = a1;
+    var a00 = a0;
+    var a10 = a1;
+    var da0 = da;
+    var da1 = da;
+    final ap = padAngle.radians / 2;
+    final rp = ap > _epsilon ? padRadius : 0.0;
+    final rc = m.min((or - ir).abs() / 2, m.max(0.0, corner));
+    var rc0 = rc;
+    var rc1 = rc;
+
+    if (rp > _epsilon) {
+      if (ir > _epsilon) {
+        var p0 = _safeAsin(rp / ir * sin(ap));
+        da0 -= p0 * 2;
+        if (da0 > _epsilon) {
+          p0 *= clockwise ? 1 : -1;
+          a00 += p0;
+          a10 -= p0;
+        } else {
+          da0 = 0;
+          a00 = a10 = (a0 + a1) / 2;
+        }
+      } else {
+        da0 = 0;
+      }
+      var p1 = _safeAsin(rp / or * sin(ap));
+      da1 -= p1 * 2;
+      if (da1 > _epsilon) {
+        p1 *= clockwise ? 1 : -1;
+        a01 += p1;
+        a11 -= p1;
+      } else {
+        da1 = 0;
+        a01 = a11 = (a0 + a1) / 2;
+      }
+    }
+
+    final p01 = CoordUtil.circlePoint(or, a01.asRadians);
+    final p10 = CoordUtil.circlePoint(ir, a10.asRadians);
+    final x01 = p01.dx;
+    final y01 = p01.dy;
+    final x10 = p10.dx;
+    final y10 = p10.dy;
+
+    if (rc > _epsilon) {
+      final p11 = CoordUtil.circlePoint(or, a11.asRadians);
+      final p00 = CoordUtil.circlePoint(ir, a00.asRadians);
+      final x11 = p11.dx;
+      final y11 = p11.dy;
+      final x00 = p00.dx;
+      final y00 = p00.dy;
+      final oc = _intersect(x01, y01, x00, y00, x11, y11, x10, y10);
+      if (da < pi && oc != null) {
+        final ax = x01 - oc.dx;
+        final ay = y01 - oc.dy;
+        final bx = x11 - oc.dx;
+        final by = y11 - oc.dy;
+        final dot = ax * bx + ay * by;
+        final al = sqrt(ax * ax + ay * ay);
+        final bl = sqrt(bx * bx + by * by);
+        final divisor = al * bl;
+        final kc = divisor <= _epsilon ? double.infinity : 1 / sin(_safeAcos(dot / divisor) / 2);
+        final lc = sqrt(oc.dx * oc.dx + oc.dy * oc.dy);
+        rc0 = m.max(0.0, m.min(rc, (ir - lc) / (kc - 1)));
+        rc1 = m.max(0.0, m.min(rc, (or - lc) / (kc + 1)));
+      } else if (da < pi) {
+        rc0 = 0.0;
+        rc1 = 0.0;
+      }
+    }
+
+    if (da1 <= _epsilon) {
+      path.moveTo(center.dx + x01, center.dy + y01);
+    } else if (rc1 > _epsilon) {
+      final p11 = CoordUtil.circlePoint(or, a11.asRadians);
+      final p00 = CoordUtil.circlePoint(ir, a00.asRadians);
+      final x11 = p11.dx;
+      final y11 = p11.dy;
+      final x00 = p00.dx;
+      final y00 = p00.dy;
+      final t0 = _cornerTangents(x00, y00, x01, y01, or, rc1, clockwise);
+      final t1 = _cornerTangents(x11, y11, x10, y10, or, rc1, clockwise);
+
+      path.moveTo(center.dx + t0.cx + t0.x01, center.dy + t0.cy + t0.y01);
+      if (rc1 < rc) {
+        _arcToCircle(
+          path,
+          center.translate(t0.cx, t0.cy),
+          rc1,
+          atan2(t0.y01, t0.x01),
+          atan2(t1.y01, t1.x01),
+          !clockwise,
+        );
+      } else {
+        _arcToCircle(
+          path,
+          center.translate(t0.cx, t0.cy),
+          rc1,
+          atan2(t0.y01, t0.x01),
+          atan2(t0.y11, t0.x11),
+          !clockwise,
+        );
+        _arcToCircle(
+          path,
+          center,
+          or,
+          atan2(t0.cy + t0.y11, t0.cx + t0.x11),
+          atan2(t1.cy + t1.y11, t1.cx + t1.x11),
+          !clockwise,
+        );
+        _arcToCircle(
+          path,
+          center.translate(t1.cx, t1.cy),
+          rc1,
+          atan2(t1.y11, t1.x11),
+          atan2(t1.y01, t1.x01),
+          !clockwise,
+        );
+      }
+    } else {
+      path.moveTo(center.dx + x01, center.dy + y01);
+      _arcToCircle(path, center, or, a01, a11, !clockwise);
+    }
+
+    if (ir <= _epsilon || da0 <= _epsilon) {
+      path.lineTo(center.dx + x10, center.dy + y10);
+    } else if (rc0 > _epsilon) {
+      final p11 = CoordUtil.circlePoint(or, a11.asRadians);
+      final p00 = CoordUtil.circlePoint(ir, a00.asRadians);
+      final x11 = p11.dx;
+      final y11 = p11.dy;
+      final x00 = p00.dx;
+      final y00 = p00.dy;
+      final t0 = _cornerTangents(x10, y10, x11, y11, ir, -rc0, clockwise);
+      final t1 = _cornerTangents(x01, y01, x00, y00, ir, -rc0, clockwise);
+
+      path.lineTo(center.dx + t0.cx + t0.x01, center.dy + t0.cy + t0.y01);
+      if (rc0 < rc) {
+        _arcToCircle(
+          path,
+          center.translate(t0.cx, t0.cy),
+          rc0,
+          atan2(t0.y01, t0.x01),
+          atan2(t1.y01, t1.x01),
+          !clockwise,
+        );
+      } else {
+        _arcToCircle(
+          path,
+          center.translate(t0.cx, t0.cy),
+          rc0,
+          atan2(t0.y01, t0.x01),
+          atan2(t0.y11, t0.x11),
+          !clockwise,
+        );
+        _arcToCircle(
+          path,
+          center,
+          ir,
+          atan2(t0.cy + t0.y11, t0.cx + t0.x11),
+          atan2(t1.cy + t1.y11, t1.cx + t1.x11),
+          clockwise,
+        );
+        _arcToCircle(
+          path,
+          center.translate(t1.cx, t1.cy),
+          rc0,
+          atan2(t1.y11, t1.x11),
+          atan2(t1.y01, t1.x01),
+          !clockwise,
+        );
+      }
+    } else {
+      _arcToCircle(path, center, ir, a10, a00, clockwise);
+    }
+
     path.close();
     return path;
   }
 
-  ///扇形
-  static Path _buildNormalArc(
+  static bool _isFullSweep(Angle sweepAngle) => sweepAngle.radians.abs() >= 2 * pi - 1e-9;
+
+  static void _arcToCircle(
+    Path path,
     Offset center,
-    Angle startAngle,
-    Angle sweepAngle,
-    double or,
-    double corner,
+    double radius,
+    double startAngle,
+    double endAngle,
+    bool counterClockwise,
   ) {
-    Path path = Path();
-    path.moveTo(center.dx, center.dy);
-    Rect orRect = Rect.fromCircle(center: center, radius: or);
-    if (corner <= _cornerMin) {
-      Offset o1 = CoordUtil.circlePoint(or, startAngle, center: center);
-      path.lineTo(o1.dx, o1.dy);
-      path.arcTo2(orRect, startAngle, sweepAngle, false);
-      path.close();
-      return path;
+    final sweep = _sweepRadians(startAngle, endAngle, counterClockwise);
+    if (sweep.abs() <= _epsilon) {
+      return;
     }
-
-    ///扇形外部有圆角
-    final Radius cr = Radius.circular(corner);
-    final endAngle = startAngle + sweepAngle;
-
-    final bool clockwise = sweepAngle.radians >= 0;
-    final lt = _computeCornerPoint(center, or, corner, startAngle, true, true);
-    final rt = _computeCornerPoint(center, or, corner, endAngle, false, true);
-    path.lineTo2(clockwise ? lt.p1 : rt.p2);
-    path.arcToPoint(
-      clockwise ? lt.p2 : rt.p1,
-      radius: cr,
-      largeArc: false,
-      clockwise: clockwise,
-    );
-
-    Angle a, b;
-    if (clockwise) {
-      a = lt.p2.angle(center);
-      b = rt.p1.angle(center);
-      if (b < a) {
-        b = b.add(2 * m.pi);
-      }
-    } else {
-      a = rt.p1.angle(center);
-      b = lt.p2.angle(center);
-      if (b > a) {
-        b = b.sub(2 * m.pi);
-      }
-    }
-    path.arcTo(orRect, a.radians, (b - a).radians, false);
-    path.arcToPoint(
-      clockwise ? rt.p2 : lt.p1,
-      radius: cr,
-      largeArc: false,
-      clockwise: clockwise,
-    );
-    path.close();
-    return path;
+    path.arcTo(Rect.fromCircle(center: center, radius: radius), startAngle, sweep, false);
   }
 
-  ///空心扇形
-  static Path _buildHollowArc(
-    Offset center,
-    Angle startAngle,
-    Angle sweepAngle,
-    double ir,
-    double or,
-    double corner,
-    Angle padAngle,
-    double padRadius,
-  ) {
-    final bool clockwise = sweepAngle.radians >= 0;
-    final Rect outRect = Rect.fromCircle(center: center, radius: or);
-    final Rect inRect = Rect.fromCircle(center: center, radius: ir);
-
-    Angle osa = startAngle;
-    Angle oea = startAngle + sweepAngle;
-    Angle isa = startAngle;
-    Angle iea = startAngle + sweepAngle;
-
-    ///修正存在angleGap时视觉上间隔不一致问题(只有innerRadius>0时有效)
-    if (padAngle.radians > 0 && ir > 0) {
-      final al = _adjustAngle(ir, or, startAngle, sweepAngle, padAngle, or);
-      isa = al[0];
-      iea = al[1];
-      osa = al[2];
-      oea = al[3];
+  static double _sweepRadians(double startAngle, double endAngle, bool counterClockwise) {
+    var delta = counterClockwise ? startAngle - endAngle : endAngle - startAngle;
+    while (delta < 0) {
+      delta += _tau;
     }
-    final outSweep = oea - osa;
-    final inSweep = iea - isa;
-
-    final Path path = Path();
-    if (corner <= _cornerMin) {
-      ///outer
-      path.moveTo2(CoordUtil.circlePoint(or, osa, center: center));
-      path.arcTo2(outRect, osa, outSweep, false);
-
-      ///inner
-      path.lineTo2(CoordUtil.circlePoint(ir, iea, center: center));
-      path.arcTo2(inRect, iea, -inSweep, false);
-      path.close();
-      return path;
-    }
-
-    ///计算外圆环和内圆环的最小corner
-    final num outLength = or * outSweep.radians.abs();
-    final num inLength = ir * inSweep.radians.abs();
-    double outCorner = corner;
-    double inCorner = corner;
-    if (corner * m.pi > outLength) {
-      outCorner = outLength / m.pi;
-    }
-    if (outSweep.radians.abs() <= 1e-6 || outCorner <= _cornerMin) {
-      outCorner = 0;
-    }
-    if (corner * m.pi > inLength) {
-      inCorner = inLength / m.pi;
-    }
-    if (inSweep.radians.abs() <= 1e-6 || inCorner <= _cornerMin) {
-      inCorner = 0;
-    }
-
-    ///外圈层
-    if (outCorner >= _cornerMin) {
-      final Radius radius = Radius.circular(outCorner);
-      final lt = _computeCornerPoint(
-        center,
-        or,
-        outCorner,
-        clockwise ? osa : oea,
-        true,
-        true,
-      );
-      final rt = _computeCornerPoint(
-        center,
-        or,
-        outCorner,
-        clockwise ? oea : osa,
-        false,
-        true,
-      );
-      path.moveTo2(clockwise ? lt.p1 : rt.p2);
-      path.arcToPoint(
-        clockwise ? lt.p2 : rt.p1,
-        radius: radius,
-        largeArc: false,
-        clockwise: clockwise,
-      );
-      Angle a, b;
-      a = (clockwise ? lt.p2 : rt.p1).angle(center);
-      b = (clockwise ? rt.p1 : lt.p2).angle(center);
-      if (clockwise && b < a) {
-        b = b.add(2 * m.pi);
-      }
-      if (!clockwise && b > a) {
-        a = a.add(2 * m.pi);
-      }
-      path.arcTo2(outRect, a, b - a, false);
-      path.lineTo2(clockwise ? rt.p1 : lt.p2);
-      path.arcToPoint(
-        clockwise ? rt.p2 : lt.p1,
-        radius: radius,
-        largeArc: false,
-        clockwise: clockwise,
-      );
-    } else {
-      path.moveTo2(CoordUtil.circlePoint(or, osa, center: center));
-      if (outSweep.radians.abs() > 1e-6) {
-        path.arcTo2(outRect, osa, outSweep, false);
-      }
-    }
-
-    ///内圈层
-    if (inCorner >= _cornerMin) {
-      final Radius radius = Radius.circular(inCorner);
-      final lb = _computeCornerPoint(
-        center,
-        ir,
-        inCorner,
-        clockwise ? isa : iea,
-        true,
-        false,
-      );
-      final rb = _computeCornerPoint(
-        center,
-        ir,
-        inCorner,
-        clockwise ? iea : isa,
-        false,
-        false,
-      );
-      path.lineTo2(clockwise ? rb.p1 : lb.p2);
-      path.arcToPoint(
-        clockwise ? rb.p2 : lb.p1,
-        radius: radius,
-        largeArc: false,
-        clockwise: clockwise,
-      );
-      Angle a, b;
-      a = (clockwise ? rb.p2 : lb.p1).angle(center);
-      b = (clockwise ? lb.p1 : rb.p2).angle(center);
-      if (clockwise && b > a) {
-        b = b.sub(2 * m.pi);
-      }
-      if (!clockwise && a > b) {
-        a = a.sub(2 * m.pi);
-      }
-      path.arcTo2(inRect, a, b - a, false);
-      path.lineTo2(clockwise ? lb.p1 : rb.p2);
-      path.arcToPoint(
-        clockwise ? lb.p2 : rb.p1,
-        radius: radius,
-        largeArc: false,
-        clockwise: clockwise,
-      );
-    } else {
-      path.lineTo2(CoordUtil.circlePoint(ir, iea, center: center));
-      if (inSweep.radians.abs() > 1e-6) {
-        path.arcTo2(inRect, iea, -inSweep, false);
-      }
-    }
-    path.close();
-    return path;
+    return counterClockwise ? -delta : delta;
   }
 
-  static List<Angle> _adjustAngle(
-    double ir,
-    double or,
-    Angle startAngle,
-    Angle sweepAngle,
-    Angle padAngle,
-    double maxRadius,
-  ) {
-    final il = _offsetAngle(ir, startAngle, sweepAngle, padAngle, maxRadius);
-    List<Angle> ol = _offsetAngle(
-      or,
-      startAngle,
-      sweepAngle,
-      padAngle,
-      maxRadius,
-    );
-    il.addAll(ol);
-    return il;
+  static double _safeAcos(double x) {
+    if (x > 1) {
+      return 0;
+    }
+    if (x < -1) {
+      return pi;
+    }
+    return acos(x);
   }
 
-  static List<Angle> _offsetAngle(
-    double r,
-    Angle startAngle,
-    Angle sweepAngle,
-    Angle padAngle,
-    double padRadius,
-  ) {
-    final sa = startAngle.radians;
-    final sw = sweepAngle.radians;
-    final pad = padAngle.radians;
-
-    if (pad == 0 || r == 0) {
-      return [startAngle, startAngle + sweepAngle];
+  static double _safeAsin(double x) {
+    if (x >= 1) {
+      return pi / 2;
     }
-
-    final outerPad = asin(((padRadius / r) * sin(pad / 2)).clamp(-1.0, 1.0));
-    final innerPad = asin(sin(pad / 2).clamp(-1.0, 1.0));
-    double start = sa + outerPad - innerPad;
-    double end = sa + sw - (outerPad - innerPad);
-
-    if (sw > 0 && end < start) {
-      final mid = (sa + sa + sw) / 2;
-      start = mid - _minAdjustedSweep / 2;
-      end = mid + _minAdjustedSweep / 2;
-    } else if (sw < 0 && end > start) {
-      final mid = (sa + sa + sw) / 2;
-      start = mid + _minAdjustedSweep / 2;
-      end = mid - _minAdjustedSweep / 2;
+    if (x <= -1) {
+      return -pi / 2;
     }
-
-    return [Angle.radians(start), Angle.radians(end)];
+    return asin(x);
   }
 
-  static bool _isFullSweep(Angle sweepAngle) =>
-      (sweepAngle.radians.abs() - 2 * pi).abs() <= 1e-9;
+  static Offset? _intersect(double x0, double y0, double x1, double y1, double x2, double y2, double x3, double y3) {
+    final x10 = x1 - x0;
+    final y10 = y1 - y0;
+    final x32 = x3 - x2;
+    final y32 = y3 - y2;
+    final t = y32 * x10 - x32 * y10;
+    if (t * t < _epsilon) {
+      return null;
+    }
+    final u = (x32 * (y0 - y2) - y32 * (x0 - x2)) / t;
+    return Offset(x0 + u * x10, y0 + u * y10);
+  }
+
+  static _CornerTangents _cornerTangents(
+    double x0,
+    double y0,
+    double x1,
+    double y1,
+    double r1,
+    double rc,
+    bool clockwise,
+  ) {
+    final x01 = x0 - x1;
+    final y01 = y0 - y1;
+    final lo = (clockwise ? rc : -rc) / sqrt(x01 * x01 + y01 * y01);
+    final ox = lo * y01;
+    final oy = -lo * x01;
+    final x11 = x0 + ox;
+    final y11 = y0 + oy;
+    final x10 = x1 + ox;
+    final y10 = y1 + oy;
+    final x00 = (x11 + x10) / 2;
+    final y00 = (y11 + y10) / 2;
+    final dx = x10 - x11;
+    final dy = y10 - y11;
+    final d2 = dx * dx + dy * dy;
+    final r = r1 - rc;
+    final d = x11 * y10 - x10 * y11;
+    final s = (dy < 0 ? -1 : 1) * sqrt(m.max(0, r * r * d2 - d * d));
+    var cx0 = (d * dy - dx * s) / d2;
+    var cy0 = (-d * dx - dy * s) / d2;
+    final cx1 = (d * dy + dx * s) / d2;
+    final cy1 = (-d * dx + dy * s) / d2;
+    final dx0 = cx0 - x00;
+    final dy0 = cy0 - y00;
+    final dx1 = cx1 - x00;
+    final dy1 = cy1 - y00;
+
+    if (dx0 * dx0 + dy0 * dy0 > dx1 * dx1 + dy1 * dy1) {
+      cx0 = cx1;
+      cy0 = cy1;
+    }
+
+    return _CornerTangents(cx: cx0, cy: cy0, x01: -ox, y01: -oy, x11: cx0 * (r1 / r - 1), y11: cy0 * (r1 / r - 1));
+  }
 
   static List<(double, double)> _angleRanges(Angle start, Angle end) {
     const eps = 1e-10;
@@ -612,69 +574,22 @@ class Arc extends BasicGeometry {
     }
     return value;
   }
-
-  ///计算切点位置
-  static _CornerOffset _computeCornerPoint(
-    Offset center,
-    num r,
-    double corner,
-    Angle angle,
-    bool left,
-    bool top,
-  ) {
-    _CornerOffset result = _CornerOffset();
-
-    final dis = (r + corner * (top ? -1 : 1.0)).abs();
-    final double x = sqrt(max(0.0, dis * dis - corner * corner));
-    Offset c = Offset(x, corner * (left ? 1 : -1));
-    result.center = c.translate(center.dx, center.dy);
-    Offset o1 = Offset(result.center.dx, center.dy);
-    Offset o2 = _computeCutPoint(center, r, result.center, corner);
-    if (left != top) {
-      Offset tmp = o1;
-      o1 = o2;
-      o2 = tmp;
-    }
-    result.p1 = o1;
-    result.p2 = o2;
-
-    ///旋转
-    result.center = result.center.rotate(angle, center: center);
-    result.p1 = result.p1.rotate(angle, center: center);
-    result.p2 = result.p2.rotate(angle, center: center);
-    return result;
-  }
-
-  ///计算两个圆相切时的切点坐标
-  static Offset _computeCutPoint(Offset c1, num r1, Offset c2, num r2) {
-    double dx = c1.dx - c2.dx;
-    double dy = c1.dy - c2.dy;
-    num r12 = r1 * r1;
-    num r22 = r2 * r2;
-
-    double d = m.sqrt(dx * dx + dy * dy);
-    if (d <= 1e-12) {
-      return c1;
-    }
-    double l = (r12 - r22 + d * d) / (2 * d);
-    double h2 = r12 - l * l;
-    double h;
-    if (h2.abs() <= 0.00001) {
-      h = 0;
-    } else {
-      h = m.sqrt(h2);
-    }
-
-    ///只需要交点1
-    double x1 = (c2.dx - c1.dx) * l / d + ((c2.dy - c1.dy) * h / d) + c1.dx;
-    double y1 = (c2.dy - c1.dy) * l / d - (c2.dx - c1.dx) * h / d + c1.dy;
-
-    return Offset(x1, y1);
-  }
 }
 
-final class _CornerOffset {
-  Offset center = Offset.zero;
-  Offset p1 = Offset.zero;
-  Offset p2 = Offset.zero;
+final class _CornerTangents {
+  final double cx;
+  final double cy;
+  final double x01;
+  final double y01;
+  final double x11;
+  final double y11;
+
+  const _CornerTangents({
+    required this.cx,
+    required this.cy,
+    required this.x01,
+    required this.y01,
+    required this.x11,
+    required this.y11,
+  });
 }
